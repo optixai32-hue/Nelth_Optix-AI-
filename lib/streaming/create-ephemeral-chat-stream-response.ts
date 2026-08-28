@@ -171,7 +171,11 @@ export async function createEphemeralChatStreamResponse(
         skillContext,
         imageAttachment,
         userQuery,
-        capabilities: { trivial }
+        capabilities: {
+          trivial,
+          needsSearch: caps.needsSearch,
+          needsImage: caps.needsImage
+        }
       })
 
       const modelId = `${model.providerId}:${model.id}`

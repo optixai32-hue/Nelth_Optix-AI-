@@ -243,7 +243,11 @@ export async function createChatStreamResponse(
         skillContext,
         imageAttachment,
         userQuery,
-        capabilities: { trivial }
+        capabilities: {
+          trivial,
+          needsSearch: caps.needsSearch,
+          needsImage: caps.needsImage
+        }
       })
 
       const messagesWithoutSpec = stripSpecFromMessages(messagesToModel)

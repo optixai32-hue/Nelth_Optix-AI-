@@ -320,7 +320,11 @@ export function createResearcher({
   /** Capability gate from the orchestrator. When `trivial` is set the request
    *  needs no skill and no external tool, so we arm NO tools — the model answers
    *  immediately without the search/fetch/image/document agent. */
-  capabilities?: { trivial?: boolean }
+  capabilities?: {
+    trivial?: boolean
+    needsSearch?: boolean
+    needsImage?: boolean
+  }
 }) {
   try {
     const currentDate = new Date().toLocaleString()
@@ -527,6 +531,16 @@ Requirements for the artifact:
       instructions,
       tools,
       activeTools: activeToolsList,
+      ...(capabilities?.needsSearch && activeToolsList.includes('search')
+        ? { toolChoice: { type: 'tool' as const, toolName: 'search' as const } }
+        : capabilities?.needsImage && activeToolsList.includes('generateImage')
+          ? {
+              toolChoice: {
+                type: 'tool' as const,
+                toolName: 'generateImage' as const
+              }
+            }
+          : {}),
       // Stop the loop as soon as an image has been generated so the model does
       // not start a second reasoning pass or keep elaborating. The image is
       // already shown by its own UI component.
