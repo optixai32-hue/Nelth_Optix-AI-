@@ -526,6 +526,13 @@ Requirements for the artifact:
     }
 
     // Create ToolLoopAgent with all configuration
+    const hasCompletedSearch = (steps: any[]) =>
+      steps.some(step =>
+        (step.toolCalls ?? []).some(
+          (call: any) => call.toolName === 'search'
+        )
+      )
+
     const agent = new ToolLoopAgent({
       model: getModel(model),
       instructions,
@@ -541,6 +548,13 @@ Requirements for the artifact:
               }
             }
           : {}),
+      prepareStep: ({ steps }) => {
+        if (!hasCompletedSearch(steps)) return {}
+        return {
+          activeTools: activeToolsList.filter(toolName => toolName !== 'search'),
+          toolChoice: 'auto' as const
+        }
+      },
       // Stop the loop as soon as an image has been generated so the model does
       // not start a second reasoning pass or keep elaborating. The image is
       // already shown by its own UI component.
