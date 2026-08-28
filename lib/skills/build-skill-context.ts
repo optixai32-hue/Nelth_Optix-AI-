@@ -29,7 +29,7 @@ import type {
  * This is the SKILL.md → operational-rules transformation: the model receives
  * directives it must satisfy in the code, not a document to read.
  */
-const EXECUTION_REQUIREMENTS_BY_SLUG: Record<string, string[]> = {
+export const EXECUTION_REQUIREMENTS_BY_SLUG: Record<string, string[]> = {
   'react-expert': [
     'Use appropriate component boundaries.',
     'Keep components focused and single-responsibility.',

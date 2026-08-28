@@ -20,6 +20,7 @@ import type { SearchMode } from '@/lib/types/search'
 import { getTextFromParts } from '@/lib/utils/message-utils'
 
 import { SkillEnforcementEngine } from './enforce'
+import { EXECUTION_REQUIREMENTS_BY_SLUG } from './build-skill-context'
 import type { SkillContextResult } from './types'
 import { validateGeneratedOutput } from './validate'
 import { stripEmojisFromCodeBlocks } from './ui-icon-validator'
@@ -80,17 +81,23 @@ function buildSkillReinforcePrompt(
   const skills = skillCtx.activated
     .map(a => {
       const reqs = a.validationRules.length ? a.validationRules : [a.objective]
-      return `- ${a.name} (${a.slug}):\n${reqs.map(r => `   • ${r}`).join('\n')}`
+      // Merge the curated, concrete execution requirements (when present) so the
+      // model is told EXACTLY what to do, not just the abstract objective. This
+      // is what makes the stepfun/Kilo thinking model genuinely APPLY the skill
+      // instead of echoing a generic version of it.
+      const curated = EXECUTION_REQUIREMENTS_BY_SLUG[a.slug]
+      const allReqs = curated && curated.length ? [...reqs, ...curated] : reqs
+      return `- ${a.name} (${a.slug}):\n${allReqs.map(r => `   • ${r}`).join('\n')}`
     })
     .join('\n')
   return `TASK: ${userQuery}
 
-Your previous answer did NOT clearly apply the ACTIVE SKILL(S). Rewrite the final result so it VISIBLY satisfies the requirements below — do not merely describe them, apply them directly.
+Your previous answer did NOT clearly apply the ACTIVE SKILL(S). Rewrite the final result so it VISIBLY satisfies the requirements below — do not merely describe them, apply them directly to the actual output (real code, real domain rules).
 
-ACTIVE SKILLS TO APPLY:
+ACTIVE SKILLS TO APPLY (each bullet is a MANDATORY execution constraint):
 ${skills}
 
-Return ONLY the improved final result.`
+Return ONLY the improved final result that demonstrably reflects every bullet above.`
 }
 
 /**
@@ -214,7 +221,11 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
       query: userQuery,
       slugs,
       bodies,
-      maxIterations: forceApply ? 1 : undefined
+      // The weak (Nelth-3.5) and thinking (Nelth-3.5 Thinking / stepfun) models
+      // both tend to produce a structurally-valid answer that ignores the skill's
+      // substance. Give the forced pass the same correction budget as a failed
+      // normal generation so it can re-refine until the skill is genuinely applied.
+      maxIterations: forceApply ? 2 : undefined
     })
 
     if (out.finalContent && out.finalContent.trim() && out.finalContent !== draft) {
