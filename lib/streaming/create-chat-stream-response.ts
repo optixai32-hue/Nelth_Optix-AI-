@@ -232,6 +232,9 @@ export async function createChatStreamResponse(
       const imageAttachment = message?.parts
         ? getImageAttachmentUrl(message.parts)
         : undefined
+      if (imageAttachment) {
+        console.log('[ImageEdit] reference image detected in chat message')
+      }
 
       const researchAgent = researcher({
         model: context.modelId,

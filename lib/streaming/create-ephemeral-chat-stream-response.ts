@@ -160,6 +160,9 @@ export async function createEphemeralChatStreamResponse(
       const imageAttachment = lastUserMessage?.parts
         ? getImageAttachmentUrl(lastUserMessage.parts)
         : undefined
+      if (imageAttachment) {
+        console.log('[ImageEdit] reference image detected in guest message')
+      }
 
       const researchAgent = researcher({
         model: `${model.providerId}:${model.id}`,

@@ -114,14 +114,17 @@ export function getImageAttachmentUrl(parts?: unknown): string | undefined {
   if (!Array.isArray(parts)) return undefined
   for (const part of parts as any[]) {
     if (!part || typeof part !== 'object') continue
-    const url = typeof part.url === 'string' ? part.url : ''
+    const url =
+      typeof part.url === 'string'
+        ? part.url
+        : typeof part.data === 'string'
+          ? part.data
+          : typeof part.content === 'string'
+            ? part.content
+            : ''
     const mediaType =
       typeof part.mediaType === 'string' ? part.mediaType : ''
-    if (
-      part.type === 'file' &&
-      mediaType.startsWith('image/') &&
-      url
-    ) {
+    if (part.type === 'file' && mediaType.startsWith('image/') && url) {
       return url
     }
     if (part.type === 'image' && url) return url
