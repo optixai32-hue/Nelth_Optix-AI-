@@ -15,6 +15,7 @@ import { BaseSearchProvider } from './base'
 // are retried a few times and only "real" browser headers are sent.
 
 const DDG_HTML_URL = 'https://html.duckduckgo.com/html/'
+const DDG_READER_URL = 'https://r.jina.ai/http://html.duckduckgo.com/html/'
 const DDG_IA_URL =
   'https://api.duckduckgo.com/?format=json&no_html=1&skip_disambig=1&no_redirect=1'
 const DDG_HOME = 'https://duckduckgo.com/'
@@ -119,6 +120,42 @@ function parseHtmlResults(html: string, limit: number): WebResult[] {
   return results
 }
 
+function parseReaderResults(markdown: string, limit: number): WebResult[] {
+  const resultRe = /\n## \[([^\]]+)\]\(([^)]+)\)\n([\s\S]*?)(?=\n## |$)/g
+  const results: WebResult[] = []
+  let match: RegExpExecArray | null
+
+  while ((match = resultRe.exec(markdown)) !== null && results.length < limit) {
+    const url = unwrapUrl(match[2])
+    const title = cleanText(match[1])
+    const snippet = cleanText(
+      match[3]
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+        .replace(/\[[^\]]*\]\([^)]*\)/g, '')
+        .replace(/[*_`>#]/g, '')
+    )
+    if (!title || !url || url.includes('duckduckgo.com/html')) continue
+    results.push({ title, url, snippet })
+  }
+  return results
+}
+
+async function ddgReaderSearch(
+  query: string,
+  limit = MAX_RESULTS
+): Promise<WebResult[]> {
+  try {
+    const res = await fetch(
+      `${DDG_READER_URL}?q=${encodeURIComponent(query)}&kl=wt-wt`,
+      { signal: AbortSignal.timeout(12000) }
+    )
+    if (!res.ok) return []
+    return parseReaderResults(await res.text(), limit)
+  } catch {
+    return []
+  }
+}
+
 // Query the DuckDuckGo HTML endpoint, retrying past anti-bot decoy pages.
 async function ddgHtmlSearch(
   query: string,
@@ -142,7 +179,8 @@ async function ddgHtmlSearch(
     }
     if (attempt < attempts - 1) await sleep(300 * (attempt + 1))
   }
-  return ddgInstantResults(query, limit)
+  const readerResults = await ddgReaderSearch(query, limit)
+  return readerResults.length ? readerResults : ddgInstantResults(query, limit)
 }
 
 interface InstantAnswerTopic {
