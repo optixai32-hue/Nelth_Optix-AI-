@@ -182,7 +182,7 @@ export async function createEphemeralChatStreamResponse(
         userQuery,
         capabilities: {
           trivial,
-          needsSearch: false,
+          needsSearch: caps.needsSearch && !preloadedSearchContext,
           needsImage: caps.needsImage || Boolean(imageAttachment)
         }
       })

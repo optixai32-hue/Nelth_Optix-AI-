@@ -254,7 +254,7 @@ export async function createChatStreamResponse(
         userQuery,
         capabilities: {
           trivial,
-          needsSearch: false,
+          needsSearch: caps.needsSearch && !preloadedSearchContext,
           needsImage: caps.needsImage || Boolean(imageAttachment)
         }
       })
