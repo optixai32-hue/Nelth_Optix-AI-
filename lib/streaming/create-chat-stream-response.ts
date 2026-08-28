@@ -3,6 +3,8 @@ import { propagateAttributes, startActiveObservation } from '@langfuse/tracing'
 import {
   consumeStream,
   convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
   smoothStream
 } from 'ai'
 
@@ -329,10 +331,8 @@ export async function createChatStreamResponse(
         })
       })
       perfTime('[TTFT] model request sent (T4)', llmStart)
-      result.consumeStream()
-
       // Log the session-total usage once the stream settles (does not block the
-      // response; consumeStream above already drives it to completion).
+      // response; the reader below drives the agent stream to completion).
       if (isUsageLogging()) {
         Promise.resolve(result.totalUsage)
           .then(usage =>
@@ -341,24 +341,64 @@ export async function createChatStreamResponse(
           .catch(() => {})
       }
 
-      return result.toUIMessageStreamResponse({
-        messageMetadata: ({ part }) => {
-          if (part.type === 'start') {
-            return {
-              traceId: parentTraceId,
-              searchMode,
-              modelId: context.modelId
-            }
+      const agentStream = result.toUIMessageStream()
+
+      // Surface the preloaded web-search results as a synthetic `tool-search` part
+      // so the Sources panel and inline citation map render LIVE. We forward the
+      // agent stream chunk-by-chunk and append the search part at the END (after the
+      // assistant text and the message `start` part): writing a tool part first broke
+      // stricter SSE clients (mobile). A complete input -> output tool sequence is
+      // emitted so the client accepts it as a finished tool result.
+      const syntheticSearchInput = {
+        type: 'tool-search' as const,
+        toolCallId: 'preloaded-search',
+        state: 'input-available' as const,
+        input: {
+          query: userQuery,
+          type: 'optimized',
+          content_types: ['web'],
+          max_results: 10,
+          search_depth: 'basic'
+        }
+      }
+      const syntheticSearchOutput = {
+        type: 'tool-search' as const,
+        toolCallId: 'preloaded-search',
+        state: 'output-available' as const,
+        input: {
+          query: userQuery,
+          type: 'optimized',
+          content_types: ['web'],
+          max_results: 10,
+          search_depth: 'basic'
+        },
+        output: { ...searchResultsForCitation, state: 'complete' }
+      }
+
+      const stream = createUIMessageStream({
+        execute: async ({ writer }) => {
+          const reader = (agentStream as unknown as ReadableStream<unknown>).getReader()
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            writer.write(value as unknown as Parameters<typeof writer.write>[0])
+          }
+          if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
+            writer.write(
+              syntheticSearchInput as unknown as Parameters<typeof writer.write>[0]
+            )
+            writer.write(
+              syntheticSearchOutput as unknown as Parameters<typeof writer.write>[0]
+            )
           }
         },
+        onError: (error: unknown) => {
+          console.error('Stream response error:', error)
+          return serializePublicError(error)
+        },
         onFinish: ({ responseMessage, isAborted }) => {
-          // Attach preloaded web-search results as a synthetic `tool-search` part
-          // so the Sources panel and inline citation map persist with the message.
-          // The model never invokes the search tool (it can't emit a valid native
-          // tool call), so no real tool part exists; without this, a reload would
-          // lose both the Sources list and the inline citations. We attach it here
-          // (not into the live SSE stream) because writing a bare tool part first
-          // breaks stricter SSE clients (e.g. mobile).
+          // Also persist the synthetic tool-search part so the Sources panel and
+          // inline citation map survive a reload.
           if (
             !isAborted &&
             responseMessage &&
@@ -438,11 +478,11 @@ export async function createChatStreamResponse(
               await endTracing()
             }
           })()
-        },
-        onError: (error: unknown) => {
-          console.error('Stream response error:', error)
-          return serializePublicError(error)
-        },
+        }
+      })
+
+      return createUIMessageStreamResponse({
+        stream,
         consumeSseStream: consumeStream
       })
     } catch (error) {
