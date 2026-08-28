@@ -174,7 +174,7 @@ export async function createEphemeralChatStreamResponse(
         capabilities: {
           trivial,
           needsSearch: caps.needsSearch,
-          needsImage: caps.needsImage
+          needsImage: caps.needsImage || Boolean(imageAttachment)
         }
       })
 

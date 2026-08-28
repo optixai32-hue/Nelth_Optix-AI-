@@ -246,7 +246,7 @@ export async function createChatStreamResponse(
         capabilities: {
           trivial,
           needsSearch: caps.needsSearch,
-          needsImage: caps.needsImage
+          needsImage: caps.needsImage || Boolean(imageAttachment)
         }
       })
 
