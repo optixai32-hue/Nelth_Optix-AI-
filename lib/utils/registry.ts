@@ -169,13 +169,25 @@ const nelthFetch: typeof fetch = async (input, init) => {
         (parsed.model === NELTH_NON_THINKING_MODEL ||
           parsed.model.endsWith('/hy3:free'))
       ) {
+        // The Vercel AI SDK flattens its own `extraBody` provider option into the
+        // request ROOT before calling fetch, so an `extra_body` key we add here is
+        // NOT understood by a standard OpenAI-compatible gateway — it reads
+        // `chat_template_kwargs` at the root. Inject it at the root (primary) and
+        // also keep a copy inside `extra_body` for the Kilo gateway convention.
+        const nelthThinkingOff = {
+          enable_thinking: false,
+          clear_thinking: true,
+          reasoning_effort: 'no_think'
+        }
+        parsed.chat_template_kwargs = {
+          ...(parsed.chat_template_kwargs || {}),
+          ...nelthThinkingOff
+        }
         parsed.extra_body = {
           ...(parsed.extra_body || {}),
           chat_template_kwargs: {
             ...(parsed.extra_body?.chat_template_kwargs || {}),
-            enable_thinking: false,
-            clear_thinking: true,
-            reasoning_effort: 'no_think'
+            ...nelthThinkingOff
           }
         }
         for (const [key, value] of Object.entries(NELTH_NON_THINKING_BODY)) {
