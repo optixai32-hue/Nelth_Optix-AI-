@@ -2,6 +2,7 @@
 
 // import Link from 'next/link' // No longer needed directly here for Sign In button
 import React from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { SquarePen } from 'lucide-react'
@@ -42,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({ user }) => {
         {/* Mobile only: sidebar toggle (close icon) + divider + New chat
             button, aligned horizontally at the header left. */}
         {isMobile && user && (
-          <div className="flex flex-row items-center gap-1 rounded-full bg-white px-1.5 py-1 shadow-[0_6px_16px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-black/5">
+          <div className="flex flex-row items-center gap-1 rounded-full bg-background/95 px-1.5 py-1 text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-border/80">
             <SidebarTrigger className="size-5 text-foreground transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:rotate-90 active:scale-90" />
             <div className="w-px h-5 bg-border" aria-hidden />
             <Button
@@ -56,6 +57,15 @@ export const Header: React.FC<HeaderProps> = ({ user }) => {
               <SquarePen size={16} />
             </Button>
           </div>
+        )}
+
+        {isMobile && !user && (
+          <Link
+            href="/auth/login"
+            className="mobile-login-pulse rounded-full bg-background/95 px-3 py-1.5 text-xs font-semibold text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-border/80"
+          >
+            Se connecter
+          </Link>
         )}
 
         {/* Desktop only: when the sidebar is collapsed, show the small trigger
