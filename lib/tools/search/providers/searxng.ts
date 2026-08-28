@@ -1,6 +1,7 @@
 import { SearchResultImage, SearchResultItem, SearchResults } from '@/lib/types'
 
 import { BaseSearchProvider } from './base'
+import { withProxy } from './proxy'
 
 // Search via SearXNG instances. No API key required. Each instance is tried in
 // order until one returns results, so a rate-limited (HTTP 429) or down
@@ -100,10 +101,10 @@ export class SearXNGSearchProvider extends BaseSearchProvider {
     let cookie = ''
     let csrf = ''
     try {
-      const home = await fetch(`${base}/`, {
-        headers: { 'User-Agent': UA },
-        signal: AbortSignal.timeout(8000)
-      })
+    const home = await fetch(`${base}/`, withProxy({
+      headers: { 'User-Agent': UA },
+      signal: AbortSignal.timeout(8000)
+    }))
       const setCookie = (
         home.headers.getSetCookie
           ? home.headers.getSetCookie()
@@ -125,7 +126,7 @@ export class SearXNGSearchProvider extends BaseSearchProvider {
     if (csrf) params.set('csrf_token', csrf)
     if (wantImages) params.set('categories', 'images')
 
-    const res = await fetch(`${base}/search`, {
+    const res = await fetch(`${base}/search`, withProxy({
       method: 'POST',
       headers: {
         'User-Agent': UA,
@@ -136,7 +137,7 @@ export class SearXNGSearchProvider extends BaseSearchProvider {
       body: params.toString(),
       signal: AbortSignal.timeout(10000),
       redirect: 'follow'
-    })
+    }))
 
     if (res.status === 429) {
       throw new Error(`${base} returned 429 (rate limited)`)

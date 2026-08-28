@@ -1,6 +1,7 @@
 import { SearchResultImage, SearchResultItem, SearchResults } from '@/lib/types'
 
 import { BaseSearchProvider } from './base'
+import { withProxy } from './proxy'
 
 const TAVILY_URL = 'https://api.tavily.com/search'
 
@@ -40,12 +41,12 @@ export class TavilySearchProvider extends BaseSearchProvider {
       include_image_descriptions: wantImages
     }
 
-    const res = await fetch(TAVILY_URL, {
+    const res = await fetch(TAVILY_URL, withProxy({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000)
-    })
+    }))
     if (!res.ok) {
       throw new Error(
         `Tavily search failed: ${res.status} ${await res.text().catch(() => '')}`

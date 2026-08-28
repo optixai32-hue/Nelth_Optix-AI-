@@ -1,6 +1,7 @@
 import { SearchResultImage, SearchResultItem, SearchResults } from '@/lib/types'
 
 import { BaseSearchProvider } from './base'
+import { withProxy } from './proxy'
 
 const BRAVE_WEB_URL = 'https://api.search.brave.com/res/v1/web/search'
 const BRAVE_IMAGES_URL = 'https://api.search.brave.com/res/v1/images/search'
@@ -44,20 +45,20 @@ export class BraveSearchProvider extends BaseSearchProvider {
     }
 
     const [webData, imageData] = await Promise.all([
-      fetch(`${BRAVE_WEB_URL}?${webParams.toString()}`, {
+      fetch(`${BRAVE_WEB_URL}?${webParams.toString()}`, withProxy({
         headers,
         signal: AbortSignal.timeout(15000)
-      }).then(r => {
+      })).then(r => {
         if (!r.ok) throw new Error(`Brave web search failed: ${r.status}`)
         return r.json() as Promise<{
           web?: { results?: { title?: string; url?: string; description?: string }[] }
         }>
       }),
       wantImages
-        ? fetch(`${BRAVE_IMAGES_URL}?${new URLSearchParams({ q, count: String(count) }).toString()}`, {
+        ? fetch(`${BRAVE_IMAGES_URL}?${new URLSearchParams({ q, count: String(count) }).toString()}`, withProxy({
             headers,
             signal: AbortSignal.timeout(15000)
-          }).then(r => {
+          })).then(r => {
             if (!r.ok) throw new Error(`Brave image search failed: ${r.status}`)
             return r.json() as Promise<{
               results?: { url?: string; title?: string; source?: string }[]

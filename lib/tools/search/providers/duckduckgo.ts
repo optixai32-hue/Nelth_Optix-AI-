@@ -1,6 +1,7 @@
 import { SearchResults } from '@/lib/types'
 
 import { BaseSearchProvider } from './base'
+import { withProxy } from './proxy'
 
 // Real web + image search via DuckDuckGo (no API key required).
 //
@@ -131,10 +132,10 @@ async function ddgHtmlSearch(
     const attempts = 1
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      const res = await fetch(url, {
+      const res = await fetch(url, withProxy({
         headers: BROWSER_HEADERS,
         signal: AbortSignal.timeout(5000)
-      })
+      }))
       if (res.ok) {
         const html = await res.text()
         const results = parseHtmlResults(html, limit)
@@ -198,15 +199,18 @@ async function ddgLiteSearch(
   limit = MAX_RESULTS
 ): Promise<WebResult[]> {
   try {
-    const res = await fetch(DDG_LITE_URL, {
-      method: 'POST',
-      headers: {
-        ...BROWSER_HEADERS,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({ q: query, kl: 'wt-wt' }).toString(),
-      signal: AbortSignal.timeout(6000)
-    })
+    const res = await fetch(
+      DDG_LITE_URL,
+      withProxy({
+        method: 'POST',
+        headers: {
+          ...BROWSER_HEADERS,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ q: query, kl: 'wt-wt' }).toString(),
+        signal: AbortSignal.timeout(6000)
+      })
+    )
     if (!res.ok) return []
     const html = await res.text()
     return parseLiteResults(html, limit)
@@ -227,10 +231,13 @@ async function ddgInstantResults(
 ): Promise<WebResult[]> {
   try {
     const url = `${DDG_IA_URL}&q=${encodeURIComponent(query)}`
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(6000),
-      headers: { 'User-Agent': BROWSER_HEADERS['User-Agent'] }
-    })
+    const res = await fetch(
+      url,
+      withProxy({
+        signal: AbortSignal.timeout(6000),
+        headers: { 'User-Agent': BROWSER_HEADERS['User-Agent'] }
+      })
+    )
     if (!res.ok) return []
 
     const data = (await res.json()) as {
@@ -270,10 +277,13 @@ async function ddgInstantResults(
 async function ddgInstantAnswer(query: string): Promise<string> {
   try {
     const url = `${DDG_IA_URL}&q=${encodeURIComponent(query)}`
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(6000),
-      headers: { 'User-Agent': BROWSER_HEADERS['User-Agent'] }
-    })
+    const res = await fetch(
+      url,
+      withProxy({
+        signal: AbortSignal.timeout(6000),
+        headers: { 'User-Agent': BROWSER_HEADERS['User-Agent'] }
+      })
+    )
     if (!res.ok) return ''
     const data = (await res.json()) as {
       AbstractText?: string
@@ -299,10 +309,10 @@ async function getVqd(query: string): Promise<string | null> {
   try {
     const res = await fetch(
       `${DDG_HOME}?q=${encodeURIComponent(query)}&iax=images&ia=images`,
-      {
+      withProxy({
         headers: BROWSER_HEADERS,
         signal: AbortSignal.timeout(6000)
-      }
+      })
     )
     if (!res.ok) return null
     const html = await res.text()
@@ -338,14 +348,17 @@ async function ddgImageSearch(
   const attempts = 2
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      const res = await fetch(url, {
-        headers: {
-          ...BROWSER_HEADERS,
-          Accept: 'application/json, text/javascript, */*; q=0.01',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        signal: AbortSignal.timeout(6000)
-      })
+      const res = await fetch(
+        url,
+        withProxy({
+          headers: {
+            ...BROWSER_HEADERS,
+            Accept: 'application/json, text/javascript, */*; q=0.01',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          signal: AbortSignal.timeout(6000)
+        })
+      )
       if (res.ok) {
         const data = (await res.json()) as {
           results?: {
