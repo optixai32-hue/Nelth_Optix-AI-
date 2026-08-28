@@ -1,19 +1,26 @@
 /**
  * Search provider configuration utilities
  *
- * The only configured search provider is DuckDuckGo (no API key required).
- * It handles both web and image search natively, so no "general" vs
- * "optimized" provider split is needed.
+ * The search provider is resolved from SEARCH_API / available API keys
+ * (Tavily, Brave) and falls back to DuckDuckGo (no key required) for local
+ * development. DuckDuckGo's HTML scraper is blocked from serverless IPs, so
+ * production deployments should configure Tavily or Brave.
  */
 
+import { resolveSearchProviderType } from '@/lib/tools/search/providers'
+
 /**
- * DuckDuckGo is always available and supports both web and image searches.
+ * A provider is always available: DuckDuckGo works without a key locally, and
+ * Tavily/Brave are used when their API key is present.
  */
 export function isGeneralSearchProviderAvailable(): boolean {
   return true
 }
 
 export function getGeneralSearchProviderName(): string {
+  const type = resolveSearchProviderType()
+  if (type === 'tavily') return 'Tavily'
+  if (type === 'brave') return 'Brave'
   return 'DuckDuckGo'
 }
 
@@ -25,11 +32,21 @@ export function supportsMultimediaContentTypes(): boolean {
 }
 
 export function getSearchTypeDescription(): string {
+  const type = resolveSearchProviderType()
+  if (type === 'tavily') {
+    return `Search type: general and optimized both use Tavily. Images are supported via content_types. When the user explicitly asks for images/pictures/photos, ALWAYS set content_types to ["image"] (or ["web","image"] to also get web links).`
+  }
+  if (type === 'brave') {
+    return `Search type: general and optimized both use Brave Search. Images are supported via content_types. When the user explicitly asks for images/pictures/photos, ALWAYS set content_types to ["image"] (or ["web","image"] to also get web links).`
+  }
   return `Search type: general and optimized both use DuckDuckGo (no API key required). Images are fully supported via content_types. When the user explicitly asks for images/pictures/photos, ALWAYS set content_types to ["image"] (or ["web","image"] to also get web links).`
 }
 
 export function getSearchToolDescription(): string {
-  return 'Search the web (and images) using DuckDuckGo. When the user wants images, set content_types:["image"] (or ["web","image"] for both). Otherwise use ["web"].'
+  const type = resolveSearchProviderType()
+  const provider =
+    type === 'tavily' ? 'Tavily' : type === 'brave' ? 'Brave' : 'DuckDuckGo'
+  return `Search the web (and images) using ${provider}. When the user wants images, set content_types:["image"] (or ["web","image"] for both). Otherwise use ["web"].`
 }
 
 export function getContentTypesGuidance(): string {
@@ -50,8 +67,12 @@ export function getSearchStrategyGuidance(): string {
 }
 
 /**
- * Always returns 'duckduckgo' as the general search provider.
+ * Returns the resolved search provider type.
  */
-export function getGeneralSearchProviderType(): 'duckduckgo' | null {
-  return 'duckduckgo'
+export function getGeneralSearchProviderType():
+  | 'duckduckgo'
+  | 'tavily'
+  | 'brave'
+  | null {
+  return resolveSearchProviderType()
 }

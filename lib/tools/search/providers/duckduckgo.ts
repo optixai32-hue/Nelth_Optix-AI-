@@ -15,6 +15,7 @@ import { BaseSearchProvider } from './base'
 // are retried a few times and only "real" browser headers are sent.
 
 const DDG_HTML_URL = 'https://html.duckduckgo.com/html/'
+const DDG_LITE_URL = 'https://duckduckgo.com/lite/'
 const DDG_IA_URL =
   'https://api.duckduckgo.com/?format=json&no_html=1&skip_disambig=1&no_redirect=1'
 const DDG_HOME = 'https://duckduckgo.com/'
@@ -127,7 +128,7 @@ async function ddgHtmlSearch(
   const url = `${DDG_HTML_URL}?q=${encodeURIComponent(query)}&kl=wt-wt`
   // Vercel frequently returns a fast 403 for this endpoint. Retrying it three
   // times only delays the serverless fallback and can exhaust the request time.
-  const attempts = 1
+    const attempts = 1
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       const res = await fetch(url, {
@@ -145,7 +146,64 @@ async function ddgHtmlSearch(
     if (attempt < attempts - 1) await sleep(300 * (attempt + 1))
   }
 
+  // The HTML endpoint is heavily bot-protected and returns empty/decoy pages
+  // from serverless (Vercel) IPs. The lite endpoint is a lighter, often less
+  // aggressively blocked source of genuine web results — try it before the
+  // Instant Answer API, which only yields an abstract for famous topics.
+  const liteResults = await ddgLiteSearch(query, limit)
+  if (liteResults.length > 0) return liteResults
+
   return ddgInstantResults(query, limit)
+}
+
+// The lite results page uses a different (simpler) markup than the HTML
+// endpoint. Links: <a class="result-link" ...>, snippets: <td class="result-snippet">.
+function parseLiteResults(html: string, limit: number): WebResult[] {
+  const linkRe =
+    /<a\b[^>]*class="result-link"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g
+  const snippetRe = /<td\b[^>]*class="result-snippet"[^>]*>([\s\S]*?)<\/td>/g
+
+  const snippets: { index: number; text: string }[] = []
+  let sm: RegExpExecArray | null
+  while ((sm = snippetRe.exec(html)) !== null) {
+    snippets.push({ index: sm.index, text: cleanText(sm[1]) })
+  }
+
+  const links: { index: number; url: string; title: string }[] = []
+  let lm: RegExpExecArray | null
+  while ((lm = linkRe.exec(html)) !== null) {
+    const title = cleanText(lm[2])
+    if (title) links.push({ index: lm.index, url: unwrapUrl(lm[1]), title })
+  }
+
+  const results: WebResult[] = []
+  for (let i = 0; i < links.length && results.length < limit; i++) {
+    const link = links[i]
+    const nextIndex = links[i + 1]?.index ?? Infinity
+    const snippet =
+      snippets.find(s => s.index > link.index && s.index < nextIndex)?.text ??
+      ''
+    results.push({ title: link.title, url: link.url, snippet })
+  }
+  return results
+}
+
+async function ddgLiteSearch(
+  query: string,
+  limit = MAX_RESULTS
+): Promise<WebResult[]> {
+  try {
+    const url = `${DDG_LITE_URL}?q=${encodeURIComponent(query)}&kl=wt-wt`
+    const res = await fetch(url, {
+      headers: BROWSER_HEADERS,
+      signal: AbortSignal.timeout(6000)
+    })
+    if (!res.ok) return []
+    const html = await res.text()
+    return parseLiteResults(html, limit)
+  } catch {
+    return []
+  }
 }
 
 interface InstantAnswerTopic {
