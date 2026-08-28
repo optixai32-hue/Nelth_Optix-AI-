@@ -162,12 +162,14 @@ async function ddgHtmlSearch(
   limit = MAX_RESULTS
 ): Promise<WebResult[]> {
   const url = `${DDG_HTML_URL}?q=${encodeURIComponent(query)}&kl=wt-wt`
-  const attempts = 3
+  // Vercel frequently returns a fast 403 for this endpoint. Retrying it three
+  // times only delays the serverless fallback and can exhaust the request time.
+  const attempts = 1
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       const res = await fetch(url, {
         headers: BROWSER_HEADERS,
-        signal: AbortSignal.timeout(6000)
+        signal: AbortSignal.timeout(5000)
       })
       if (res.ok) {
         const html = await res.text()
