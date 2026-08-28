@@ -439,6 +439,10 @@ export function createResearcher({
         activeToolsList = []
       }
 
+      if (preloadedSearchContext) {
+        activeToolsList = activeToolsList.filter(toolName => toolName !== 'search')
+      }
+
     // Build tools object with proper typing
     const tools: ResearcherTools = {
       search: searchTool,
