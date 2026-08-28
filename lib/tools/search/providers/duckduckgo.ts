@@ -156,12 +156,14 @@ async function ddgHtmlSearch(
   return ddgInstantResults(query, limit)
 }
 
-// The lite results page uses a different (simpler) markup than the HTML
-// endpoint. Links: <a class="result-link" ...>, snippets: <td class="result-snippet">.
+// The lite results page uses single-quoted attributes and a simpler table
+// markup. Result links are external <a href="https://..."> (DuckDuckGo wrappers
+// are unwrapped), and snippets live in elements with class *result-snippet*.
 function parseLiteResults(html: string, limit: number): WebResult[] {
   const linkRe =
-    /<a\b[^>]*class="result-link"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g
-  const snippetRe = /<td\b[^>]*class="result-snippet"[^>]*>([\s\S]*?)<\/td>/g
+    /<a\b[^>]*href=["'](https?:\/\/(?!(?:[^"']*\.)?duckduckgo\.com)[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  const snippetRe =
+    /<(?:td|div|span|p)\b[^>]*class=["'][^"']*result-snippet[^"']*["'][^>]*>([\s\S]*?)<\/(?:td|div|span|p)>/gi
 
   const snippets: { index: number; text: string }[] = []
   let sm: RegExpExecArray | null
@@ -188,14 +190,21 @@ function parseLiteResults(html: string, limit: number): WebResult[] {
   return results
 }
 
+// The lite endpoint returns genuine web results via POST (GET only yields the
+// zero-click abstract). It is lighter than the HTML endpoint and, like it, may
+// still be blocked from serverless IPs — callers fall back to the Instant Answer API.
 async function ddgLiteSearch(
   query: string,
   limit = MAX_RESULTS
 ): Promise<WebResult[]> {
   try {
-    const url = `${DDG_LITE_URL}?q=${encodeURIComponent(query)}&kl=wt-wt`
-    const res = await fetch(url, {
-      headers: BROWSER_HEADERS,
+    const res = await fetch(DDG_LITE_URL, {
+      method: 'POST',
+      headers: {
+        ...BROWSER_HEADERS,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({ q: query, kl: 'wt-wt' }).toString(),
       signal: AbortSignal.timeout(6000)
     })
     if (!res.ok) return []

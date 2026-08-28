@@ -6,6 +6,6 @@
   "devCommand": "bun run dev",
   "regions": ["cdg1"],
   "env": {
-    "SEARCH_API": "searxng"
+    "SEARCH_API": "duckduckgo"
   }
 }
