@@ -21,6 +21,7 @@ export function getGeneralSearchProviderName(): string {
   const type = resolveSearchProviderType()
   if (type === 'tavily') return 'Tavily'
   if (type === 'brave') return 'Brave'
+  if (type === 'searxng') return 'SearXNG'
   return 'DuckDuckGo'
 }
 
@@ -39,13 +40,22 @@ export function getSearchTypeDescription(): string {
   if (type === 'brave') {
     return `Search type: general and optimized both use Brave Search. Images are supported via content_types. When the user explicitly asks for images/pictures/photos, ALWAYS set content_types to ["image"] (or ["web","image"] to also get web links).`
   }
+  if (type === 'searxng') {
+    return `Search type: general and optimized both use SearXNG (no API key required). Images are supported via content_types. When the user explicitly asks for images/pictures/photos, ALWAYS set content_types to ["image"] (or ["web","image"] to also get web links).`
+  }
   return `Search type: general and optimized both use DuckDuckGo (no API key required). Images are fully supported via content_types. When the user explicitly asks for images/pictures/photos, ALWAYS set content_types to ["image"] (or ["web","image"] to also get web links).`
 }
 
 export function getSearchToolDescription(): string {
   const type = resolveSearchProviderType()
   const provider =
-    type === 'tavily' ? 'Tavily' : type === 'brave' ? 'Brave' : 'DuckDuckGo'
+    type === 'tavily'
+      ? 'Tavily'
+      : type === 'brave'
+        ? 'Brave'
+        : type === 'searxng'
+          ? 'SearXNG'
+          : 'DuckDuckGo'
   return `Search the web (and images) using ${provider}. When the user wants images, set content_types:["image"] (or ["web","image"] for both). Otherwise use ["web"].`
 }
 
@@ -73,6 +83,7 @@ export function getGeneralSearchProviderType():
   | 'duckduckgo'
   | 'tavily'
   | 'brave'
+  | 'searxng'
   | null {
   return resolveSearchProviderType()
 }
