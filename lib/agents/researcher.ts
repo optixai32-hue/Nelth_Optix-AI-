@@ -506,7 +506,7 @@ Put EVERY design decision (colors, typography, layout, copy, hover/focus states,
     // the model sees and applies them first.
     const skillLayer = skillContext ? skillContext : ''
     const preloadedSearchLayer = preloadedSearchContext
-      ? `\n\nSERVER-PROVIDED WEB RESULTS (numbered 1..N in the order listed):\n${preloadedSearchContext}\nUse these results to answer now. Do NOT emit any <tool_call> or function-call syntax. Cite each source INLINE as [n](#preloaded-search) where n is its 1-based number (example: [1](#preloaded-search) for the first result). Never write bare URLs; always wrap them in the [n](#preloaded-search) citation format.\n`
+      ? `\n\nSERVER-PROVIDED WEB RESULTS (each numbered 1..N):\n${preloadedSearchContext}\nUse these results to answer now. Do NOT emit any <tool_call> or function-call syntax. After every fact that comes from a source, cite it INLINE using SQUARE BRACKETS around the source number only, e.g. [1] or [3]. Example: "iOS 27 rolled out across devices[1]." Never write bare numbers without brackets, and never write raw URLs. The citation [n] refers to source n in the numbered list above.\n`
       : ''
     let instructions = `${CORE_DIRECTIVE}\n\n${TOOL_CALL_PROTOCOL}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
 
