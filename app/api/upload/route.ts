@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { PutObjectCommand } from '@aws-sdk/client-s3'
+import ImageKit from 'imagekit'
 
 import { capture } from '@/lib/analytics/dispatch'
 import { getCurrentUserId } from '@/lib/auth/get-current-user'
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: 'File too large (max 5MB)' },
+        { error: 'File too large (max 20MB)' },
         { status: 400 }
       )
     }
@@ -133,6 +134,35 @@ async function uploadFileToR2(
   const sanitizedFileName = sanitizeFilename(file.name)
   const filePath = `${userId}/chats/${chatId}/${Date.now()}-${sanitizedFileName}`
   const buffer = Buffer.from(await file.arrayBuffer())
+
+  if (
+    process.env.IMAGEKIT_PRIVATE_KEY &&
+    process.env.IMAGEKIT_PUBLIC_KEY &&
+    process.env.IMAGEKIT_URL_ENDPOINT
+  ) {
+    try {
+      const imageKit = new ImageKit({
+        publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+        privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+        urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
+      })
+      const result = await imageKit.upload({
+        file: buffer,
+        fileName: sanitizedFileName,
+        folder: `/nelth-ai/${userId}/chats/${chatId || 'draft'}`,
+        useUniqueFileName: true
+      })
+      return {
+        filename: file.name,
+        key: `imagekit:${result.filePath}`,
+        url: result.url,
+        mediaType: file.type,
+        type: 'file'
+      }
+    } catch (error: any) {
+      console.warn('[upload] ImageKit upload failed; trying object storage:', error)
+    }
+  }
 
   // Object storage path (production).
   if (isObjectStorageConfigured()) {

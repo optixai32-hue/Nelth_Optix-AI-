@@ -131,6 +131,10 @@ export async function signFilePartUrls(
         return part
       }
 
+      if (part.key.startsWith('imagekit:')) {
+        return part
+      }
+
       if (
         options.allowedKeyPrefix &&
         !isObjectKeyWithinPrefix(part.key, options.allowedKeyPrefix)
