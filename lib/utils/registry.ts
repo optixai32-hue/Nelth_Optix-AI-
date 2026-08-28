@@ -169,6 +169,8 @@ const nelthFetch: typeof fetch = async (input, init) => {
           ...(parsed.extra_body || {}),
           chat_template_kwargs: {
             ...(parsed.extra_body?.chat_template_kwargs || {}),
+            enable_thinking: false,
+            clear_thinking: true,
             reasoning_effort: 'no_think'
           }
         }
