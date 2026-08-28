@@ -303,6 +303,7 @@ export function createResearcher({
   modelConfig,
   searchMode = 'adaptive',
   skillContext,
+  preloadedSearchContext,
   imageAttachment,
   userQuery,
   capabilities
@@ -312,6 +313,8 @@ export function createResearcher({
   searchMode?: SearchMode
   /** On-demand expertise from the Skill Router (progressive disclosure). */
   skillContext?: string
+  /** Server-side search results used when the selected model emits fake XML tool calls. */
+  preloadedSearchContext?: string
   /** URL of an uploaded image attachment to force the img2img route. */
   imageAttachment?: string
   /** Latest user message text, used to detect code/artifact creation so we can
@@ -497,7 +500,10 @@ Put EVERY design decision (colors, typography, layout, copy, hover/focus states,
     // the preview iframe). Leading the prompt with the active skills guarantees
     // the model sees and applies them first.
     const skillLayer = skillContext ? skillContext : ''
-    let instructions = `${CORE_DIRECTIVE}\n\n${TOOL_CALL_PROTOCOL}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${systemPrompt}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
+    const preloadedSearchLayer = preloadedSearchContext
+      ? `\n\nSERVER-PROVIDED WEB RESULTS:\n${preloadedSearchContext}\nUse these results to answer now. Do not emit any tool-call syntax. Cite sources as Markdown links.\n`
+      : ''
+    let instructions = `${CORE_DIRECTIVE}\n\n${TOOL_CALL_PROTOCOL}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
 
     // Trailing override for code/artifact requests. The QUICK/ADAPTIVE prompts
     // contain a generic "OUTPUT FORMAT (MANDATORY)" + "Emoji usage" section that

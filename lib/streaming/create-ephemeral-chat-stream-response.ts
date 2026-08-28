@@ -18,6 +18,7 @@ import {
   type AttachmentLike,
   extractAttachmentFormats} from '@/lib/skills/document-runtime'
 import { getImageAttachmentUrl, getTextFromParts } from '@/lib/utils/message-utils'
+import { search as runWebSearch } from '@/lib/tools/search'
 import { isTracingEnabled } from '@/lib/utils/telemetry'
 
 import {
@@ -108,6 +109,13 @@ export async function createEphemeralChatStreamResponse(
       // context when nothing matches so the model streams immediately. Mirrors the
       // authenticated chat path so guests get the same lazy architecture.
       const caps = await detectRequestCapabilities(userQuery, attachmentFormats)
+      let preloadedSearchContext: string | undefined
+      if (caps.needsSearch) {
+        const searchResult = await runWebSearch(userQuery, 10, 'basic')
+        preloadedSearchContext = searchResult.results
+          .map(result => `- ${result.title}: ${result.url}\n  ${result.content}`)
+          .join('\n')
+      }
 
       // A skill is needed only when one matched (LEVEL 1) or an attachment forces
       // it (e.g. an uploaded document). Everything else (greetings, simple chat,
@@ -169,11 +177,12 @@ export async function createEphemeralChatStreamResponse(
         modelConfig: model,
         searchMode,
         skillContext,
+        preloadedSearchContext,
         imageAttachment,
         userQuery,
         capabilities: {
           trivial,
-          needsSearch: caps.needsSearch,
+          needsSearch: false,
           needsImage: caps.needsImage || Boolean(imageAttachment)
         }
       })

@@ -29,6 +29,7 @@ import {
   truncateMessages
 } from '../utils/context-window'
 import { getImageAttachmentUrl, getTextFromParts } from '../utils/message-utils'
+import { search as runWebSearch } from '../tools/search'
 import { perfLog, perfTime } from '../utils/perf-logging'
 import { isUsageLogging, logUsage } from '../utils/usage-logging'
 
@@ -170,6 +171,13 @@ export async function createChatStreamResponse(
       // routing/loading skills or arming the research agent. Falls back to an empty
       // context when nothing matches so the model streams immediately.
       const caps = await detectRequestCapabilities(userQuery, attachmentFormats)
+      let preloadedSearchContext: string | undefined
+      if (caps.needsSearch) {
+        const searchResult = await runWebSearch(userQuery, 10, 'basic')
+        preloadedSearchContext = searchResult.results
+          .map(result => `- ${result.title}: ${result.url}\n  ${result.content}`)
+          .join('\n')
+      }
 
       // A skill is needed only when one matched (LEVEL 1) or an attachment forces
       // it (e.g. an uploaded document). Everything else (greetings, simple chat,
@@ -241,11 +249,12 @@ export async function createChatStreamResponse(
         modelConfig: model,
         searchMode,
         skillContext,
+          preloadedSearchContext,
         imageAttachment,
         userQuery,
         capabilities: {
           trivial,
-          needsSearch: caps.needsSearch,
+          needsSearch: false,
           needsImage: caps.needsImage || Boolean(imageAttachment)
         }
       })
