@@ -95,6 +95,24 @@ export function extractCitationMapsFromMessages(
  * Process citations in content, replacing [number](#toolCallId) with [domain](url)
  * Display text uses domain name instead of number (e.g., [google](url))
  */
+/**
+ * Weak/reasoning models (e.g. Nelth-3.5) often emit bare `[n]` citations
+ * instead of the full `[n](#toolCallId)` syntax the renderer needs. When a
+ * message has exactly ONE citation map (the synthetic `preloaded-search` part),
+ * rewrite those bare tokens into `[n](#toolCallId)` so they resolve to the real
+ * source URL. Tokens already followed by `(#...)` and real markdown links like
+ * `[google](url)` are left untouched (the `(?!\()` lookahead skips them).
+ */
+function normalizeBareCitations(
+  content: string,
+  citationMaps: Record<string, Record<number, SearchResultItem>>
+): string {
+  const toolCallIds = Object.keys(citationMaps)
+  if (toolCallIds.length !== 1) return content
+  const id = toolCallIds[0]
+  return content.replace(/\[(\d{1,2})\](?!\()/g, (_m, n) => `[${n}](#${id})`)
+}
+
 export function processCitations(
   content: string,
   citationMaps: Record<string, Record<number, SearchResultItem>>
@@ -103,9 +121,13 @@ export function processCitations(
     return content || ''
   }
 
+  // Rewrite weak-model bare [n] citations into resolvable [n](#toolCallId) form
+  // before matching the full citation syntax below.
+  const normalized = normalizeBareCitations(content, citationMaps)
+
   // Replace [number](#toolCallId) with [domain](actual-url)
   // Also handle cases with spaces: [ number ]
-  return content.replace(
+  return normalized.replace(
     /\[\s*(\d+)\s*\]\(#([^)]+)\)/g,
     (_match, num, toolCallId) => {
       const citationNum = parseInt(num, 10)
