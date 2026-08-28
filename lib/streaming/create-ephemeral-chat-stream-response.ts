@@ -1,7 +1,13 @@
 import type { LangfuseSpan } from '@langfuse/tracing'
 import { propagateAttributes, startActiveObservation } from '@langfuse/tracing'
 import type { UIMessage } from 'ai'
-import { consumeStream, convertToModelMessages, smoothStream } from 'ai'
+import {
+  consumeStream,
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  smoothStream
+} from 'ai'
 
 import { researcher } from '@/lib/agents/researcher'
 import {
@@ -18,6 +24,7 @@ import {
   type AttachmentLike,
   extractAttachmentFormats} from '@/lib/skills/document-runtime'
 import { getImageAttachmentUrl, getTextFromParts } from '@/lib/utils/message-utils'
+import { search as runWebSearch } from '@/lib/tools/search'
 
 import { isTracingEnabled } from '@/lib/utils/telemetry'
 
@@ -109,13 +116,21 @@ export async function createEphemeralChatStreamResponse(
       // context when nothing matches so the model streams immediately. Mirrors the
       // authenticated chat path so guests get the same lazy architecture.
       const caps = await detectRequestCapabilities(userQuery, attachmentFormats)
-      // NOTE: We no longer preload search results as text into the prompt. That
-      // approach disarmed the search tool (see researcher.ts) and produced NO
-      // `tool-search` UI part, so the answer showed neither a Sources panel nor
-      // inline citations. Instead we keep the search tool armed and let the
-      // orchestrator force a real search tool call (toolChoice: 'search') when
-      // `caps.needsSearch` is true, which drives both the Sources list and the
-      // inline citation rendering.
+      // Preloaded search: the weak/reasoning models (e.g. Nelth-3.5 Thinking)
+      // cannot emit a valid native tool call — they output a fake <tool_call> XML
+      // block and the agent retries in a loop. So we fetch results server-side and
+      // feed them as text. To still show citations, we ALSO surface these results
+      // as a synthetic `tool-search` UI part in the stream (see below), which drives
+      // the Sources panel and the inline citation map.
+      let preloadedSearchContext: string | undefined
+      let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
+      if (caps.needsSearch) {
+        const searchResult = await runWebSearch(userQuery, 10, 'basic')
+        preloadedSearchContext = searchResult.results
+          .map(result => `- ${result.title}: ${result.url}\n  ${result.content}`)
+          .join('\n')
+        searchResultsForCitation = searchResult
+      }
 
       // A skill is needed only when one matched (LEVEL 1) or an attachment forces
       // it (e.g. an uploaded document). Everything else (greetings, simple chat,
@@ -177,11 +192,12 @@ export async function createEphemeralChatStreamResponse(
         modelConfig: model,
         searchMode,
         skillContext,
+        preloadedSearchContext,
         imageAttachment,
         userQuery,
         capabilities: {
           trivial,
-          needsSearch: caps.needsSearch,
+          needsSearch: caps.needsSearch && !preloadedSearchContext,
           needsImage: caps.needsImage || Boolean(imageAttachment)
         }
       })
@@ -201,7 +217,6 @@ export async function createEphemeralChatStreamResponse(
           }
         })
       })
-      result.consumeStream()
 
       if (isUsageLogging()) {
         Promise.resolve(result.totalUsage)
@@ -209,15 +224,44 @@ export async function createEphemeralChatStreamResponse(
           .catch(() => {})
       }
 
-      return result.toUIMessageStreamResponse({
-        messageMetadata: ({ part }) => {
-          if (part.type === 'start') {
-            return {
-              traceId: parentTraceId,
-              searchMode,
-              modelId: `${model.providerId}:${model.id}`
+      // Surface the preloaded web-search results as a synthetic `tool-search` UI
+      // part so the Sources panel and inline citation map are populated even
+      // though the model never invoked the search tool (it can't emit a valid
+      // native tool call). The citation map is keyed by `preloaded-search`, and
+      // the preloaded prompt instructs the model to cite as [n](#preloaded-search).
+      const syntheticSearchPart =
+        searchResultsForCitation && searchResultsForCitation.results.length > 0
+          ? {
+              type: 'tool-search' as const,
+              toolCallId: 'preloaded-search',
+              state: 'output-available' as const,
+              input: {
+                query: userQuery,
+                type: 'optimized',
+                content_types: ['web'],
+                max_results: 10,
+                search_depth: 'basic'
+              },
+              output: { ...searchResultsForCitation, state: 'complete' as const }
             }
+          : undefined
+
+      const stream = createUIMessageStream({
+        execute: async ({ writer }) => {
+          if (syntheticSearchPart) {
+            writer.write(
+              syntheticSearchPart as unknown as Parameters<typeof writer.write>[0]
+            )
           }
+          writer.merge(
+            result.toUIMessageStream() as unknown as Parameters<
+              typeof writer.merge
+            >[0]
+          )
+        },
+        onError: (error: unknown) => {
+          console.error('Ephemeral stream response error:', error)
+          return serializePublicError(error)
         },
         onFinish: ({ responseMessage }) => {
           // Numero 1: guarantee NO emoji leaks into any generated code/artifact
@@ -228,11 +272,11 @@ export async function createEphemeralChatStreamResponse(
           // Langfuse is unreachable, awaiting forceFlush would keep the
           // response open and the UI stuck on "Répondre…".
           void endTracing()
-        },
-        onError: (error: unknown) => {
-          console.error('Ephemeral stream response error:', error)
-          return serializePublicError(error)
-        },
+        }
+      })
+
+      return createUIMessageStreamResponse({
+        stream,
         consumeSseStream: consumeStream
       })
     } catch (error) {
