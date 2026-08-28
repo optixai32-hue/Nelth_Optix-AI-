@@ -533,6 +533,39 @@ Requirements for the artifact:
         )
       )
 
+    const repairLegacyToolCall = async ({ toolCall, error }: any) => {
+      const name = String(toolCall?.toolName ?? '').toLowerCase()
+      if (!name.includes('search') || !error) return null
+
+      let input: Record<string, unknown>
+      try {
+        input =
+          typeof toolCall.input === 'string'
+            ? JSON.parse(toolCall.input)
+            : { ...(toolCall.input ?? {}) }
+      } catch {
+        return null
+      }
+
+      const query = String(input.query ?? input.q ?? '').trim()
+      if (!query) return null
+
+      return {
+        ...toolCall,
+        toolName: 'search',
+        input: JSON.stringify({
+          query,
+          type: input.type === 'general' ? 'general' : 'optimized',
+          content_types: ['web'],
+          max_results: Number(input.max_results ?? input.topk ?? 10),
+          search_depth:
+            input.search_depth === 'advanced' ? 'advanced' : 'basic',
+          include_domains: [],
+          exclude_domains: []
+        })
+      }
+    }
+
     const agent = new ToolLoopAgent({
       model: getModel(model),
       instructions,
@@ -555,6 +588,7 @@ Requirements for the artifact:
           toolChoice: 'auto' as const
         }
       },
+      experimental_repairToolCall: repairLegacyToolCall,
       // Stop the loop as soon as an image has been generated so the model does
       // not start a second reasoning pass or keep elaborating. The image is
       // already shown by its own UI component.
