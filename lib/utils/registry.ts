@@ -164,7 +164,11 @@ const nelthFetch: typeof fetch = async (input, init) => {
   if (init && typeof init.body === 'string') {
     try {
       const parsed = JSON.parse(init.body) as Record<string, any>
-      if (parsed?.model === NELTH_NON_THINKING_MODEL) {
+      if (
+        typeof parsed?.model === 'string' &&
+        (parsed.model === NELTH_NON_THINKING_MODEL ||
+          parsed.model.endsWith('/hy3:free'))
+      ) {
         parsed.extra_body = {
           ...(parsed.extra_body || {}),
           chat_template_kwargs: {

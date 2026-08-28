@@ -1,8 +1,8 @@
 import { Model } from '@/lib/types/models'
 
 export const DEFAULT_MODEL: Model = {
-  id: 'stepfun/step-3.7-flash:free',
-  name: 'Nelth-3.5 Thinking',
+  id: 'tencent/hy3:free',
+  name: 'Nelth-3.5',
   provider: 'Kilo',
   providerId: 'kilo-gateway'
 }
