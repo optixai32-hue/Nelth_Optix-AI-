@@ -15,7 +15,6 @@ import { BaseSearchProvider } from './base'
 // are retried a few times and only "real" browser headers are sent.
 
 const DDG_HTML_URL = 'https://html.duckduckgo.com/html/'
-const CORSPROXY_URL = 'https://corsproxy.io/'
 const DDG_IA_URL =
   'https://api.duckduckgo.com/?format=json&no_html=1&skip_disambig=1&no_redirect=1'
 const DDG_HOME = 'https://duckduckgo.com/'
@@ -144,24 +143,6 @@ async function ddgHtmlSearch(
       // network error / timeout — retry
     }
     if (attempt < attempts - 1) await sleep(300 * (attempt + 1))
-  }
-
-  const corsProxyKey = process.env.CORSPROXY_API_KEY
-  if (corsProxyKey) {
-    try {
-      const targetUrl = `${DDG_HTML_URL}?q=${encodeURIComponent(query)}&kl=wt-wt`
-      const proxyUrl = `${CORSPROXY_URL}?key=${encodeURIComponent(corsProxyKey)}&url=${encodeURIComponent(targetUrl)}`
-      const res = await fetch(proxyUrl, {
-        headers: BROWSER_HEADERS,
-        signal: AbortSignal.timeout(8000)
-      })
-      if (res.ok) {
-        const results = parseHtmlResults(await res.text(), limit)
-        if (results.length > 0) return results
-      }
-    } catch {
-      // Fall through to DuckDuckGo Instant Answers.
-    }
   }
 
   return ddgInstantResults(query, limit)
