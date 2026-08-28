@@ -41,7 +41,7 @@ const IMAGE_INTENT_RE =
 const DOCUMENT_INTENT_RE =
   /\b(pdf|docx|xlsx|pptx|document|documents|transcribe|facture|invoice|rapport|report|contrat|contract|cv|lettre|pr[eé]sentation|presentation|diapos|slides)\b/i
 const CURRENT_INFO_RE =
-  /\b(search|cherche|recherch|actualit[eé]|news|price|prix|weather|m[eé]t[eé]o|current|recent|latest|last|today|aujourd'hui|en\s+direct|live|2026|2025)\b/i
+  /\b(search|cherche|recherch|actualit[eé]|news|price|prix|weather|m[eé]t[eé]o|current|recent|r[eé]cent|latest|last|today|aujourd'hui|en\s+direct|live|event|événement|évènement|annonce|announcement|2026|2025)\b/i
 
 const DOC_FORMATS = new Set(['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'ppt'])
 
