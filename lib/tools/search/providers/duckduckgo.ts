@@ -142,7 +142,58 @@ async function ddgHtmlSearch(
     }
     if (attempt < attempts - 1) await sleep(300 * (attempt + 1))
   }
-  return []
+  return ddgInstantResults(query, limit)
+}
+
+interface InstantAnswerTopic {
+  Text?: string
+  FirstURL?: string
+  Topics?: InstantAnswerTopic[]
+}
+
+async function ddgInstantResults(
+  query: string,
+  limit = MAX_RESULTS
+): Promise<WebResult[]> {
+  try {
+    const url = `${DDG_IA_URL}&q=${encodeURIComponent(query)}`
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(6000),
+      headers: { 'User-Agent': BROWSER_HEADERS['User-Agent'] }
+    })
+    if (!res.ok) return []
+
+    const data = (await res.json()) as {
+      AbstractText?: string
+      AbstractSource?: string
+      AbstractURL?: string
+      RelatedTopics?: InstantAnswerTopic[]
+    }
+    const results: WebResult[] = []
+    if (data.AbstractText && data.AbstractURL) {
+      results.push({
+        title: data.AbstractSource || query,
+        url: data.AbstractURL,
+        snippet: data.AbstractText
+      })
+    }
+
+    const topics = (data.RelatedTopics ?? []).flatMap(topic =>
+      topic.Topics?.length ? topic.Topics : [topic]
+    )
+    for (const topic of topics) {
+      if (!topic.Text || !topic.FirstURL) continue
+      results.push({
+        title: topic.Text.split(' - ')[0] || query,
+        url: topic.FirstURL,
+        snippet: topic.Text
+      })
+      if (results.length >= limit) break
+    }
+    return results
+  } catch {
+    return []
+  }
 }
 
 // Query the DuckDuckGo Instant Answer API for a short abstract.
