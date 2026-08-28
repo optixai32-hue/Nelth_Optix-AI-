@@ -158,6 +158,10 @@ export async function POST(req: Request) {
       )
     }
 
+    console.log(
+      `[Chat] model=${selectedModel.providerId}:${selectedModel.id} mode=${searchMode} userAgent=${req.headers.get('user-agent')?.slice(0, 80) ?? 'unknown'}`
+    )
+
     if (!isGuest) {
       const overallLimitResponse = await checkAndEnforceOverallChatLimit(userId)
       if (overallLimitResponse) return overallLimitResponse

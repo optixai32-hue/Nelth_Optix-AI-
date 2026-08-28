@@ -384,7 +384,7 @@ export function createResearcher({
           `[Researcher] Adaptive mode: maxSteps=50, tools=[${activeToolsList.join(', ')}]`
         )
         maxSteps = 50
-        searchTool = originalSearchTool
+        searchTool = wrapSearchToolForQuickMode(originalSearchTool)
         break
     }
 
@@ -544,7 +544,11 @@ Requirements for the artifact:
       // Stop the loop as soon as an image has been generated so the model does
       // not start a second reasoning pass or keep elaborating. The image is
       // already shown by its own UI component.
-      stopWhen: [stepCountIs(maxSteps), hasToolCall('generateImage')],
+      stopWhen: [
+        stepCountIs(maxSteps),
+        hasToolCall('generateImage'),
+        ...(capabilities?.needsSearch ? [hasToolCall('search')] : [])
+      ],
       ...(modelConfig?.providerOptions && {
         providerOptions: modelConfig.providerOptions
       }),
