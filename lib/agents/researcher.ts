@@ -7,6 +7,7 @@ import { documentTool } from '../tools/document'
 import { fetchTool } from '../tools/fetch'
 import { createQuestionTool } from '../tools/question'
 import { createSearchTool } from '../tools/search'
+import { normalizeToolCall } from '../tools/runtime/normalize-tool-call'
 import { createTodoTools } from '../tools/todo'
 import { createImageGenerationTool } from '../tools/image-generation'
 import { SearchMode } from '../types/search'
@@ -544,35 +545,17 @@ Requirements for the artifact:
       )
 
     const repairLegacyToolCall = async ({ toolCall, error }: any) => {
-      const name = String(toolCall?.toolName ?? '').toLowerCase()
-      if (!name.includes('search') || !error) return null
-
-      let input: Record<string, unknown>
-      try {
-        input =
-          typeof toolCall.input === 'string'
-            ? JSON.parse(toolCall.input)
-            : { ...(toolCall.input ?? {}) }
-      } catch {
-        return null
-      }
-
-      const query = String(input.query ?? input.q ?? '').trim()
-      if (!query) return null
-
+      if (!error) return null
+      const normalized = normalizeToolCall(
+        toolCall.toolCallId,
+        toolCall.toolName,
+        toolCall.input
+      )
+      if (!normalized) return null
       return {
         ...toolCall,
-        toolName: 'search',
-        input: JSON.stringify({
-          query,
-          type: input.type === 'general' ? 'general' : 'optimized',
-          content_types: ['web'],
-          max_results: Number(input.max_results ?? input.topk ?? 10),
-          search_depth:
-            input.search_depth === 'advanced' ? 'advanced' : 'basic',
-          include_domains: [],
-          exclude_domains: []
-        })
+        toolName: normalized.name,
+        input: JSON.stringify(normalized.arguments)
       }
     }
 
