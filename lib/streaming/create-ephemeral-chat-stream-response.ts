@@ -1,13 +1,7 @@
 import type { LangfuseSpan } from '@langfuse/tracing'
 import { propagateAttributes, startActiveObservation } from '@langfuse/tracing'
 import type { UIMessage } from 'ai'
-import {
-  consumeStream,
-  convertToModelMessages,
-  createUIMessageStream,
-  createUIMessageStreamResponse,
-  smoothStream
-} from 'ai'
+import { consumeStream, convertToModelMessages, smoothStream } from 'ai'
 
 import { researcher } from '@/lib/agents/researcher'
 import {
@@ -217,6 +211,7 @@ export async function createEphemeralChatStreamResponse(
           }
         })
       })
+      result.consumeStream()
 
       if (isUsageLogging()) {
         Promise.resolve(result.totalUsage)
@@ -224,46 +219,43 @@ export async function createEphemeralChatStreamResponse(
           .catch(() => {})
       }
 
-      // Surface the preloaded web-search results as a synthetic `tool-search` UI
-      // part so the Sources panel and inline citation map are populated even
-      // though the model never invoked the search tool (it can't emit a valid
-      // native tool call). The citation map is keyed by `preloaded-search`, and
-      // the preloaded prompt instructs the model to cite as [n](#preloaded-search).
-      const syntheticSearchPart =
-        searchResultsForCitation && searchResultsForCitation.results.length > 0
-          ? {
-              type: 'tool-search' as const,
-              toolCallId: 'preloaded-search',
-              state: 'output-available' as const,
-              input: {
-                query: userQuery,
-                type: 'optimized',
-                content_types: ['web'],
-                max_results: 10,
-                search_depth: 'basic'
-              },
-              output: { ...searchResultsForCitation, state: 'complete' as const }
+      return result.toUIMessageStreamResponse({
+        messageMetadata: ({ part }) => {
+          if (part.type === 'start') {
+            return {
+              traceId: parentTraceId,
+              searchMode,
+              modelId: `${model.providerId}:${model.id}`
             }
-          : undefined
-
-      const stream = createUIMessageStream({
-        execute: async ({ writer }) => {
-          if (syntheticSearchPart) {
-            writer.write(
-              syntheticSearchPart as unknown as Parameters<typeof writer.write>[0]
-            )
           }
-          writer.merge(
-            result.toUIMessageStream() as unknown as Parameters<
-              typeof writer.merge
-            >[0]
-          )
-        },
-        onError: (error: unknown) => {
-          console.error('Ephemeral stream response error:', error)
-          return serializePublicError(error)
         },
         onFinish: ({ responseMessage }) => {
+          // Attach preloaded web-search results as a synthetic `tool-search` part
+          // so the Sources panel and inline citation map persist with the message.
+          // Attached here (not in the live SSE stream) because a bare tool part
+          // first breaks stricter SSE clients (e.g. mobile).
+          if (
+            responseMessage &&
+            searchResultsForCitation &&
+            searchResultsForCitation.results.length > 0
+          ) {
+            responseMessage.parts = [
+              ...(responseMessage.parts ?? []),
+              {
+                type: 'tool-search',
+                toolCallId: 'preloaded-search',
+                state: 'output-available',
+                input: {
+                  query: userQuery,
+                  type: 'optimized',
+                  content_types: ['web'],
+                  max_results: 10,
+                  search_depth: 'basic'
+                },
+                output: { ...searchResultsForCitation, state: 'complete' }
+              } as unknown as (typeof responseMessage.parts)[number]
+            ]
+          }
           // Numero 1: guarantee NO emoji leaks into any generated code/artifact
           // (emoji-as-UI-icon) for guest chats too. Conversational text outside
           // code blocks is preserved.
@@ -272,11 +264,11 @@ export async function createEphemeralChatStreamResponse(
           // Langfuse is unreachable, awaiting forceFlush would keep the
           // response open and the UI stuck on "Répondre…".
           void endTracing()
-        }
-      })
-
-      return createUIMessageStreamResponse({
-        stream,
+        },
+        onError: (error: unknown) => {
+          console.error('Ephemeral stream response error:', error)
+          return serializePublicError(error)
+        },
         consumeSseStream: consumeStream
       })
     } catch (error) {

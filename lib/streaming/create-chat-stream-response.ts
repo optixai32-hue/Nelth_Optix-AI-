@@ -3,8 +3,6 @@ import { propagateAttributes, startActiveObservation } from '@langfuse/tracing'
 import {
   consumeStream,
   convertToModelMessages,
-  createUIMessageStream,
-  createUIMessageStreamResponse,
   smoothStream
 } from 'ai'
 
@@ -331,9 +329,10 @@ export async function createChatStreamResponse(
         })
       })
       perfTime('[TTFT] model request sent (T4)', llmStart)
+      result.consumeStream()
 
       // Log the session-total usage once the stream settles (does not block the
-      // response; the SSE stream below drives it to completion).
+      // response; consumeStream above already drives it to completion).
       if (isUsageLogging()) {
         Promise.resolve(result.totalUsage)
           .then(usage =>
@@ -342,46 +341,47 @@ export async function createChatStreamResponse(
           .catch(() => {})
       }
 
-      // Surface the preloaded web-search results as a synthetic `tool-search` UI
-      // part so the Sources panel and inline citation map are populated even
-      // though the model never invoked the search tool (it can't emit a valid
-      // native tool call). The citation map is keyed by `preloaded-search`, and
-      // the preloaded prompt instructs the model to cite as [n](#preloaded-search).
-      const syntheticSearchPart =
-        searchResultsForCitation && searchResultsForCitation.results.length > 0
-          ? {
-              type: 'tool-search' as const,
-              toolCallId: 'preloaded-search',
-              state: 'output-available' as const,
-              input: {
-                query: userQuery,
-                type: 'optimized',
-                content_types: ['web'],
-                max_results: 10,
-                search_depth: 'basic'
-              },
-              output: { ...searchResultsForCitation, state: 'complete' as const }
+      return result.toUIMessageStreamResponse({
+        messageMetadata: ({ part }) => {
+          if (part.type === 'start') {
+            return {
+              traceId: parentTraceId,
+              searchMode,
+              modelId: context.modelId
             }
-          : undefined
-
-      const stream = createUIMessageStream({
-        execute: async ({ writer }) => {
-          if (syntheticSearchPart) {
-            writer.write(
-              syntheticSearchPart as unknown as Parameters<typeof writer.write>[0]
-            )
           }
-          writer.merge(
-            result.toUIMessageStream() as unknown as Parameters<
-              typeof writer.merge
-            >[0]
-          )
-        },
-        onError: (error: unknown) => {
-          console.error('Stream response error:', error)
-          return serializePublicError(error)
         },
         onFinish: ({ responseMessage, isAborted }) => {
+          // Attach preloaded web-search results as a synthetic `tool-search` part
+          // so the Sources panel and inline citation map persist with the message.
+          // The model never invokes the search tool (it can't emit a valid native
+          // tool call), so no real tool part exists; without this, a reload would
+          // lose both the Sources list and the inline citations. We attach it here
+          // (not into the live SSE stream) because writing a bare tool part first
+          // breaks stricter SSE clients (e.g. mobile).
+          if (
+            !isAborted &&
+            responseMessage &&
+            searchResultsForCitation &&
+            searchResultsForCitation.results.length > 0
+          ) {
+            responseMessage.parts = [
+              ...(responseMessage.parts ?? []),
+              {
+                type: 'tool-search',
+                toolCallId: 'preloaded-search',
+                state: 'output-available',
+                input: {
+                  query: userQuery,
+                  type: 'optimized',
+                  content_types: ['web'],
+                  max_results: 10,
+                  search_depth: 'basic'
+                },
+                output: { ...searchResultsForCitation, state: 'complete' }
+              } as unknown as (typeof responseMessage.parts)[number]
+            ]
+          }
           // Post-processing (skill enforcement, Firebase/DB persistence, tracing
           // flush) runs in the background and does NOT block the SSE stream from
           // closing. If any of these hang — e.g. an unreachable Firebase/Langfuse
@@ -438,11 +438,11 @@ export async function createChatStreamResponse(
               await endTracing()
             }
           })()
-        }
-      })
-
-      return createUIMessageStreamResponse({
-        stream,
+        },
+        onError: (error: unknown) => {
+          console.error('Stream response error:', error)
+          return serializePublicError(error)
+        },
         consumeSseStream: consumeStream
       })
     } catch (error) {
