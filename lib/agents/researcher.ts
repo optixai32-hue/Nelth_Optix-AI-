@@ -546,8 +546,7 @@ Requirements for the artifact:
       // already shown by its own UI component.
       stopWhen: [
         stepCountIs(maxSteps),
-        hasToolCall('generateImage'),
-        ...(capabilities?.needsSearch ? [hasToolCall('search')] : [])
+        hasToolCall('generateImage')
       ],
       ...(modelConfig?.providerOptions && {
         providerOptions: modelConfig.providerOptions
