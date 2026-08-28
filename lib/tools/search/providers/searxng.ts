@@ -92,13 +92,50 @@ export class SearXNGSearchProvider extends BaseSearchProvider {
     wantImages: boolean,
     includeDomains: string[]
   ): Promise<SearchResults> {
-    const params = new URLSearchParams({ q })
+    // SearXNG requires a session cookie + CSRF token for search: fetch the home
+    // page first to obtain them, then POST the query. This works against
+    // self-hosted instances (the reliable way to run SearXNG) and many public
+    // ones. Public instances that rate-limit simply throw and the next instance
+    // in the fallback list is tried.
+    let cookie = ''
+    let csrf = ''
+    try {
+      const home = await fetch(`${base}/`, {
+        headers: { 'User-Agent': UA },
+        signal: AbortSignal.timeout(8000)
+      })
+      const setCookie = (
+        home.headers.getSetCookie
+          ? home.headers.getSetCookie()
+          : home.headers.get('set-cookie')
+            ? [home.headers.get('set-cookie') as string]
+            : []
+      ) as string[]
+      cookie = setCookie.map(c => c.split(';')[0]).join('; ')
+      const ht = await home.text()
+      const cm =
+        ht.match(/name="csrf_token"[^>]*value="([^"]+)"/) ||
+        ht.match(/csrf_token["']?\s*[:=]\s*["']([^"']+)["']/)
+      if (cm) csrf = cm[1]
+    } catch {
+      // Some instances don't require a session; fall through and POST anyway.
+    }
+
+    const params = new URLSearchParams({ q, format: 'json' })
+    if (csrf) params.set('csrf_token', csrf)
     if (wantImages) params.set('categories', 'images')
 
-    const url = `${base}/search?${params.toString()}`
-    const res = await fetch(url, {
-      headers: { 'User-Agent': UA, Accept: 'application/json, text/html' },
-      signal: AbortSignal.timeout(10000)
+    const res = await fetch(`${base}/search`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': UA,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'text/html,application/json',
+        ...(cookie ? { Cookie: cookie } : {})
+      },
+      body: params.toString(),
+      signal: AbortSignal.timeout(10000),
+      redirect: 'follow'
     })
 
     if (res.status === 429) {
