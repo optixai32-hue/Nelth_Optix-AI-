@@ -44,3 +44,13 @@ _local/
 
 .vercel
 .env*
+
+# build logs
+_build*.log
+_get_pw*.log
+_dev*.log
+_build_v2.log
+_build_final.log
+_build_v3.log
+_build_v4.log
+_build_exit.txt
