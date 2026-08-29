@@ -6,7 +6,6 @@
   "devCommand": "bun run dev",
   "regions": ["cdg1"],
   "env": {
-    "SEARCH_API": "searxng",
-    "SEARXNG_API_URL": "https://searxng-production-4ff3.up.railway.app"
+    "SEARCH_API": "nelthweb"
   }
 }

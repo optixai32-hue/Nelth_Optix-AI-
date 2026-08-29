@@ -5,10 +5,7 @@ import { SearchResults } from '@/lib/types'
 import { getSearchToolDescription } from '@/lib/utils/search-config'
 import { logToolPayload } from '@/lib/utils/usage-logging'
 
-import {
-  createSearchProvider,
-  resolveSearchProviderType
-} from './search/providers'
+import { createSearchProvider } from './search/providers'
 
 /**
  * Creates a search tool with the appropriate schema for the given model.
@@ -64,10 +61,9 @@ export function createSearchTool(fullModel: string) {
         }
       }
 
-      // The provider is resolved from SEARCH_API / available API keys (Tavily,
-      // Brave) and falls back to DuckDuckGo for local dev.
+      // All search now goes through the NelthWeb provider.
       console.log(
-        `Using search API: ${resolveSearchProviderType()}, Type: ${type}, Search Depth: ${effectiveSearchDepth}`
+        `Using search API: nelthweb, Type: ${type}, Search Depth: ${effectiveSearchDepth}`
       )
 
       try {
