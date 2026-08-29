@@ -432,6 +432,25 @@ export function createResearcher({
         )
       }
 
+      // IMAGE TASKS: the weak model (Nelth-3.5) sometimes emits a spurious
+      // `tool-search` fake-XML call before the real image tool, which the runtime
+      // executes as a garbage web search ("Searching for 'tool-search'"). When the
+      // request is an image task that does NOT genuinely need web search, drop
+      // search/fetch so generateImage is the only generative tool — the model goes
+      // straight to the image without a bogus search round-trip. (If a real search
+      // is needed, caps.needsSearch is true and we keep the tools.)
+      if (capabilities?.needsImage && !capabilities?.needsSearch) {
+        const before = activeToolsList.join(',')
+        activeToolsList = activeToolsList.filter(
+          t => t !== 'search' && t !== 'fetch'
+        )
+        if (before !== activeToolsList.join(',')) {
+          console.log(
+            `[Researcher] Image task — dropped search/fetch to avoid spurious tool-search, tools=[${activeToolsList.join(', ')}]`
+          )
+        }
+      }
+
       // LAZY TOOL ARMING: a trivial request (greeting, simple chat, translation,
       // plain explanation) was gated by the orchestrator as needing no skill and
       // no external tool. Arm NO tools so the model answers immediately without
