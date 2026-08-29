@@ -564,15 +564,21 @@ Requirements for the artifact:
       instructions,
       tools,
       activeTools: activeToolsList,
-      ...(capabilities?.needsSearch && activeToolsList.includes('search')
-        ? { toolChoice: { type: 'tool' as const, toolName: 'search' as const } }
-        : capabilities?.needsImage && activeToolsList.includes('generateImage')
-          ? {
-              toolChoice: {
-                type: 'tool' as const,
-                toolName: 'generateImage' as const
-              }
+      // Tool-choice priority: a request's dominant intent must win. Image tasks
+      // are checked BEFORE search, because `needsSearch` is triggered by a very
+      // broad regex (matches "2026", "today", "current", "event", "price", …).
+      // Without this ordering, an image-edit / image-generation request that also
+      // contains a current-info word would be hard-forced to the `search` tool and
+      // never call the intended image tool.
+      ...(capabilities?.needsImage && activeToolsList.includes('generateImage')
+        ? {
+            toolChoice: {
+              type: 'tool' as const,
+              toolName: 'generateImage' as const
             }
+          }
+        : capabilities?.needsSearch && activeToolsList.includes('search')
+          ? { toolChoice: { type: 'tool' as const, toolName: 'search' as const } }
           : {}),
       prepareStep: ({ steps }) => {
         if (!hasCompletedSearch(steps)) return {}
