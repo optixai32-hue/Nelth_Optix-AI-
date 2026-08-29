@@ -259,12 +259,28 @@ export async function createEphemeralChatStreamResponse(
         output: { ...searchResultsForCitation, state: 'complete' }
       }
 
+      // Nelth-3.5 (tencent/hy3:free) is a non-thinking model: the Kilo gateway
+      // ALWAYS returns a `reasoning` field (reasoning_tokens is never 0, and no
+      // request param can disable it server-side — confirmed by probing the API).
+      // Drop reasoning parts at the stream source so the client never receives or
+      // persists them; the final answer text is unaffected.
+      const isNonThinkingModel = model.id === 'tencent/hy3:free'
+
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
           const reader = (agentStream as unknown as ReadableStream<unknown>).getReader()
           while (true) {
             const { done, value } = await reader.read()
             if (done) break
+            const part = value as { type?: string } | undefined
+            if (
+              isNonThinkingModel &&
+              part &&
+              typeof part.type === 'string' &&
+              part.type.includes('reasoning')
+            ) {
+              continue
+            }
             writer.write(value as unknown as Parameters<typeof writer.write>[0])
           }
           if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
