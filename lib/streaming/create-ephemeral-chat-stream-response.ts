@@ -305,6 +305,20 @@ export async function createEphemeralChatStreamResponse(
               ) {
                 continue
               }
+              // Skip error parts emitted by the agent stream — they would
+              // otherwise be written to the client and rendered as
+              // "We could not generate a response" even when real answer
+              // content was already delivered. The AI SDK v5 emits several
+              // error part types: 'error', 'tool-error', 'tool-input-error',
+              // 'tool-output-error'.
+              if (
+                part &&
+                typeof part.type === 'string' &&
+                (part.type === 'error' || part.type.endsWith('-error'))
+              ) {
+                console.error('[Ephemeral] skipping error part from agent stream:', part)
+                continue
+              }
               writer.write(value as unknown as Parameters<typeof writer.write>[0])
               if (
                 part &&

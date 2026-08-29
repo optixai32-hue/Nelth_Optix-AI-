@@ -404,11 +404,13 @@ export async function createChatStreamResponse(
       // preloaded search block). It is used here to filter reasoning parts from
       // the stream so the client never receives or persists them.
 
-      // Hoisted so `onError` can decide whether the error is fatal. If real answer
-      // content was already streamed to the client, a trailing stream error (e.g. a
-      // transient gateway hiccup AFTER the text completed) must NOT replace the
-      // delivered answer with "We could not generate a response".
+      // Tracks whether any answer content was streamed to the client. If real
+      // answer content was already delivered, a trailing stream error (e.g. a
+      // transient gateway hiccup AFTER the text completed, or an error part
+      // emitted by the agent stream) must NOT replace the delivered answer
+      // with "We could not generate a response".
       let wroteContent = false
+      let writtenPartCount = 0
 
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
@@ -426,7 +428,22 @@ export async function createChatStreamResponse(
               ) {
                 continue
               }
+              // Skip error parts emitted by the agent stream — they would
+              // otherwise be written to the client and rendered as
+              // "We could not generate a response" even when real answer
+              // content was already delivered. The AI SDK v5 emits several
+              // error part types: 'error', 'tool-error', 'tool-input-error',
+              // 'tool-output-error'.
+              if (
+                part &&
+                typeof part.type === 'string' &&
+                (part.type === 'error' || part.type.endsWith('-error'))
+              ) {
+                console.error('[Stream] skipping error part from agent stream:', part)
+                continue
+              }
               writer.write(value as unknown as Parameters<typeof writer.write>[0])
+              writtenPartCount++
               if (
                 part &&
                 typeof part.type === 'string' &&
@@ -436,10 +453,6 @@ export async function createChatStreamResponse(
               }
             }
           } catch (streamErr) {
-            // The answer may already be fully streamed to the client. Log the real
-            // error for diagnosis but do NOT rethrow — rethrowing would hand an
-            // error part to the client and overwrite the delivered response with a
-            // generic failure message.
             console.error(
               '[Stream] error after content streamed=' + wroteContent + ':',
               streamErr
@@ -448,11 +461,6 @@ export async function createChatStreamResponse(
               throw streamErr
             }
           } finally {
-            // ALWAYS surface the preloaded search results as a synthetic tool-search
-            // part so the Sources panel and inline [n] citations render — even when
-            // the model stream errored (e.g. it attempted a search tool call that is
-            // unavailable in preloaded mode). Without this, a successful answer would
-            // arrive with NO citations.
             if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
               try {
                 writer.write(
@@ -468,11 +476,15 @@ export async function createChatStreamResponse(
           }
         },
         onError: (error: unknown) => {
-          console.error('Stream response error:', error)
-          // If the answer was already streamed to the client, do NOT replace it with
-          // a generic failure — the user got a valid response. Return an empty string so
-          // the AI SDK emits no error part and the delivered answer stays visible.
-          if (wroteContent) {
+          console.error(
+            'Stream response error (wroteContent=' +
+              wroteContent +
+              ', parts=' +
+              writtenPartCount +
+              '):',
+            error
+          )
+          if (wroteContent || writtenPartCount > 0) {
             console.error(
               '[Stream] error suppressed — content already delivered; not surfacing to user'
             )
