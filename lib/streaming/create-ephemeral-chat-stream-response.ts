@@ -23,7 +23,7 @@ import { stripEmojiFromCodeInMessage } from '@/lib/skills/enforce-stream'
 import {
   type AttachmentLike,
   extractAttachmentFormats} from '@/lib/skills/document-runtime'
-import { getImageAttachmentUrl, getTextFromParts } from '@/lib/utils/message-utils'
+import { getImageAttachmentUrl, getTextFromParts, stripFakeToolCallXmlFromMessage } from '@/lib/utils/message-utils'
 import { search as runWebSearch } from '@/lib/tools/search'
 
 import { isTracingEnabled } from '@/lib/utils/telemetry'
@@ -116,21 +116,11 @@ export async function createEphemeralChatStreamResponse(
       // context when nothing matches so the model streams immediately. Mirrors the
       // authenticated chat path so guests get the same lazy architecture.
       const caps = await detectRequestCapabilities(userQuery, attachmentFormats)
-      // Preloaded search: the weak/reasoning models (e.g. Nelth-3.5 Thinking)
-      // cannot emit a valid native tool call — they output a fake <tool_call> XML
-      // block and the agent retries in a loop. So we fetch results server-side and
-      // feed them as text. To still show citations, we ALSO surface these results
-      // as a synthetic `tool-search` UI part in the stream (see below), which drives
-      // the Sources panel and the inline citation map.
-      let preloadedSearchContext: string | undefined
-      let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
-      if (caps.needsSearch) {
-        const searchResult = await runWebSearch(userQuery, 10, 'basic')
-        preloadedSearchContext = searchResult.results
-          .map(result => `- ${result.title}: ${result.url}\n  ${result.content}`)
-          .join('\n')
-        searchResultsForCitation = searchResult
-      }
+
+      // Nelth-3.5 (tencent/hy3:free) is a non-thinking model that cannot emit valid
+      // native tool calls — it outputs fake <tool_call> XML blocks. So for this model
+      // we ALWAYS preload search results for non-trivial queries.
+      const isNonThinkingModel = model.id === 'tencent/hy3:free'
 
       // A skill is needed only when one matched (LEVEL 1) or an attachment forces
       // it (e.g. an uploaded document). Everything else (greetings, simple chat,
@@ -162,6 +152,26 @@ export async function createEphemeralChatStreamResponse(
         !caps.needsDocument &&
         !caps.founderPhoto &&
         !skillNeeded
+
+      // Preloaded search: the weak non-thinking model cannot emit a valid native
+      // tool call — it outputs a fake <tool_call> XML block and the agent retries
+      // in a loop. So we fetch results server-side and feed them as text. To still
+      // show citations, we ALSO surface these results as a synthetic `tool-search`
+      // UI part in the stream (see below), which drives the Sources panel and the
+      // inline citation map.
+      // For the weak model we preload on ALL non-trivial queries (not just
+      // regex-matched ones) because it cannot search on its own at all.
+      const shouldPreloadSearch =
+        caps.needsSearch || (isNonThinkingModel && !trivial)
+      let preloadedSearchContext: string | undefined
+      let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
+      if (shouldPreloadSearch) {
+        const searchResult = await runWebSearch(userQuery, 10, 'basic')
+        preloadedSearchContext = searchResult.results
+          .map(result => `- ${result.title}: ${result.url}\n  ${result.content}`)
+          .join('\n')
+        searchResultsForCitation = searchResult
+      }
 
       let prevCtx: Awaited<ReturnType<typeof getPreviousDesignContext>> = {
         slugs: [],
@@ -267,48 +277,80 @@ export async function createEphemeralChatStreamResponse(
         output: { ...searchResultsForCitation, state: 'complete' }
       }
 
-      // Nelth-3.5 (tencent/hy3:free) is a non-thinking model: the Kilo gateway
-      // ALWAYS returns a `reasoning` field (reasoning_tokens is never 0, and no
-      // request param can disable it server-side — confirmed by probing the API).
-      // Drop reasoning parts at the stream source so the client never receives or
-      // persists them; the final answer text is unaffected.
-      const isNonThinkingModel = model.id === 'tencent/hy3:free'
+      // isNonThinkingModel is declared earlier in the function (before the
+      // preloaded search block). It is used here to filter reasoning parts from
+      // the stream so the client never receives or persists them.
+
+      // Shared between execute and onError: if real answer content was already
+      // streamed to the client, a trailing stream error must NOT replace the
+      // delivered answer with a generic failure message.
+      const streamErrorSuppression = { wroteContent: false }
 
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
-          const reader = (agentStream as unknown as ReadableStream<unknown>).getReader()
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            const part = value as { type?: string } | undefined
-            if (
-              isNonThinkingModel &&
-              part &&
-              typeof part.type === 'string' &&
-              part.type.includes('reasoning')
-            ) {
-              continue
+          try {
+            const reader = (agentStream as unknown as ReadableStream<unknown>).getReader()
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              const part = value as { type?: string } | undefined
+              if (
+                isNonThinkingModel &&
+                part &&
+                typeof part.type === 'string' &&
+                part.type.includes('reasoning')
+              ) {
+                continue
+              }
+              writer.write(value as unknown as Parameters<typeof writer.write>[0])
+              if (
+                part &&
+                typeof part.type === 'string' &&
+                (part.type === 'text' || part.type === 'text-delta')
+              ) {
+                streamErrorSuppression.wroteContent = true
+              }
             }
-            writer.write(value as unknown as Parameters<typeof writer.write>[0])
-          }
-          if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
-            writer.write(
-              syntheticSearchInput as unknown as Parameters<typeof writer.write>[0]
+            if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
+              writer.write(
+                syntheticSearchInput as unknown as Parameters<typeof writer.write>[0]
+              )
+              writer.write(
+                syntheticSearchOutput as unknown as Parameters<typeof writer.write>[0]
+              )
+            }
+          } catch (streamErr) {
+            console.error(
+              '[Ephemeral] error after content streamed=' +
+                streamErrorSuppression.wroteContent +
+                ':',
+              streamErr
             )
-            writer.write(
-              syntheticSearchOutput as unknown as Parameters<typeof writer.write>[0]
-            )
+            if (!streamErrorSuppression.wroteContent) {
+              throw streamErr
+            }
           }
         },
         onError: (error: unknown) => {
           console.error('Ephemeral stream response error:', error)
+          if (streamErrorSuppression.wroteContent) {
+            console.error(
+              '[Ephemeral] error suppressed — content already delivered; not surfacing to user'
+            )
+            return ''
+          }
           return serializePublicError(error)
         },
         onFinish: ({ responseMessage }) => {
           // Numero 1: guarantee NO emoji leaks into any generated code/artifact
           // (emoji-as-UI-icon) for guest chats too. Conversational text outside
           // code blocks is preserved.
-          if (responseMessage) stripEmojiFromCodeInMessage(responseMessage)
+          if (responseMessage) {
+            stripEmojiFromCodeInMessage(responseMessage)
+            // Strip fake <tool_call> / <function> XML blocks the weak model
+            // emits as text instead of native tool calls.
+            stripFakeToolCallXmlFromMessage(responseMessage)
+          }
           // Do not block the SSE stream closure on the tracing flush: if
           // Langfuse is unreachable, awaiting forceFlush would keep the
           // response open and the UI stuck on "Répondre…".

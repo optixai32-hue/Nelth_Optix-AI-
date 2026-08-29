@@ -45,6 +45,36 @@ function buildUrl(
   return `${NELTHWEB_BASE}${path}?${usp.toString()}`
 }
 
+async function fetchWithRetry(
+  url: string,
+  maxRetries = 3,
+  baseDelayMs = 500
+): Promise<Response> {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' })
+      if (res.ok) return res
+      // Retry on server errors (5xx) and rate limits (429)
+      if (res.status >= 500 || res.status === 429) {
+        lastError = new Error(`HTTP ${res.status} ${res.statusText}`)
+        const delay = baseDelayMs * 2 ** attempt + Math.random() * 200
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      // Non-retryable error — return the response so caller can handle it
+      return res
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * 2 ** attempt + Math.random() * 200
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+  throw lastError ?? new Error('NelthWeb request failed after retries')
+}
+
 function asString(value: unknown): string {
   if (typeof value === 'string') return value
   if (value == null) return ''
@@ -89,11 +119,13 @@ function mapWebResponse(
     const description = asString(r.description)
     const url = resolveWebUrl(r, bibliography, i)
     const citation = asString(r.citation)
-    const content = citation
+    // Content MUST be the actual description text so the model can answer from it.
+    // The citation marker ([1], [2]…) is only for inline citation referencing.
+    const content = description
       ? citation
-      : description
-        ? `${title} — ${description}`
-        : title
+        ? `${description} ${citation}`
+        : description
+      : title
     return { title, url, content }
   })
 
@@ -150,7 +182,7 @@ export class NelthWebSearchProvider {
         q: query,
         count: String(maxResults || DEFAULT_IMAGE_COUNT)
       })
-      const res = await fetch(url, { cache: 'no-store' })
+      const res = await fetchWithRetry(url)
       if (!res.ok) {
         throw new Error(
           `NelthWeb image search failed: ${res.status} ${res.statusText}`
@@ -169,7 +201,7 @@ export class NelthWebSearchProvider {
     })
 
     const webPromise = (async () => {
-      const res = await fetch(webUrl, { cache: 'no-store' })
+      const res = await fetchWithRetry(webUrl)
       if (!res.ok) {
         throw new Error(
           `NelthWeb search failed: ${res.status} ${res.statusText}`
@@ -189,7 +221,7 @@ export class NelthWebSearchProvider {
     })
     const imagePromise = (async () => {
       try {
-        const res = await fetch(imageUrl, { cache: 'no-store' })
+        const res = await fetchWithRetry(imageUrl)
         if (!res.ok) return { images: [] as SearchResultImage[] }
         const data = (await res.json()) as NelthWebImageResponse
         return mapImageResponse(data, query)

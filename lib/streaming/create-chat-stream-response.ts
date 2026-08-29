@@ -34,7 +34,7 @@ import {
   shouldTruncateMessages,
   truncateMessages
 } from '../utils/context-window'
-import { getImageAttachmentUrl, getTextFromParts } from '../utils/message-utils'
+import { getImageAttachmentUrl, getTextFromParts, stripFakeToolCallXmlFromMessage } from '../utils/message-utils'
 import { search as runWebSearch } from '../tools/search'
 import { perfLog, perfTime } from '../utils/perf-logging'
 import { isUsageLogging, logUsage } from '../utils/usage-logging'
@@ -177,21 +177,16 @@ export async function createChatStreamResponse(
       // routing/loading skills or arming the research agent. Falls back to an empty
       // context when nothing matches so the model streams immediately.
       const caps = await detectRequestCapabilities(userQuery, attachmentFormats)
-      // Preloaded search: the weak/reasoning models (e.g. Nelth-3.5 Thinking)
-      // cannot emit a valid native tool call — they output a fake <tool_call> XML
-      // block and the agent retries in a loop. So we fetch results server-side and
-      // feed them as text. To still show citations, we ALSO surface these results
-      // as a synthetic `tool-search` UI part in the stream (see below), which drives
-      // the Sources panel and the inline citation map.
-      let preloadedSearchContext: string | undefined
-      let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
-      if (caps.needsSearch) {
-        const searchResult = await runWebSearch(userQuery, 10, 'basic')
-        preloadedSearchContext = searchResult.results
-          .map(result => `- ${result.title}: ${result.url}\n  ${result.content}`)
-          .join('\n')
-        searchResultsForCitation = searchResult
-      }
+
+      // Nelth-3.5 (tencent/hy3:free) is a non-thinking model: the Kilo gateway
+      // ALWAYS returns a `reasoning` field (reasoning_tokens is never 0, and no
+      // request param can disable it server-side). It also cannot emit valid
+      // native tool calls — it outputs fake <tool_call> XML blocks. So for this
+      // model we ALWAYS preload search results for non-trivial queries (unless
+      // the capability detector already flagged needsSearch, in which case we
+      // preload too). This prevents the model from hallucinating current info
+      // it no longer has in its weights.
+      const isNonThinkingModel = model.id === 'tencent/hy3:free'
 
       // A skill is needed only when one matched (LEVEL 1) or an attachment forces
       // it (e.g. an uploaded document). Everything else (greetings, simple chat,
@@ -221,6 +216,26 @@ export async function createChatStreamResponse(
         !caps.needsDocument &&
         !caps.founderPhoto &&
         !skillNeeded
+
+      // Preloaded search: the weak non-thinking model cannot emit a valid native
+      // tool call — it outputs a fake <tool_call> XML block and the agent retries
+      // in a loop. So we fetch results server-side and feed them as text. To still
+      // show citations, we ALSO surface these results as a synthetic `tool-search`
+      // UI part in the stream (see below), which drives the Sources panel and the
+      // inline citation map.
+      // For the weak model we preload on ALL non-trivial queries (not just
+      // regex-matched ones) because it cannot search on its own at all.
+      const shouldPreloadSearch =
+        caps.needsSearch || (isNonThinkingModel && !trivial)
+      let preloadedSearchContext: string | undefined
+      let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
+      if (shouldPreloadSearch) {
+        const searchResult = await runWebSearch(userQuery, 10, 'basic')
+        preloadedSearchContext = searchResult.results
+          .map(result => `- ${result.title}: ${result.url}\n  ${result.content}`)
+          .join('\n')
+        searchResultsForCitation = searchResult
+      }
 
       let prevCtx: Awaited<ReturnType<typeof getPreviousDesignContext>> = {
         slugs: [],
@@ -382,12 +397,9 @@ export async function createChatStreamResponse(
         output: { ...searchResultsForCitation, state: 'complete' }
       }
 
-      // Nelth-3.5 (tencent/hy3:free) is a non-thinking model: the Kilo gateway
-      // ALWAYS returns a `reasoning` field (reasoning_tokens is never 0, and no
-      // request param can disable it server-side — confirmed by probing the API).
-      // Drop reasoning parts at the stream source so the client never receives or
-      // persists them; the final answer text is unaffected.
-      const isNonThinkingModel = model.id === 'tencent/hy3:free'
+      // isNonThinkingModel is declared earlier in the function (before the
+      // preloaded search block). It is used here to filter reasoning parts from
+      // the stream so the client never receives or persists them.
 
       // Hoisted so `onError` can decide whether the error is fatal. If real answer
       // content was already streamed to the client, a trailing stream error (e.g. a
@@ -527,6 +539,11 @@ export async function createChatStreamResponse(
               // re-inserts them even for plain code requests. Conversational text
               // outside code blocks is preserved (legitimate on-page emoji stay).
               stripEmojiFromCodeInMessage(responseMessage)
+
+              // Strip fake <tool_call> / <function> XML blocks the weak model
+              // emits as text instead of native tool calls — they would otherwise
+              // leak into the final answer as raw markup.
+              stripFakeToolCallXmlFromMessage(responseMessage)
 
               // Persist stream results to database (best-effort, non-blocking)
               await persistStreamResults(

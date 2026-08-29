@@ -207,3 +207,38 @@ export function hasToolCalls(message: UIMessage | null): boolean {
       part.type && (part.type.startsWith('tool-') || part.type === 'tool-call')
   )
 }
+
+// Fake XML tool-call blocks the weak non-thinking model emits as text instead of
+// native tool calls. These leak into the final answer and are rendered as raw
+// <tool_call>…</tool_call> markup. Strip them so the user never sees them.
+const FAKE_TOOL_CALL_RE = /<tool_call\b[^>]*>[\s\S]*?<\/tool_call>/gi
+const FAKE_FUNCTION_CALL_RE = /<function\b[^>]*>[\s\S]*?<\/function>/gi
+const FAKE_TOOL_SEARCH_RE =
+  /<tool-search\b[^>]*>[\s\S]*?<\/tool-search>/gi
+
+export function stripFakeToolCallXml(text: string): string {
+  if (!text) return text
+  return text
+    .replace(FAKE_TOOL_CALL_RE, '')
+    .replace(FAKE_FUNCTION_CALL_RE, '')
+    .replace(FAKE_TOOL_SEARCH_RE, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+export function stripFakeToolCallXmlFromMessage(message: {
+  parts?: unknown[]
+}): boolean {
+  const parts = (message.parts as Array<{ type: string; text?: string }>) ?? []
+  let changed = false
+  for (const p of parts) {
+    if (p.type === 'text' && typeof p.text === 'string') {
+      const cleaned = stripFakeToolCallXml(p.text)
+      if (cleaned !== p.text) {
+        p.text = cleaned
+        changed = true
+      }
+    }
+  }
+  return changed
+}
