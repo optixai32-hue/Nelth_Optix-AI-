@@ -242,3 +242,19 @@ export function stripFakeToolCallXmlFromMessage(message: {
   }
   return changed
 }
+
+// Detect pure greetings / short chat messages that do NOT need web search.
+// These are conversational turns where the model should answer immediately
+// without any tool. Anything longer or more specific (even if it fails the
+// strict intent regexes) should still get preloaded search for the weak
+// model so it doesn't hallucinate [n] citations.
+const PURE_GREETING_RE =
+  /^\s*(bonjour|hello|hi|hey|salut|coucou|yo|ça\s+va|ca\s+va|comment\s+(ça|ca)\s+va|what'?s\s+up|how\s+are\s+you|comment\s+allez[- ]vous|merci|thanks|thx|ok|okay|oui|yes|no|non|d'?accord|noted|super|cool|great|bien|bienvenue|welcome|bye|au\s+revoir|bonne\s+(journée|nuit)|good\s+(morning|evening|night|afternoon))\s*[!?.?\s]*$/i
+
+export function isPureGreeting(query: string): boolean {
+  if (!query) return false
+  const trimmed = query.trim()
+  // Very short messages (< 25 chars) that match a greeting pattern
+  if (trimmed.length > 40) return false
+  return PURE_GREETING_RE.test(trimmed)
+}

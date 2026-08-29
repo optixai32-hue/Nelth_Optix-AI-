@@ -34,7 +34,7 @@ import {
   shouldTruncateMessages,
   truncateMessages
 } from '../utils/context-window'
-import { getImageAttachmentUrl, getTextFromParts, stripFakeToolCallXmlFromMessage } from '../utils/message-utils'
+import { getImageAttachmentUrl, getTextFromParts, isPureGreeting, stripFakeToolCallXmlFromMessage } from '../utils/message-utils'
 import { search as runWebSearch } from '../tools/search'
 import { perfLog, perfTime } from '../utils/perf-logging'
 import { isUsageLogging, logUsage } from '../utils/usage-logging'
@@ -223,10 +223,13 @@ export async function createChatStreamResponse(
       // show citations, we ALSO surface these results as a synthetic `tool-search`
       // UI part in the stream (see below), which drives the Sources panel and the
       // inline citation map.
-      // For the weak model we preload on ALL non-trivial queries (not just
-      // regex-matched ones) because it cannot search on its own at all.
+      // For the weak model we preload on ALL non-greeting queries (not just
+      // regex-matched ones) because it cannot search on its own at all. A query
+      // like "sources d'images d'Elon Musk" fails every intent regex but still
+      // needs real results — without them the model hallucinates [n] citations.
       const shouldPreloadSearch =
-        caps.needsSearch || (isNonThinkingModel && !trivial)
+        caps.needsSearch ||
+        (isNonThinkingModel && !isPureGreeting(userQuery))
       let preloadedSearchContext: string | undefined
       let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
       if (shouldPreloadSearch) {
