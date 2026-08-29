@@ -391,28 +391,55 @@ export async function createChatStreamResponse(
 
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
-          const reader = (agentStream as unknown as ReadableStream<unknown>).getReader()
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            const part = value as { type?: string } | undefined
-            if (
-              isNonThinkingModel &&
-              part &&
-              typeof part.type === 'string' &&
-              part.type.includes('reasoning')
-            ) {
-              continue
+          // Track whether we already streamed real content. A non-fatal error that
+          // occurs AFTER the answer was delivered (e.g. a stray tool call the weak
+          // model emits once it has finished, or a trailing transport hiccup) must
+          // NOT replace a successful answer with "We could not generate a response".
+          let wroteContent = false
+          try {
+            const reader = (agentStream as unknown as ReadableStream<unknown>).getReader()
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              const part = value as { type?: string } | undefined
+              if (
+                isNonThinkingModel &&
+                part &&
+                typeof part.type === 'string' &&
+                part.type.includes('reasoning')
+              ) {
+                continue
+              }
+              writer.write(value as unknown as Parameters<typeof writer.write>[0])
+              if (
+                part &&
+                typeof part.type === 'string' &&
+                (part.type === 'text' || part.type === 'text-delta')
+              ) {
+                wroteContent = true
+              }
             }
-            writer.write(value as unknown as Parameters<typeof writer.write>[0])
-          }
-          if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
-            writer.write(
-              syntheticSearchInput as unknown as Parameters<typeof writer.write>[0]
+            if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
+              writer.write(
+                syntheticSearchInput as unknown as Parameters<typeof writer.write>[0]
+              )
+              writer.write(
+                syntheticSearchOutput as unknown as Parameters<typeof writer.write>[0]
+              )
+              wroteContent = true
+            }
+          } catch (streamErr) {
+            // The answer may already be fully streamed to the client. Log the real
+            // error for diagnosis but do NOT rethrow — rethrowing would hand an
+            // error part to the client and overwrite the delivered response with a
+            // generic failure message.
+            console.error(
+              '[Stream] error after content streamed=' + wroteContent + ':',
+              streamErr
             )
-            writer.write(
-              syntheticSearchOutput as unknown as Parameters<typeof writer.write>[0]
-            )
+            if (!wroteContent) {
+              throw streamErr
+            }
           }
         },
         onError: (error: unknown) => {

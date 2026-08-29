@@ -501,6 +501,16 @@ export function createResearcher({
         // Dynamic prompt loading: only include the heavy blocks the request
         // actually needs, keeping the system prompt small for fast TTFT.
         const quickIntent = detectQuickIntent(userQuery ?? '', imageAttachment)
+        // When search results were preloaded server-side (weak model that cannot
+        // emit valid native tool calls), the search-details prompt would still tell
+        // the model to "call the search tool first" — but `search` is removed from
+        // activeTools below, so the model would emit an unresolvable tool call and
+        // the stream would error out AFTER the answer was already streamed. Drop the
+        // search-details block here; the preloaded context already instructs the
+        // model to answer directly from the provided results.
+        if (preloadedSearchContext) {
+          quickIntent.search = false
+        }
         console.log(
           `[Researcher] Quick intent: search=${quickIntent.search} image=${quickIntent.image} code=${quickIntent.code} document=${quickIntent.document}`
         )
