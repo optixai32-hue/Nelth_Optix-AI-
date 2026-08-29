@@ -138,9 +138,27 @@ export async function createEphemeralChatStreamResponse(
       // agent entirely.
       const skillNeeded =
         caps.candidateSkillSlugs.length > 0 || attachmentFormats.length > 0
+
+      // Detect an uploaded image in the latest user message BEFORE the `trivial`
+      // gate. The generateImage tool needs it to force the image-to-image route.
+      // If resolved only AFTER `trivial`, an image upload is wrongly treated as a
+      // trivial request and ALL tools (incl. generateImage) get disarmed — so the
+      // model falls back to the web search tool.
+      const lastUserMessage = [...messages]
+        .reverse()
+        .find(m => m.role === 'user')
+      const imageAttachment = lastUserMessage?.parts
+        ? getImageAttachmentUrl(lastUserMessage.parts)
+        : undefined
+      if (imageAttachment) {
+        console.log('[ImageEdit] reference image detected in guest message')
+      }
+      // Effective image intent: explicit text intent OR an attached image.
+      const needsImageEff = caps.needsImage || Boolean(imageAttachment)
+
       const trivial =
         !caps.needsSearch &&
-        !caps.needsImage &&
+        !needsImageEff &&
         !caps.needsDocument &&
         !caps.founderPhoto &&
         !skillNeeded
@@ -175,18 +193,8 @@ export async function createEphemeralChatStreamResponse(
           ? `${skillCtx.context}\n\n${skillCtx.operationalPrompt}`
           : skillCtx?.context ?? ''
 
-      // Detect an uploaded image in the latest user message so generateImage
-      // forces the image-to-image route instead of text-to-image.
-      const lastUserMessage = [...messages]
-        .reverse()
-        .find(m => m.role === 'user')
-      const imageAttachment = lastUserMessage?.parts
-        ? getImageAttachmentUrl(lastUserMessage.parts)
-        : undefined
-      if (imageAttachment) {
-        console.log('[ImageEdit] reference image detected in guest message')
-      }
-
+      // Get the researcher agent with search mode. `imageAttachment` / `needsImageEff`
+      // are already resolved above, before the `trivial` gate.
       const researchAgent = researcher({
         model: `${model.providerId}:${model.id}`,
         modelConfig: model,
@@ -198,7 +206,7 @@ export async function createEphemeralChatStreamResponse(
         capabilities: {
           trivial,
           needsSearch: caps.needsSearch && !preloadedSearchContext,
-          needsImage: caps.needsImage || Boolean(imageAttachment)
+          needsImage: needsImageEff
         }
       })
 

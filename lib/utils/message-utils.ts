@@ -121,14 +121,33 @@ export function getImageAttachmentUrl(parts?: unknown): string | undefined {
           ? part.data
           : typeof part.content === 'string'
             ? part.content
-            : ''
+            : typeof part.file === 'string'
+              ? part.file
+              : ''
+    // Accept any image indicator: an explicit image media type, a data:image
+    // URL, or an image file extension on the name/URL. Uploads frequently
+    // arrive with mediaType "application/octet-stream" or only a blob/remote
+    // URL, so we must not rely solely on mediaType starting with "image/".
     const mediaType =
-      typeof part.mediaType === 'string' ? part.mediaType : ''
-    if (part.type === 'file' && mediaType.startsWith('image/') && url) {
-      return url
-    }
-    if (part.type === 'image' && url) return url
-    if (url.startsWith('data:image/')) return url
+      typeof part.mediaType === 'string'
+        ? part.mediaType
+        : typeof part.mimeType === 'string'
+          ? part.mimeType
+          : typeof part.type === 'string' && part.type.startsWith('image/')
+            ? part.type
+            : ''
+    const name =
+      typeof part.filename === 'string'
+        ? part.filename
+        : typeof part.name === 'string'
+          ? part.name
+          : ''
+    const isImage =
+      mediaType.startsWith('image/') ||
+      url.startsWith('data:image/') ||
+      /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(name) ||
+      /\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?|#|$)/i.test(url)
+    if (isImage && url) return url
   }
   return undefined
 }
