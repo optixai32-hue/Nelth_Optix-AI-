@@ -389,13 +389,14 @@ export async function createChatStreamResponse(
       // persists them; the final answer text is unaffected.
       const isNonThinkingModel = model.id === 'tencent/hy3:free'
 
+      // Hoisted so `onError` can decide whether the error is fatal. If real answer
+      // content was already streamed to the client, a trailing stream error (e.g. a
+      // transient gateway hiccup AFTER the text completed) must NOT replace the
+      // delivered answer with "We could not generate a response".
+      let wroteContent = false
+
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
-          // Track whether we already streamed real content. A non-fatal error that
-          // occurs AFTER the answer was delivered (e.g. a stray tool call the weak
-          // model emits once it has finished, or a trailing transport hiccup) must
-          // NOT replace a successful answer with "We could not generate a response".
-          let wroteContent = false
           try {
             const reader = (agentStream as unknown as ReadableStream<unknown>).getReader()
             while (true) {
@@ -453,6 +454,15 @@ export async function createChatStreamResponse(
         },
         onError: (error: unknown) => {
           console.error('Stream response error:', error)
+          // If the answer was already streamed to the client, do NOT replace it with
+          // a generic failure — the user got a valid response. Return an empty string so
+          // the AI SDK emits no error part and the delivered answer stays visible.
+          if (wroteContent) {
+            console.error(
+              '[Stream] error suppressed — content already delivered; not surfacing to user'
+            )
+            return ''
+          }
           return serializePublicError(error)
         },
         onFinish: ({ responseMessage, isAborted }) => {
