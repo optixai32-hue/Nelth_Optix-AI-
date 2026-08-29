@@ -684,7 +684,19 @@ Put EVERY design decision (colors, typography, layout, copy, hover/focus states,
     const preloadedSearchLayer = preloadedSearchContext
       ? `\n\nSERVER-PROVIDED WEB RESULTS (each numbered 1..N):\n${preloadedSearchContext}\nUse these results to answer now. Do NOT emit any <tool_call> or function-call syntax.\n\nCITATIONS (MANDATORY): Every factual claim that comes from a source MUST be followed immediately by that source's number inside SQUARE BRACKETS, e.g. [1] or [3]. Place the [n] right after the sentence it supports. Example: "iOS 27 rolled out across devices[1]." Each citation is a SEPARATE [n] token placed next to its own fact.\nSTRICT RULES:\n- Write each citation as [n] where n is the source's 1-based number from the numbered list above.\n- NEVER concatenate numbers into one string (NEVER write "1314" or "13141920"). Write [1][3][14] as separate tokens instead.\n- NEVER write a bare number with no brackets, and NEVER write a raw URL.\nThese [n] markers are automatically turned into clickable links to the real source, so just use [n] next to each fact.\n`
       : ''
-    let instructions = `${CORE_DIRECTIVE}\n\n${TOOL_CALL_PROTOCOL}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
+    // In preloaded (server-side search) mode the search tool is NOT available to
+    // the model — results are injected as text. Replacing the generic
+    // TOOL_CALL_PROTOCOL (which says "invoke the search tool immediately") with a
+    // preloaded variant stops the weak model from emitting an unresolvable search
+    // tool call (which would error the stream) and tells it to answer from the
+    // provided results instead.
+    const toolCallProtocol = preloadedSearchContext
+      ? `TOOL CALL PROTOCOL — PRELOADED SEARCH:
+- Web search results are ALREADY provided to you above (SERVER-PROVIDED WEB RESULTS). Do NOT call any search/fetch tool — none is available in this mode.
+- Answer directly from the provided results. Cite them inline with [n] markers as instructed.
+- The only tools you may use are image generation and document handling when explicitly requested. Do not attempt a web search tool call.`
+      : TOOL_CALL_PROTOCOL
+    let instructions = `${CORE_DIRECTIVE}\n\n${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
 
     // Trailing override for code/artifact requests. The QUICK/ADAPTIVE prompts
     // contain a generic "OUTPUT FORMAT (MANDATORY)" + "Emoji usage" section that

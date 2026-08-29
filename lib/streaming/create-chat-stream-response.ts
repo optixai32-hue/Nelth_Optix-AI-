@@ -419,15 +419,6 @@ export async function createChatStreamResponse(
                 wroteContent = true
               }
             }
-            if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
-              writer.write(
-                syntheticSearchInput as unknown as Parameters<typeof writer.write>[0]
-              )
-              writer.write(
-                syntheticSearchOutput as unknown as Parameters<typeof writer.write>[0]
-              )
-              wroteContent = true
-            }
           } catch (streamErr) {
             // The answer may already be fully streamed to the client. Log the real
             // error for diagnosis but do NOT rethrow — rethrowing would hand an
@@ -439,6 +430,24 @@ export async function createChatStreamResponse(
             )
             if (!wroteContent) {
               throw streamErr
+            }
+          } finally {
+            // ALWAYS surface the preloaded search results as a synthetic tool-search
+            // part so the Sources panel and inline [n] citations render — even when
+            // the model stream errored (e.g. it attempted a search tool call that is
+            // unavailable in preloaded mode). Without this, a successful answer would
+            // arrive with NO citations.
+            if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
+              try {
+                writer.write(
+                  syntheticSearchInput as unknown as Parameters<typeof writer.write>[0]
+                )
+                writer.write(
+                  syntheticSearchOutput as unknown as Parameters<typeof writer.write>[0]
+                )
+              } catch {
+                /* writer already closed */
+              }
             }
           }
         },
