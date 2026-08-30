@@ -247,9 +247,10 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
       return data.results
         .slice(0, maxResults)
         .map(item => {
-          const thumb = item.thumbnail || ''
-          const full = item.image || item.url || ''
-          const proxiedUrl = `/api/image-proxy?thumb=${encodeURIComponent(thumb)}&url=${encodeURIComponent(full)}`
+          const rawUrl = item.image || item.thumbnail || item.url || ''
+          const proxiedUrl = rawUrl
+            ? `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(rawUrl)}&f=1&nofb=1`
+            : ''
           return {
             url: proxiedUrl,
             description: item.title || cleanQuery
