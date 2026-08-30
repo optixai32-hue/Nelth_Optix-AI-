@@ -618,8 +618,15 @@ export function createResearcher({
         activeToolsList = []
       }
 
-      if (preloadedSearchContext) {
-        activeToolsList = activeToolsList.filter(toolName => toolName !== 'search')
+      const isNonThinking =
+        modelConfig?.id === 'tencent/hy3:free' ||
+        model.includes('tencent/hy3:free') ||
+        modelConfig?.id?.includes('hy3:free')
+
+      if (preloadedSearchContext || isNonThinking) {
+        activeToolsList = activeToolsList.filter(
+          toolName => toolName !== 'search' && toolName !== 'fetch'
+        )
       }
 
     // Build tools object with proper typing
@@ -682,7 +689,7 @@ Put EVERY design decision (colors, typography, layout, copy, hover/focus states,
     // the model sees and applies them first.
     const skillLayer = skillContext ? skillContext : ''
     const preloadedSearchLayer = preloadedSearchContext
-      ? `\n\nSERVER-PROVIDED WEB RESULTS (each numbered 1..N):\n${preloadedSearchContext}\nUse these results to answer now. Do NOT emit any <tool_call> or function-call syntax.\n\nCITATIONS (MANDATORY): Every factual claim that comes from a source MUST be followed immediately by that source's number inside SQUARE BRACKETS, e.g. [1] or [3]. Place the [n] right after the sentence it supports. Example: "iOS 27 rolled out across devices[1]." Each citation is a SEPARATE [n] token placed next to its own fact.\nSTRICT RULES:\n- Write each citation as [n] where n is the source's 1-based number from the numbered list above.\n- NEVER concatenate numbers into one string (NEVER write "1314" or "13141920"). Write [1][3][14] as separate tokens instead.\n- NEVER write a bare number with no brackets, and NEVER write a raw URL.\nThese [n] markers are automatically turned into clickable links to the real source, so just use [n] next to each fact.\n`
+      ? `\n\nSERVER-PROVIDED WEB RESULTS (each numbered 1..N):\n${preloadedSearchContext}\nUse these results to answer now. Do NOT emit any <tool_call>, <tool_calls>, or function-call syntax.\n\nCITATIONS (MANDATORY): Every factual claim that comes from a source MUST be followed immediately by that source's number inside SQUARE BRACKETS, e.g. [1] or [3]. Place the [n] right after the sentence it supports. Example: "iOS 27 rolled out across devices[1]." Each citation is a SEPARATE [n] token placed next to its own fact.\nSTRICT RULES:\n- Write each citation as [n] where n is the source's 1-based number from the numbered list above.\n- NEVER concatenate numbers into one string (NEVER write "1314" or "13141920"). Write [1][3][14] as separate tokens instead.\n- NEVER write a bare number with no brackets, and NEVER write a raw URL.\nThese [n] markers are automatically turned into clickable links to the real source, so just use [n] next to each fact.\n`
       : ''
     // In preloaded (server-side search) mode the search tool is NOT available to
     // the model — results are injected as text. Replacing the generic
@@ -694,8 +701,13 @@ Put EVERY design decision (colors, typography, layout, copy, hover/focus states,
       ? `TOOL CALL PROTOCOL — PRELOADED SEARCH:
 - Web search results are ALREADY provided to you above (SERVER-PROVIDED WEB RESULTS). Do NOT call any search/fetch tool — none is available in this mode.
 - Answer directly from the provided results. Cite them inline with [n] markers as instructed.
-- The only tools you may use are image generation and document handling when explicitly requested. Do not attempt a web search tool call.`
-      : TOOL_CALL_PROTOCOL
+- Do NOT emit any <tool_call>, <tool_calls>, <function>, <invoke>, or XML markup.`
+      : isNonThinking
+        ? `DIRECT CONVERSATIONAL RESPONSE PROTOCOL:
+- You are answering directly in natural markdown text.
+- Do NOT emit any <tool_call>, <tool_calls>, <function>, <invoke>, or XML markup.
+- Output your conversational answer directly.`
+        : TOOL_CALL_PROTOCOL
     let instructions = `${CORE_DIRECTIVE}\n\n${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
 
     // Trailing override for code/artifact requests. The QUICK/ADAPTIVE prompts

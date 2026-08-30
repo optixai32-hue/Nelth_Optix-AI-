@@ -213,12 +213,12 @@ export function hasToolCalls(message: UIMessage | null): boolean {
 // <tool_call>…</tool_call> or <tool_calls:id>… markup. Strip them completely so the
 // user never sees them.
 const FAKE_TOOL_PATTERNS = [
-  /<tool_calls?[:\s\w-]*>[\s\S]*?(?:<\/tool_calls?[:\s\w-]*>|<\/invoke[:\s\w-]*>|(?=<tool_calls?[:\s\w-]*>)|$)/gi,
-  /<tool_call[:\s\w-]*>[\s\S]*?(?:<\/tool_call[:\s\w-]*>|<\/invoke[:\s\w-]*>|(?=<tool_calls?[:\s\w-]*>)|$)/gi,
-  /<invoke[:\s\w-]*>[\s\S]*?(?:<\/invoke[:\s\w-]*>|$)/gi,
+  /<tool_calls?\b[^>]*>[\s\S]*?(?:<\/tool_calls?\b[^>]*>|<\/invoke\b[^>]*>|(?=<tool_calls?\b)|$)/gi,
+  /<tool_call\b[^>]*>[\s\S]*?(?:<\/tool_call\b[^>]*>|<\/invoke\b[^>]*>|(?=<tool_calls?\b)|$)/gi,
+  /<invoke\b[^>]*>[\s\S]*?(?:<\/invoke\b[^>]*>|$)/gi,
   /<function\b[^>]*>[\s\S]*?(?:<\/function>|$)/gi,
   /<tool-search\b[^>]*>[\s\S]*?(?:<\/tool-search>|$)/gi,
-  /<\/?(?:tool_calls?|invoke|function|tool-search)[:\s\w-]*\/?>/gi
+  /<\/?(?:tool_calls?|tool_call|invoke|function|tool-search)\b[^>]*\/?>/gi
 ]
 
 export function stripFakeToolCallXml(text: string): string {
