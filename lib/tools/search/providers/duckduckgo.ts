@@ -178,13 +178,35 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
     }
   }
 
+  private cleanImageQuery(query: string): string {
+    const cleaned = query
+      .replace(
+        /\b(recherche|rechercher|cherche|chercher|trouve|trouver|montre|montrer|affiche|afficher|search|find|show me|photos?|images?|pictures?|visuels?|de|du|des|d'|d’|un|une|la|le|les|of|an?|the)\b/gi,
+        ' '
+      )
+      .replace(/\s+/g, ' ')
+      .trim()
+    return cleaned || query
+  }
+
   private async getVqdToken(query: string): Promise<string | null> {
     try {
-      const url = `https://duckduckgo.com/?q=${encodeURIComponent(query)}`
-      const res = await this.fetchWithTimeout(url)
+      const cleanQuery = this.cleanImageQuery(query)
+      const url = `https://duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}&iax=images&ia=images`
+      const res = await this.fetchWithTimeout(url, {
+        headers: {
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none'
+        }
+      })
       if (!res.ok) return null
       const text = await res.text()
-      const match = text.match(/vqd=['"]?([^'"&\s>]+)['"]?/)
+      const match =
+        text.match(/vqd=['"]?([^'"&\s>]+)['"]?/) ||
+        text.match(/vqd=([^&"'\s]+)/)
       if (match?.[1]) return match[1]
       const headerVqd = res.headers.get('x-vqd-4')
       if (headerVqd) return headerVqd
@@ -194,24 +216,39 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
     }
   }
 
-  private async searchImages(query: string, vqd: string, maxResults = 8): Promise<SearchResultImage[]> {
+  private async searchImages(
+    query: string,
+    vqd: string,
+    maxResults = 10
+  ): Promise<SearchResultImage[]> {
     try {
-      const url = `https://duckduckgo.com/i.js?q=${encodeURIComponent(query)}&vqd=${encodeURIComponent(vqd)}&o=json&p=1&s=0&u=bing&f=,,,&l=wt-wt`
+      const cleanQuery = this.cleanImageQuery(query)
+      const url = `https://duckduckgo.com/i.js?l=wt-wt&o=json&q=${encodeURIComponent(cleanQuery)}&vqd=${encodeURIComponent(vqd)}&f=,,,&p=1`
       const res = await this.fetchWithTimeout(url, {
         headers: {
-          Referer: 'https://duckduckgo.com/'
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          Referer: 'https://duckduckgo.com/',
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'same-origin',
+          'X-Requested-With': 'XMLHttpRequest'
         }
       })
       if (!res.ok) return []
       const data = (await res.json()) as {
-        results?: Array<{ image?: string; title?: string; url?: string }>
+        results?: Array<{
+          image?: string
+          title?: string
+          url?: string
+          thumbnail?: string
+        }>
       }
       if (!data.results || !Array.isArray(data.results)) return []
       return data.results
         .slice(0, maxResults)
         .map(item => ({
-          url: item.image || item.url || '',
-          description: item.title || query
+          url: item.image || item.thumbnail || item.url || '',
+          description: item.title || cleanQuery
         }))
         .filter(img => isValidUrl(img.url))
     } catch {
@@ -339,25 +376,24 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
       }
     }
 
-    // 3. If images are needed, attempt image search via vqd token
+    // 3. Fetch images directly via DuckDuckGo Image API (i.js)
     if (wantsImages) {
       try {
         const vqd = await this.getVqdToken(query)
         if (vqd) {
-          images = await this.searchImages(query, vqd, 8)
+          images = await this.searchImages(query, vqd, 12)
         }
       } catch (imgErr) {
         console.warn('[DuckDuckGo] Image search error:', imgErr)
       }
     }
 
-    // 4. VERCEL RESILIENCE: If DuckDuckGo was blocked (returned 0 results),
-    // automatically fall back to NelthWeb so the chat NEVER fails or errors!
+    // 4. Fallback for web results only if DuckDuckGo returned 0 web results
     if (webResults.length === 0) {
       console.warn(
-        '[DuckDuckGo] 0 results from DuckDuckGo on this environment; falling back to NelthWeb...'
+        '[DuckDuckGo] 0 web results from DuckDuckGo; falling back to NelthWeb...'
       )
-      return this.nelthWebFallback.search(
+      const fallbackRes = await this.nelthWebFallback.search(
         query,
         maxResults,
         searchDepth,
@@ -365,24 +401,11 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
         excludeDomains,
         options
       )
-    }
-
-    // If web results succeeded but images were requested and empty, fetch images from fallback
-    if (wantsImages && images.length === 0) {
-      try {
-        const fallbackRes = await this.nelthWebFallback.search(
-          query,
-          maxResults,
-          searchDepth,
-          includeDomains,
-          excludeDomains,
-          options
-        )
-        if (fallbackRes.images && fallbackRes.images.length > 0) {
-          images = fallbackRes.images
-        }
-      } catch {
-        /* ignore image fallback failure */
+      return {
+        results: fallbackRes.results,
+        images: images.length > 0 ? images : fallbackRes.images,
+        query,
+        number_of_results: fallbackRes.results.length
       }
     }
 

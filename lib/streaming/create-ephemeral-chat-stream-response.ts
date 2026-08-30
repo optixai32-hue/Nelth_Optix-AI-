@@ -176,6 +176,9 @@ export async function createEphemeralChatStreamResponse(
               `[${i + 1}] ${result.title}: ${result.url}\n  ${result.content}`
           )
           .join('\n\n')
+        if (searchResult.images && searchResult.images.length > 0) {
+          preloadedSearchContext += `\n\nIMAGES DISPONIBLES DANS LA GALERIE:\n${searchResult.images.length} images DuckDuckGo ont été trouvées et sont affichées dans la galerie au-dessus.\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: Ne liste PAS de liens de banques d'images (comme Getty, iStock, Adobe Stock) dans ton texte. Présente simplement et brièvement le sujet de façon naturelle.`
+        }
         searchResultsForCitation = searchResult
       }
 
