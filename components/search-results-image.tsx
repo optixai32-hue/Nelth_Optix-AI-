@@ -4,10 +4,8 @@
 import {
   type Dispatch,
   type SetStateAction,
-  useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState
 } from 'react'
 
@@ -42,76 +40,38 @@ interface SearchResultsImageSectionProps {
 
 type NormalizedImage = { id: string; url: string; description: string }
 
-type FilterStatus = 'loading' | 'ready' | 'empty'
-
-interface FilteredImagesState {
-  key: string
-  status: FilterStatus
-  images: NormalizedImage[]
-}
-
 const normalizeImages = (images: SearchResultImage[]): NormalizedImage[] => {
   if (!images || images.length === 0) {
     return []
   }
 
-  return images.map((image, index) => {
-    if (typeof image === 'string') {
-      return {
-        id: `${index}-${image}`,
-        url: image,
-        description: ''
+  return images
+    .map((image, index) => {
+      if (typeof image === 'string') {
+        return {
+          id: `${index}-${image}`,
+          url: image,
+          description: ''
+        }
       }
-    }
 
-    const url = image.url ?? ''
-    return {
-      id: `${index}-${url}`,
-      url,
-      description: image.description ?? ''
-    }
-  })
+      const url = image.url ?? ''
+      return {
+        id: `${index}-${url}`,
+        url,
+        description: image.description ?? ''
+      }
+    })
+    .filter(img => Boolean(img.url))
 }
 
 const useFilteredImages = (images: SearchResultImage[]) => {
   const normalizedImages = useMemo(() => normalizeImages(images), [images])
-  const normalizedKey = useMemo(
-    () => normalizedImages.map(image => image.id).join('|'),
-    [normalizedImages]
-  )
-  const [removedState, setRemovedState] = useState<{
-    key: string
-    ids: string[]
-  }>({
-    key: '',
-    ids: []
-  })
-
-  const removeImage = useCallback(
-    (id: string) => {
-      setRemovedState(prevState => {
-        const ids = prevState.key === normalizedKey ? prevState.ids : []
-        return ids.includes(id)
-          ? { key: normalizedKey, ids }
-          : { key: normalizedKey, ids: [...ids, id] }
-      })
-    },
-    [normalizedKey]
-  )
-
-  const visibleImages = useMemo(() => {
-    const removedIds =
-      removedState.key === normalizedKey ? removedState.ids : []
-    return normalizedImages.filter(image => !removedIds.includes(image.id))
-  }, [normalizedImages, normalizedKey, removedState])
-  const status: FilterStatus = visibleImages.length === 0 ? 'empty' : 'ready'
-  const displayImages = visibleImages
+  const status = normalizedImages.length === 0 ? 'empty' : 'ready'
 
   return {
     status,
-    filteredImages: visibleImages,
-    displayImages,
-    removeImage
+    displayImages: normalizedImages
   }
 }
 
@@ -188,14 +148,12 @@ export const SearchResultsImageSection: React.FC<
   const [api, setApi] = useState<CarouselApi>()
   const [selectedIndex, setSelectedIndex] = useState(0)
 
-  const { status, filteredImages, displayImages, removeImage } =
-    useFilteredImages(images)
-
-  const filteredCount = filteredImages.length
+  const { status, displayImages } = useFilteredImages(images)
+  const imageCount = displayImages.length
 
   const { current } = useCarouselMetrics({
     api,
-    imageCount: filteredCount,
+    imageCount,
     selectedIndex,
     setSelectedIndex
   })
@@ -219,21 +177,11 @@ export const SearchResultsImageSection: React.FC<
         const actualIndex = startIndex + index
         const cornerClasses = cornerClassForIndex(actualIndex, isFullMode)
 
-        if (!image.url) {
-          return (
-            <div key={image.id} className="aspect-video">
-              <div
-                className={`h-full w-full bg-muted animate-pulse shadow-sm ${cornerClasses}`}
-              />
-            </div>
-          )
-        }
-
         return (
           <Dialog key={image.id}>
             <DialogTrigger asChild>
               <div
-                className="aspect-video cursor-pointer relative"
+                className="aspect-video cursor-pointer relative overflow-hidden rounded-lg bg-muted/40 border border-border/50 transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
                 onClick={() => handleSelect(actualIndex)}
               >
                 <div className="flex-1 h-full">
@@ -242,16 +190,17 @@ export const SearchResultsImageSection: React.FC<
                       src={image.url}
                       alt={`Image ${actualIndex + 1}`}
                       className={`h-full w-full object-cover shadow-sm ${cornerClasses}`}
-                      onError={() => removeImage(image.id)}
+                      referrerPolicy="no-referrer"
+                      loading="lazy"
                     />
                   </div>
                 </div>
                 {!isFullMode &&
                   index === imageSubset.length - 1 &&
-                  filteredCount > 1 && (
-                    <div className="absolute bottom-1.5 right-1.5 bg-black/40 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                  imageCount > 1 && (
+                    <div className="absolute bottom-1.5 right-1.5 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
                       <Images size={14} />
-                      <span>{filteredCount}</span>
+                      <span>{imageCount}</span>
                     </div>
                   )}
               </div>
@@ -268,19 +217,20 @@ export const SearchResultsImageSection: React.FC<
                   setApi={setApi}
                   opts={{
                     startIndex: selectedIndex,
-                    loop: filteredCount > 1
+                    loop: imageCount > 1
                   }}
                   className="w-full max-h-[70vh]"
                 >
                   <CarouselContent>
-                    {filteredImages.map((img, idx) => (
+                    {displayImages.map((img, idx) => (
                       <CarouselItem key={img.id}>
                         <div className="relative w-full h-full flex items-center justify-center">
                           <img
                             src={img.url}
                             alt={`Image ${idx + 1}`}
-                            className="max-w-full max-h-[70vh] object-contain"
-                            onError={() => removeImage(img.id)}
+                            className="max-w-full max-h-[70vh] object-contain rounded-md"
+                            referrerPolicy="no-referrer"
+                            loading="lazy"
                           />
                           <ImageCreditOverlay
                             url={img.url}
@@ -290,7 +240,7 @@ export const SearchResultsImageSection: React.FC<
                       </CarouselItem>
                     ))}
                   </CarouselContent>
-                  {filteredCount > 1 && (
+                  {imageCount > 1 && (
                     <div className="absolute inset-8 flex items-center justify-between p-4 pointer-events-none">
                       <CarouselPrevious className="size-10 rounded-full shadow-sm focus:outline-hidden pointer-events-auto">
                         <span className="sr-only">Previous</span>
@@ -302,7 +252,7 @@ export const SearchResultsImageSection: React.FC<
                   )}
                 </Carousel>
                 <div className="py-2 text-center text-sm text-white/70">
-                  {current} of {filteredCount}
+                  {current} of {imageCount}
                 </div>
               </div>
             </DialogContent>
