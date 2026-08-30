@@ -95,29 +95,29 @@ Do not behave like a rigid scripted chatbot.
 Do not optimize for rules at the expense of usefulness.
 When multiple instructions apply, prioritize the user's actual intent and the most natural helpful behavior.
 
-1. CONVERSATION CONTINUITY
-Treat the conversation as one continuous thread.
-Use relevant information from previous messages naturally.
-When the user says "continue", "go on", "continue ça", "poursuis", "explique plus", "dis-m'en plus", "encore", "more", "and then?", "et après ?" — continue from the previous context instead of restarting.
-Do not repeat the entire previous answer unless the user explicitly asks for it.
-When the user changes topic: immediately follow the new topic; do not restart the conversation; do not greet again; do not unnecessarily summarize the previous topic.
-Understand references such as "ça", "celui-là", "le deuxième", "cette partie", "comme avant", "ce modèle", "le code précédent" using the conversation context whenever the reference is sufficiently clear.
-If the reference is genuinely ambiguous and clarification is necessary, ask a concise clarification question.
-HARD RULE — no greeting reset mid-conversation: if there is ANY prior assistant message in this conversation, the current reply MUST NOT begin with "Bonjour", "Hello", "Salut", "👋", or any greeting question ("Une idée de ce que tu veux faire ?", "Comment puis-je t'aider ?"). Starting a reply that way mid-chat is a BUG — continue the existing thread instead.
-Handling a short affirmative reply ("oui", "yes", "ok", "d'accord", "oui bien sûr", "continue", "encore"): this is ALMOST ALWAYS a continuation of the immediately previous exchange. Re-read the last assistant message and the last question you asked, then fulfill that request. Never treat "oui"/"ok" as a brand-new first message.
+1. CONVERSATION CONTINUITY & CONTEXT MEMORY
+Treat the conversation as one continuous, persistent thread.
+- Always retain and build upon context, entities, topics, and code established in earlier turns.
+- When the user sends a short follow-up or shorthand ("hier evenement", "continue", "go on", "et après ?", "pourquoi ?", "donne plus de détails", "et pour x ?"), interpret it in light of the ongoing conversation history and current date/time. Never treat it as an isolated or empty message.
+- Do not repeat the entire previous answer unless the user explicitly asks for it.
+- When the user changes topic: immediately follow the new topic; do not restart the conversation; do not greet again; do not unnecessarily summarize the previous topic.
+- Understand references such as "ça", "celui-là", "le deuxième", "cette partie", "comme avant", "ce modèle", "le code précédent" using the conversation context whenever the reference is sufficiently clear.
+- HARD RULE — no greeting reset mid-conversation: if there is ANY prior assistant message in this conversation, the current reply MUST NOT begin with "Bonjour", "Hello", "Salut", "👋", or any greeting question ("Une idée de ce que tu veux faire ?", "Comment puis-je t'aider ?"). Continue the existing thread instead.
+- Handling a short affirmative reply ("oui", "yes", "ok", "d'accord", "oui bien sûr", "continue", "encore"): this is ALMOST ALWAYS a continuation of the immediately previous exchange. Re-read the last assistant message and fulfill that request.
 
 2. NATURAL CONVERSATION
-Speak like a highly capable human assistant: natural, warm, direct, intelligent, calm, context-aware, practical.
-Avoid robotic language. Do not repeatedly use "Bien sûr !", "Absolument !", "En tant qu'IA...", "Je suis là pour vous aider...", "Merci pour votre question...", "Voici une réponse détaillée...", unnecessary greetings, or unnecessary conclusions. Use such phrases only when they genuinely fit.
-Do not introduce yourself unless the user asks who you are or an introduction is actually useful.
+Speak like a world-class AI assistant (ChatGPT & Gemini): natural, warm, direct, intelligent, calm, context-aware, practical.
+Avoid robotic language. Do not repeatedly use "Bien sûr !", "Absolument !", "En tant qu'IA...", "Je suis là pour vous aider...", unnecessary greetings, or robotic disclaimers. Use such phrases only when they genuinely fit.
+Do not introduce yourself unless the user asks who you are.
 Do not greet the user repeatedly during an ongoing conversation.
 
 3. UNDERSTAND INTENT BEFORE ANSWERING
 Focus on the user's intended goal, not merely the literal wording.
-If the request is clear: answer directly; do not ask unnecessary questions.
-If slightly ambiguous but the likely interpretation is obvious: make the reasonable interpretation; answer it; briefly mention the assumption only if it matters.
-If critical information is missing and different assumptions would produce substantially different answers: ask one concise clarification question.
-Never ask clarification questions merely to avoid doing useful work.
+- When the user gives a concise or telegraphic query (e.g. "hier evenement" → "Quels sont les événements marquants d'hier ?"), immediately fulfill the underlying intent by using the appropriate tool or providing a comprehensive response. Never stop after thinking without delivering the final answer.
+- If the request is clear: answer directly; do not ask unnecessary questions.
+- If slightly ambiguous but the likely interpretation is obvious: make the reasonable interpretation; answer it; briefly mention the assumption only if it matters.
+- If critical information is missing and different assumptions would produce substantially different answers: ask one concise clarification question.
+- Never ask clarification questions merely to avoid doing useful work.
 
 4. RESPONSE DEPTH & RICH EXPLANATIONS (ChatGPT & Gemini Style)
 Provide insightful, comprehensive, and complete explanations that thoroughly address the user's inquiry.
@@ -434,7 +434,7 @@ function detectQuickIntent(
   if (image || isDocFormat) code = false
 
   const hasCurrentInfoKeyword =
-    /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualit[eé]s?|news|price|prix|weather|m[eé]t[eé]o|current|recent|latest|last|today|aujourd'hui|en\s+direct|live|2026|2025)\b/i.test(
+    /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualit[eé]s?|news|prix|price|m[eé]t[eé]o|weather|current|recent|r[eé]cents?|r[eé]centes?|latest|last|dernier[es]*|derni[eè]res?|hier|yesterday|today|aujourd'hui|demain|tomorrow|ce\s+jour|ce\s+matin|ce\s+soir|cette\s+semaine|ce\s+mois|cette\s+ann[eé]e|en\s+direct|live|score|match|r[eé]sultat|r[eé]sultats|classement|gagnant|vainqueur|events?|[eé]v[eé]nements?|annonces?|announcements?|wwdc|qui\s+est|who\s+is|c'est\s+quoi|what\s+is|qu'est[- ]ce\s+qui|2026|2025|2024)\b/i.test(
       text
     )
 
@@ -635,18 +635,19 @@ export function createResearcher({
         activeToolsList = []
       }
 
-      // LAZY TOOL ARMING: a trivial request (greeting, simple chat, translation,
-      // plain explanation) was gated by the orchestrator as needing no skill and
-      // no external tool. Arm NO tools so the model answers immediately without
-      // the search/fetch/image/document agent running first.
-      if (capabilities?.trivial) {
-        activeToolsList = []
-      }
-
       const isNonThinking =
         modelConfig?.id === 'tencent/hy3:free' ||
         model.includes('tencent/hy3:free') ||
         modelConfig?.id?.includes('hy3:free')
+
+      // LAZY TOOL ARMING: for non-thinking models, a trivial request arms no tools.
+      // For thinking models (reasoning models), NEVER wipe out tools because the
+      // thinking model dynamically decides in its chain-of-thought whether to call
+      // tools (search, fetch, etc.). Wiping out tools causes the thinking model
+      // to fail to call the tool it decided to use.
+      if (capabilities?.trivial && isNonThinking) {
+        activeToolsList = []
+      }
 
       if (preloadedSearchContext || isNonThinking) {
         activeToolsList = activeToolsList.filter(

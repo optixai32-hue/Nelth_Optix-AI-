@@ -41,7 +41,7 @@ const IMAGE_INTENT_RE =
 const DOCUMENT_INTENT_RE =
   /\b(pdf|docx|xlsx|pptx|document|documents|transcribe|facture|invoice|rapport|report|contrat|contract|cv|lettre|pr[eé]sentation|presentation|diapos|slides)\b/i
 const CURRENT_INFO_RE =
-  /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualit[eé]s?|news|prix|price|m[eé]t[eé]o|weather|current|recent|r[eé]cents?|latest|dernier[es]*|derni[eè]res?|today|aujourd'hui|ce\s+jour|en\s+direct|live|score|match|r[eé]sultat|event|événement|évènement|annonce|announcement|wwdc|qui\s+est|who\s+is|c'est\s+quoi|what\s+is|2026|2025)\b/i
+  /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualit[eé]s?|news|prix|price|m[eé]t[eé]o|weather|current|recent|r[eé]cents?|r[eé]centes?|latest|dernier[es]*|derni[eè]res?|hier|yesterday|today|aujourd'hui|demain|tomorrow|ce\s+jour|ce\s+matin|ce\s+soir|cette\s+semaine|ce\s+mois|cette\s+ann[eé]e|en\s+direct|live|score|match|r[eé]sultat|r[eé]sultats|classement|gagnant|vainqueur|events?|[eé]v[eé]nements?|annonces?|announcements?|wwdc|qui\s+est|who\s+is|c'est\s+quoi|what\s+is|qu'est[- ]ce\s+qui|2026|2025|2024)\b/i
 
 const DOC_FORMATS = new Set(['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'ppt'])
 
