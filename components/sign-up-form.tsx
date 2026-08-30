@@ -23,6 +23,7 @@ import { IconLogo } from '@/components/ui/icons'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PasswordInput } from '@/components/ui/password-input'
+
 import { useI18n } from './i18n-provider'
 
 export function SignUpForm({

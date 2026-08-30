@@ -9,8 +9,9 @@ import {
 import type { ModelSelectorData } from '@/lib/types/model-selector'
 import { setCookie } from '@/lib/utils/cookies'
 
-import { useSidebar } from '@/components/ui/sidebar'
 import { useIsMobile } from '@/hooks/use-mobile'
+
+import { useSidebar } from '@/components/ui/sidebar'
 
 import {
   type ModelOption,

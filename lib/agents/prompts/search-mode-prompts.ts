@@ -2,11 +2,12 @@ import {
   getImageSpecPrompt,
   getRelatedQuestionsSpecPrompt
 } from '@/lib/render/prompt'
-import { getCodeQualityPrompt } from './code-quality'
 import {
   getContentTypesGuidance,
   isGeneralSearchProviderAvailable
 } from '@/lib/utils/search-config'
+
+import { getCodeQualityPrompt } from './code-quality'
 
 // Search mode system prompts
 

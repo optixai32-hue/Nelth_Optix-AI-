@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { validateGeneratedOutput } from './validate'
+
 import { validateUiIcons } from './ui-icon-validator'
+import { validateGeneratedOutput } from './validate'
 
 const withSkill = (code: string) => validateGeneratedOutput(code, { slugs: ['frontend-design'] })
 

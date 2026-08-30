@@ -19,11 +19,11 @@ import type { Model } from '@/lib/types/models'
 import type { SearchMode } from '@/lib/types/search'
 import { getTextFromParts } from '@/lib/utils/message-utils'
 
-import { SkillEnforcementEngine } from './enforce'
 import { EXECUTION_REQUIREMENTS_BY_SLUG } from './build-skill-context'
+import { SkillEnforcementEngine } from './enforce'
 import type { SkillContextResult } from './types'
-import { validateGeneratedOutput } from './validate'
 import { stripEmojisFromCodeBlocks } from './ui-icon-validator'
+import { validateGeneratedOutput } from './validate'
 
 interface EnforceOptions {
   responseMessage: { parts?: unknown[]; role?: string }

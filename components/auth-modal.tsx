@@ -11,6 +11,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { IconLogo } from '@/components/ui/icons'
+
 import { useI18n } from './i18n-provider'
 
 interface AuthModalProps {

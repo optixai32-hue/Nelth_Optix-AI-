@@ -19,13 +19,12 @@ import {
   getPreviousDesignContext
 } from '@/lib/skills/build-skill-context'
 import { detectRequestCapabilities } from '@/lib/skills/capability-detection'
-import { stripEmojiFromCodeInMessage } from '@/lib/skills/enforce-stream'
 import {
   type AttachmentLike,
   extractAttachmentFormats} from '@/lib/skills/document-runtime'
-import { getImageAttachmentUrl, getTextFromParts, isPureGreeting, stripFakeToolCallXmlFromMessage } from '@/lib/utils/message-utils'
+import { stripEmojiFromCodeInMessage } from '@/lib/skills/enforce-stream'
 import { search as runWebSearch } from '@/lib/tools/search'
-
+import { getImageAttachmentUrl, getTextFromParts, isPureGreeting, stripFakeToolCallXmlFromMessage } from '@/lib/utils/message-utils'
 import { isTracingEnabled } from '@/lib/utils/telemetry'
 
 import {

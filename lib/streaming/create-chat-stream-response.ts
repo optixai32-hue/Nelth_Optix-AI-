@@ -29,13 +29,13 @@ import { isTracingEnabled } from '@/lib/utils/telemetry'
 
 import { loadChat } from '../actions/chat'
 import { generateChatTitle } from '../agents/title-generator'
+import { search as runWebSearch } from '../tools/search'
 import {
   getMaxAllowedTokens,
   shouldTruncateMessages,
   truncateMessages
 } from '../utils/context-window'
 import { getImageAttachmentUrl, getTextFromParts, isPureGreeting, stripFakeToolCallXmlFromMessage } from '../utils/message-utils'
-import { search as runWebSearch } from '../tools/search'
 import { perfLog, perfTime } from '../utils/perf-logging'
 import { isUsageLogging, logUsage } from '../utils/usage-logging'
 

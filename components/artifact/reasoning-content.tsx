@@ -6,9 +6,10 @@ import {
   Streamdown
 } from 'streamdown'
 
-import { cn } from '@/lib/utils'
-import { defaultComponents } from '@/components/assistant-ui/markdown-text'
 import { mergeStreamdownSpecRenderer } from '@/lib/render/streamdown-spec'
+import { cn } from '@/lib/utils'
+
+import { defaultComponents } from '@/components/assistant-ui/markdown-text'
 
 import 'katex/dist/katex.min.css'
 

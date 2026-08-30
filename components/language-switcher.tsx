@@ -1,7 +1,8 @@
 'use client'
 
+import { type Locale,locales } from '@/lib/i18n/config'
 import { cn } from '@/lib/utils'
-import { locales, type Locale } from '@/lib/i18n/config'
+
 import { useI18n } from './i18n-provider'
 
 const LABELS: Record<Locale, string> = {

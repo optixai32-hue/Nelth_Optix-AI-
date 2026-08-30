@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { generateDocument } from './document-engine'
 import type { DocumentAST } from './document-ast/types'
+import { generateDocument } from './document-engine'
 
 /**
  * Maturity test for the SVG renderer. Runs the SAME Document AST used by the

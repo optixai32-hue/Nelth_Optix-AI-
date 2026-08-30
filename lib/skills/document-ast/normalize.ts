@@ -1,6 +1,6 @@
-import type { DocumentAST } from './types'
 import { markdownToAst } from './markdown-to-ast'
 import { documentAstSchema } from './schema'
+import type { DocumentAST } from './types'
 
 /** True when the value already looks like a Document AST (has `blocks`). */
 export function isAst(value: unknown): value is DocumentAST {

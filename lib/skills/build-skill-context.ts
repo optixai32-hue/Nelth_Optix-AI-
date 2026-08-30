@@ -1,5 +1,7 @@
 import { getTextFromParts } from '@/lib/utils/message-utils'
 import { perfTime } from '@/lib/utils/perf-logging'
+
+import { buildOperationalSkillPrompt } from './enforce'
 import { loadSelectedSkillContent } from './loader'
 import { getSkillRegistry } from './registry'
 import {
@@ -10,7 +12,6 @@ import {
   routeSkills
 } from './router'
 import { getSkillValidationRules, SKILL_EXECUTION_RULES } from './skill-rules'
-import { buildOperationalSkillPrompt } from './enforce'
 import type {
   ActivatedSkill,
   LoadedSkill,

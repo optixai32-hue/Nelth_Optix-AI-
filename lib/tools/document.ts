@@ -1,8 +1,9 @@
+import { headers } from 'next/headers'
+
 import { tool } from 'ai'
 import { z } from 'zod'
 
-import { headers } from 'next/headers'
-
+import { generateDocument } from '@/lib/skills/document-engine'
 import {
   type DocumentFormat,
   formatFromName,
@@ -11,7 +12,6 @@ import {
   readDocument,
   validateDocument
 } from '@/lib/skills/document-runtime'
-import { generateDocument } from '@/lib/skills/document-engine'
 import { storeDocument } from '@/lib/skills/document-store'
 
 const FORMATS = ['pdf', 'docx', 'xlsx', 'pptx', 'html', 'markdown'] as const

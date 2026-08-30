@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
 import JSZip from 'jszip'
+import { describe, expect, it } from 'vitest'
 
+import type { DocumentAST } from './document-ast/types'
 import { generateDocument } from './document-engine'
 import { mimeForFormat } from './document-runtime'
-import type { DocumentAST } from './document-ast/types'
 
 /**
  * Maturity test for the PPTX renderer. Runs the SAME Document AST used by the

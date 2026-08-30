@@ -312,7 +312,7 @@ export function validateJs(js: string): Violation[] {
 
   try {
     // Compiles (does not execute) — catches real syntax errors.
-    // eslint-disable-next-line no-new-func
+     
     new Function(body)
   } catch (e) {
     if (e instanceof SyntaxError) {

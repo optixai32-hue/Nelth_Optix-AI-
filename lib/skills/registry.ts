@@ -3,9 +3,8 @@ import { promises as fs } from 'fs'
 import path from 'path'
 
 import {
-  SKILLS_MAIN_ROUTING,
-  SKILLS_CLAUDE_ROUTING
-} from './skills-main-routing'
+  SKILLS_CLAUDE_ROUTING,
+  SKILLS_MAIN_ROUTING} from './skills-main-routing'
 import type { SkillMeta } from './types'
 
 /**

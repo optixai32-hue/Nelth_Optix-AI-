@@ -19,10 +19,10 @@
  * (brand hex color) to get a genuinely designed document.
  */
 
-import { getTemplate, TEMPLATES } from './document-templates'
-import { buildMarkdownSource, parseMarkdown, type Block, type Run } from './document-runtime'
-import { buildInvoiceModel, renderInvoiceHtml } from './document-invoice'
 import { buildCvModel, renderCvHtml } from './document-cv'
+import { buildInvoiceModel, renderInvoiceHtml } from './document-invoice'
+import { type Block, buildMarkdownSource, parseMarkdown, type Run } from './document-runtime'
+import { getTemplate, TEMPLATES } from './document-templates'
 
 /**
  * One-time Chromium availability cache.

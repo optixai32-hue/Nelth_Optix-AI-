@@ -2,8 +2,8 @@
 
 import type { ToolPart } from '@/lib/types/ai'
 
-import { SearchArtifactContent } from '@/components/artifact/search-artifact-content'
 import { DocumentToolContent } from '@/components/artifact/document-tool-content'
+import { SearchArtifactContent } from '@/components/artifact/search-artifact-content'
 
 export function ToolInvocationContent({ part }: { part: ToolPart }) {
   switch (part.type) {

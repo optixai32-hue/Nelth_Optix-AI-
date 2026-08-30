@@ -3,9 +3,10 @@
 import { useMemo } from 'react'
 
 import { getTips, shuffle } from '@/lib/footer-tips'
-import { useI18n } from './i18n-provider'
 
 import { useTypewriterCycle } from '@/hooks/use-typewriter-cycle'
+
+import { useI18n } from './i18n-provider'
 
 function FooterContent() {
   const { t } = useI18n()

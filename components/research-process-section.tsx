@@ -32,6 +32,8 @@ import {
 } from '@/components/ai-elements/reasoning'
 
 import { useArtifact } from './artifact/artifact-context'
+import { DocumentToolContent } from './artifact/document-tool-content'
+import { ImageGeneration } from './elements/image-generation'
 import {
   Steps,
   StepsContent,
@@ -40,8 +42,6 @@ import {
 } from './prompt-kit/steps'
 import { ShimmerSkeleton } from './ui/shimmer-skeleton'
 import { ToolSection } from './tool-section'
-import { DocumentToolContent } from './artifact/document-tool-content'
-import { ImageGeneration } from './elements/image-generation'
 
 // Message part types
 type TextPart = {

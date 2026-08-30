@@ -1,4 +1,4 @@
-import { SearchResults, SearchResultItem, SearchResultImage } from '@/lib/types'
+import { SearchResultImage,SearchResultItem, SearchResults } from '@/lib/types'
 
 /**
  * NelthWeb search provider — the single, authoritative web + image search backend.

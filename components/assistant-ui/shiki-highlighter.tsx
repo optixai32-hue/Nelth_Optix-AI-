@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-
 import ShikiHighlighter, {
   type ShikiHighlighterProps,
 } from "react-shiki";

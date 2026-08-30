@@ -1,7 +1,7 @@
-import { generateDocument } from './lib/skills/document-engine.ts'
-import { storeDocument, resolveStoredDocument } from './lib/skills/document-store.ts'
 import { GET } from './app/api/documents/[id]/route.ts'
+import { generateDocument } from './lib/skills/document-engine.ts'
 import { mimeForFormat } from './lib/skills/document-runtime.ts'
+import { resolveStoredDocument,storeDocument } from './lib/skills/document-store.ts'
 
 for (const fmt of ['pdf','docx','xlsx','pptx']) {
   const buf = await generateDocument({ format: fmt, content: { title: 'Report', paragraphs: ['Hello world from '+fmt] } })

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+
 import {
-  validateGeneratedOutput,
   validateCss,
+  validateGeneratedOutput,
   validateHtml,
   validateResponsive
 } from './validate'

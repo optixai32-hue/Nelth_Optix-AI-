@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from 'fs'
+
 import { htmlToPdf } from '../lib/skills/document-pdf-html'
 
 const [,, htmlPath, outPath] = process.argv

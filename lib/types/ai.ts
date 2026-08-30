@@ -2,10 +2,10 @@ import type { ReasoningPart, TextPart } from '@ai-sdk/provider-utils'
 import type { InferUITool, UIMessage as AIMessage } from 'ai'
 
 import { fetchTool } from '@/lib/tools/fetch'
+import type { createImageGenerationTool } from '@/lib/tools/image-generation'
 import { askQuestionTool } from '@/lib/tools/question'
 import { searchTool } from '@/lib/tools/search'
 import { createTodoTools, type TodoItem } from '@/lib/tools/todo'
-import type { createImageGenerationTool } from '@/lib/tools/image-generation'
 import type { SearchMode } from '@/lib/types/search'
 
 // Re-export TodoItem for external use

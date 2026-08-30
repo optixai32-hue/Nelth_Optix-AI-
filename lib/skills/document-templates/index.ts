@@ -1,16 +1,15 @@
-import type { TemplateDef } from './types'
-
-import defaultTpl from './default'
-import minimal from './minimal'
-import report from './report'
-import cv from './cv'
-import resume from './resume'
-import portfolio from './portfolio'
-import invoice from './invoice'
 import brochure from './brochure'
-import magazine from './magazine'
 import certificate from './certificate'
+import cv from './cv'
+import defaultTpl from './default'
+import invoice from './invoice'
+import magazine from './magazine'
+import minimal from './minimal'
+import portfolio from './portfolio'
 import proposal from './proposal'
+import report from './report'
+import resume from './resume'
+import type { TemplateDef } from './types'
 
 /**
  * Template registry. Each document type (cv, invoice, report, certificate, …)

@@ -3,9 +3,9 @@ import JSZip from 'jszip'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import type { DocumentAST } from './document-ast/types'
+import { getCapabilities } from './document-capabilities'
 import { generateDocument } from './document-engine'
 import { mimeForFormat, readDocument } from './document-runtime'
-import { getCapabilities } from './document-capabilities'
 
 /**
  * GOLDEN COMPATIBILITY TEST — DocumentAST v1.

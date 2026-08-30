@@ -35,7 +35,7 @@ class SpecErrorBoundary extends Component<
     if (this.state.hasError) {
       return (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          Ce composant n'a pas pu être affiché (spécification invalide).
+          Ce composant n&apos;a pas pu être affiché (spécification invalide).
         </div>
       )
     }

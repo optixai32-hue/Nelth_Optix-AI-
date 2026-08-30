@@ -6,6 +6,10 @@ import type {
   VideoHTMLAttributes,
 } from 'react';
 import { useEffect, useRef } from 'react';
+
+import { type ClassValue,clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Carousel,
@@ -14,8 +18,6 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel';
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))

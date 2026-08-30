@@ -1,5 +1,5 @@
-import type { DocumentAST } from '../../document-ast/types'
 import { astToMarkdown } from '../../document-ast/ast-to-markdown'
+import type { DocumentAST } from '../../document-ast/types'
 import type { RendererCapabilities } from '../../document-capabilities'
 
 /** Markdown renderer — serializes the AST back to a Markdown document. */

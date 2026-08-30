@@ -311,7 +311,7 @@ export function Chat({
     }
 
     return result
-  }, [messages])
+  }, [messages, chatId])
 
   // Listen for copy message shortcut
   // Uses ref to avoid re-registering listener on every messages change.

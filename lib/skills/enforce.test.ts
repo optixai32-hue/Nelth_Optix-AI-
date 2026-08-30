@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import {
   buildOperationalSkillPrompt,
   buildRefinementPrompt,
@@ -6,8 +7,8 @@ import {
   MAX_SKILL_REFINEMENT_ITERATIONS,
   SkillEnforcementEngine
 } from './enforce'
-import { validateGeneratedOutput } from './validate'
 import type { ActivatedSkill, LoadedSkill, SkillContextResult } from './types'
+import { validateGeneratedOutput } from './validate'
 
 const fakeActivated: ActivatedSkill[] = [
   {

@@ -4,20 +4,20 @@
  * (Outputs go to ./_audit_out; cleaned up at the end.)
  */
 import { promises as fs } from 'fs'
+import { existsSync, mkdtempSync, readFileSync,rmSync } from 'fs'
 import os from 'os'
 import path from 'path'
-import { mkdtempSync, existsSync, rmSync, readFileSync } from 'fs'
 
-import { validateSkill } from './skills-main/skills-main/skills/skill-creator/scripts/quick_validate'
+import { buildDocx } from './skills-main/skills-main/skills/docx/scripts/docx'
+import { createConnection } from './skills-main/skills-main/skills/mcp-builder/scripts/connections'
+import { fillPdf } from './skills-main/skills-main/skills/pdf/scripts/fill_pdf'
+import { buildPptx } from './skills-main/skills-main/skills/pptx/scripts/pptx'
 import { packageSkill } from './skills-main/skills-main/skills/skill-creator/scripts/package_skill'
+import { validateSkill } from './skills-main/skills-main/skills/skill-creator/scripts/quick_validate'
 import { Frame } from './skills-main/skills-main/skills/slack-gif-creator/core/frame'
 import { GIFBuilder } from './skills-main/skills-main/skills/slack-gif-creator/core/gif_builder'
 import { withServer } from './skills-main/skills-main/skills/webapp-testing/scripts/with_server'
-import { createConnection } from './skills-main/skills-main/skills/mcp-builder/scripts/connections'
-import { buildDocx } from './skills-main/skills-main/skills/docx/scripts/docx'
-import { buildPptx } from './skills-main/skills-main/skills/pptx/scripts/pptx'
 import { recalc } from './skills-main/skills-main/skills/xlsx/scripts/recalc'
-import { fillPdf } from './skills-main/skills-main/skills/pdf/scripts/fill_pdf'
 
 const OUT = mkdtempSync(path.join(os.tmpdir(), 'audit-'))
 let pass = 0

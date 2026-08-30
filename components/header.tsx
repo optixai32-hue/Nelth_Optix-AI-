@@ -8,12 +8,14 @@ import { useRouter } from 'next/navigation'
 import { SquarePen } from 'lucide-react'
 
 import type { AppUser } from '@/lib/firebase/user'
-import { cn } from '@/lib/utils'
 import { SHORTCUT_EVENTS } from '@/lib/keyboard-shortcuts'
+import { cn } from '@/lib/utils'
+
+import { useIsMobile } from '@/hooks/use-mobile'
 
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
+
 import { Button } from './ui/button'
-import { useIsMobile } from '@/hooks/use-mobile'
 
 interface HeaderProps {
   user: AppUser | null

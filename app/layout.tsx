@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
-import { headers } from 'next/headers'
 import { Inter as FontSans } from 'next/font/google'
+import { headers } from 'next/headers'
 
 import { Analytics } from '@vercel/analytics/next'
 
@@ -11,9 +11,8 @@ import {
 } from '@/lib/auth/get-current-user'
 import { UserProvider } from '@/lib/contexts/user-context'
 import { hasFirebaseConfig } from '@/lib/firebase/config'
-import { detectLocaleFromHeader } from '@/lib/i18n/config'
-import { I18nProvider } from '@/components/i18n-provider'
 import type { AppUser } from '@/lib/firebase/user'
+import { detectLocaleFromHeader } from '@/lib/i18n/config'
 import { getModelSelectorData } from '@/lib/model-selector/get-model-selector-data'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +24,7 @@ import ArtifactRoot from '@/components/artifact/artifact-root'
 import FloatingAccountMenu from '@/components/floating-account-menu'
 import GuestMenu from '@/components/guest-menu'
 import Header from '@/components/header'
+import { I18nProvider } from '@/components/i18n-provider'
 import { KeyboardShortcutHandler } from '@/components/keyboard-shortcut-handler'
 import { LibraryProvider } from '@/components/library/library-context'
 import { PostHogProvider } from '@/components/posthog-provider'

@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+
 import { useI18n } from './i18n-provider'
 
 interface ErrorModalProps {

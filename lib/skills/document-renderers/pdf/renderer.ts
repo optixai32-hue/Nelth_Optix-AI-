@@ -1,6 +1,6 @@
+import { astToMarkdown } from '../../document-ast/ast-to-markdown'
 import type { DocumentAST } from '../../document-ast/types'
 import type { RendererCapabilities } from '../../document-capabilities'
-import { astToMarkdown } from '../../document-ast/ast-to-markdown'
 import { createDocument } from '../../document-runtime'
 
 export interface RenderOptions {

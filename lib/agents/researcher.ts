@@ -5,21 +5,21 @@ import { type Model } from '@/lib/types/models'
 
 import { documentTool } from '../tools/document'
 import { fetchTool } from '../tools/fetch'
-import { createQuestionTool } from '../tools/question'
-import { createSearchTool } from '../tools/search'
-import { normalizeToolCall } from '../tools/runtime/normalize-tool-call'
-import { createTodoTools } from '../tools/todo'
 import { createImageGenerationTool } from '../tools/image-generation'
+import { createQuestionTool } from '../tools/question'
+import { normalizeToolCall } from '../tools/runtime/normalize-tool-call'
+import { createSearchTool } from '../tools/search'
+import { createTodoTools } from '../tools/todo'
 import { SearchMode } from '../types/search'
 import { getModel } from '../utils/registry'
 import { isTracingEnabled } from '../utils/telemetry'
-import { classifyVisualIntent } from './visual-intent'
 
 import {
   getAdaptiveModePrompt,
   getQuickModePrompt,
   type QuickPromptFlags
 } from './prompts/search-mode-prompts'
+import { classifyVisualIntent } from './visual-intent'
 
 /**
  * Injected HIGH in the system instructions so the model never leaks the

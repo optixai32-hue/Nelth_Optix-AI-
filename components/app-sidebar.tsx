@@ -20,8 +20,8 @@ import { ChatHistorySection } from './sidebar/chat-history-section'
 import { ChatHistorySkeleton } from './sidebar/chat-history-skeleton'
 import { NewChatMenuItem } from './sidebar/new-chat-menu-item'
 import { IconLogo } from './ui/icons'
-import { LanguageSwitcher } from './language-switcher'
 import GuestMenu from './guest-menu'
+import { LanguageSwitcher } from './language-switcher'
 import UserMenu from './user-menu'
 
 export default function AppSidebar({ user }: { user: AppUser | null }) {

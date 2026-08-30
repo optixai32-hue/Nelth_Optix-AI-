@@ -11,7 +11,6 @@ import { toast } from 'sonner'
 
 import { submitFeedback } from '@/lib/actions/site-feedback'
 import { cn } from '@/lib/utils'
-import { useI18n } from './i18n-provider'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -22,6 +21,8 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+
+import { useI18n } from './i18n-provider'
 
 type Sentiment = 'positive' | 'neutral' | 'negative'
 

@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { type ChangeEvent,useEffect, useRef, useState } from 'react'
+
 import { RefreshCwIcon, XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+
 import { ghostButton, paper } from './surfaces'
 
 const ALLOWED_SIZES = ['1024x1024', '848x1264', '1264x848'] as const

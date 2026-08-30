@@ -15,8 +15,6 @@ import { deleteAccount } from '@/lib/actions/account'
 import { clearSession, getFirebaseAuth } from '@/lib/firebase/client'
 import type { AppUser } from '@/lib/firebase/user'
 
-import { FeedbackModal } from '@/components/feedback-modal'
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +37,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 
+import { FeedbackModal } from '@/components/feedback-modal'
 import { useTheme } from '@/components/theme-provider'
 
 interface AccountSettingsDialogProps {

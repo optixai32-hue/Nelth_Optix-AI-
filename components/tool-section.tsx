@@ -4,11 +4,11 @@ import { UseChatHelpers } from '@ai-sdk/react'
 
 import type { ToolPart, UIDataTypes, UIMessage, UITools } from '@/lib/types/ai'
 
+import { DocumentToolContent } from './artifact/document-tool-content'
 import FetchSection from './fetch-section'
 import { QuestionConfirmation } from './question-confirmation'
 import { SearchSection } from './search-section'
 import { ToolTodoDisplay } from './tool-todo-display'
-import { DocumentToolContent } from './artifact/document-tool-content'
 
 interface ToolSectionProps {
   tool: ToolPart

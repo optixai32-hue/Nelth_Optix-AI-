@@ -8,6 +8,7 @@ import { IconPlus as Plus } from '@tabler/icons-react'
 import { SHORTCUT_EVENTS } from '@/lib/keyboard-shortcuts'
 
 import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+
 import { useI18n } from '../i18n-provider'
 
 export function NewChatMenuItem() {

@@ -37,10 +37,13 @@ next-env.d.ts
 
 # temporary files
 .tmp/
+.document-store/
+**/.document-store/
 # local filesystem upload fallback (used when object storage is not configured)
 .local-uploads/
 # Local-only scratch / docs (not committed)
 _local/
+
 
 .vercel
 .env*
@@ -56,3 +59,6 @@ _build_v4.log
 _build_exit.txt
 _build_nelthweb.log
 _build_nelthweb_exit.txt
+_tc*.log
+test-*.json
+test-*.txt

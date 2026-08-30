@@ -7,8 +7,8 @@ import { renderPptx } from './document-renderers/pptx/renderer'
 import { renderSvg } from './document-renderers/svg/renderer'
 import { renderXlsx } from './document-renderers/xlsx/renderer'
 import { astToLegacySpec,isLegacySpec, normalizeToAst, validateAst } from './document-ast'
-import { buildMarkdownSource,createDocument } from './document-runtime'
 import { hasRenderer } from './document-capabilities'
+import { buildMarkdownSource,createDocument } from './document-runtime'
 
 export interface GenerateRequest {
   format: string

@@ -29,9 +29,8 @@ import { IconLogo } from '@/components/ui/icons'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-import { useI18n } from './i18n-provider'
-
 import { PasswordInput } from './ui/password-input'
+import { useI18n } from './i18n-provider'
 
 export function LoginForm({
   className,

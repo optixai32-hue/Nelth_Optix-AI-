@@ -43,6 +43,7 @@ import {
   subscribeToCookieChange
 } from '@/lib/utils/cookies'
 import { stripMarkdownText } from '@/lib/utils/markdown'
+
 import { useAuthCheck } from '@/hooks/use-auth-check'
 
 import { useArtifact } from './artifact/artifact-context'
@@ -57,10 +58,10 @@ import {
   TooltipTrigger
 } from './ui/tooltip'
 import { ActionButtons } from './action-buttons'
+import { useI18n } from './i18n-provider'
 import { MessageNavigationDots } from './message-navigation-dots'
 import { SearchModeSelector } from './search-mode-selector'
 import { UploadedFileList } from './uploaded-file-list'
-import { useI18n } from './i18n-provider'
 
 // Constants for timing delays
 const INPUT_UPDATE_DELAY_MS = 10 // Delay to ensure input value is updated before form submission

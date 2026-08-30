@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+
 import { NelthLogo } from './nelth-logo'
 
 function IconLogo({ className, ...props }: React.ComponentProps<'svg'>) {

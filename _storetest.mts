@@ -1,4 +1,4 @@
-import { storeDocument, resolveStoredDocument } from './lib/skills/document-store.ts'
+import { resolveStoredDocument,storeDocument } from './lib/skills/document-store.ts'
 for (const [name, mime] of [['a.pdf','application/pdf'],['b.docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document'],['c.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],['d.pptx','application/vnd.openxmlformats-officedocument.presentationml.presentation']]) {
   const buf = Buffer.from('hello-'+name)
   const stored = await storeDocument(buf, name, mime)

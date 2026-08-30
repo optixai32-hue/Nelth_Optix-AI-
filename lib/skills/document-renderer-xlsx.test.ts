@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import JSZip from 'jszip'
 import ExcelJS from 'exceljs'
+import JSZip from 'jszip'
+import { describe, expect, it } from 'vitest'
 
+import type { DocumentAST } from './document-ast/types'
 import { generateDocument } from './document-engine'
 import { mimeForFormat } from './document-runtime'
-import type { DocumentAST } from './document-ast/types'
 
 /**
  * Maturity test for the XLSX renderer. Runs the SAME Document AST used by the

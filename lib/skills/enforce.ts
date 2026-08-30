@@ -13,18 +13,17 @@
  * supplied generator.
  */
 
+import { isVisualQuery } from './router'
+import { getSkillValidationRules } from './skill-rules'
 import type {
   ActivatedSkill,
   LoadedSkill,
   SkillContextResult,
   SkillExecutionState
 } from './types'
-import { getSkillValidationRules } from './skill-rules'
-import { isVisualQuery } from './router'
 import {
-  type ValidationResult,
-  validateGeneratedOutput
-} from './validate'
+  validateGeneratedOutput,
+  type ValidationResult} from './validate'
 
 /** Bounded refinement iterations (user requested 2–3). */
 export const MAX_SKILL_REFINEMENT_ITERATIONS = 2

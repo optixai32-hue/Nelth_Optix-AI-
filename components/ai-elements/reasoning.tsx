@@ -20,13 +20,14 @@ import { ChevronDownIcon, LightbulbIcon } from "lucide-react"
 import { Streamdown } from "streamdown"
 
 import { cn } from "@/lib/utils"
-import { defaultComponents } from "@/components/assistant-ui/markdown-text"
 
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+
+import { defaultComponents } from "@/components/assistant-ui/markdown-text"
 
 import { Shimmer } from "./shimmer"
 

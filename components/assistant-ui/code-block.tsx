@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
 import {
   CheckIcon,
   CodeIcon,
@@ -12,8 +13,9 @@ import {
   XIcon,
 } from "lucide-react";
 
-import { SyntaxHighlighter } from "./shiki-highlighter";
 import { SpecFenceBlock } from "@/components/spec-fence-block";
+
+import { SyntaxHighlighter } from "./shiki-highlighter";
 
 function extractCode(children: unknown): string {
   if (typeof children === "string") return children;
@@ -214,28 +216,15 @@ function PreviewBody({ language, code }: { language: string; code: string }) {
   );
 }
 
-export function CodeBlock({
-  children,
-  className,
-  node,
-  ...props
+function StandardCodeBlock({
+  language,
+  code,
+  meta,
 }: {
-  children?: unknown;
-  className?: string;
-  node?: { properties?: { metastring?: string; className?: string[] } };
-  [key: string]: unknown;
+  language: string;
+  code: string;
+  meta?: string;
 }) {
-  const rawLang =
-    typeof className === "string" ? LANG_RE.exec(className)?.[1] : undefined;
-  const language = normalizeLang(rawLang);
-  const code = extractCode(children);
-  const meta = node?.properties?.metastring;
-
-  // `spec` fences drive the Generated UI (Related questions / Images).
-  if (language === "spec") {
-    return <SpecFenceBlock source={code} />;
-  }
-
   const previewable =
     PREVIEWABLE.has(language) ||
     ((language === "xml" ||
@@ -418,4 +407,29 @@ export function CodeBlock({
         : null}
     </div>
   );
+}
+
+export function CodeBlock({
+  children,
+  className,
+  node,
+  ...props
+}: {
+  children?: unknown;
+  className?: string;
+  node?: { properties?: { metastring?: string; className?: string[] } };
+  [key: string]: unknown;
+}) {
+  const rawLang =
+    typeof className === "string" ? LANG_RE.exec(className)?.[1] : undefined;
+  const language = normalizeLang(rawLang);
+  const code = extractCode(children);
+  const meta = node?.properties?.metastring;
+
+  // `spec` fences drive the Generated UI (Related questions / Images).
+  if (language === "spec") {
+    return <SpecFenceBlock source={code} />;
+  }
+
+  return <StandardCodeBlock language={language} code={code} meta={meta} />;
 }

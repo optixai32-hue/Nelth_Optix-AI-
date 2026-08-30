@@ -6,12 +6,12 @@ import type {
   UIToolInvocation
 } from 'ai'
 
+import type { documentTool } from '../tools/document'
 import type { fetchTool } from '../tools/fetch'
+import type { createImageGenerationTool } from '../tools/image-generation'
 import type { createQuestionTool } from '../tools/question'
 import type { createSearchTool } from '../tools/search'
 import type { createTodoTools } from '../tools/todo'
-import type { documentTool } from '../tools/document'
-import type { createImageGenerationTool } from '../tools/image-generation'
 
 // Define the tools type for researcher agent
 export type ResearcherTools = {
