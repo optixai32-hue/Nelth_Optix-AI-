@@ -218,7 +218,8 @@ const FAKE_TOOL_PATTERNS = [
   /<invoke\b[^>]*>[\s\S]*?(?:<\/invoke\b[^>]*>|$)/gi,
   /<function\b[^>]*>[\s\S]*?(?:<\/function>|$)/gi,
   /<tool-search\b[^>]*>[\s\S]*?(?:<\/tool-search>|$)/gi,
-  /<\/?(?:tool_calls?|tool_call|invoke|function|tool-search)\b[^>]*\/?>/gi
+  /<\/?(?:tool_calls?|tool_call|invoke|function|tool-search)\b[^>]*\/?>/gi,
+  /<\/?tool_call(?:s|:[a-zA-Z0-9_-]+)?[^>]*>/gi
 ]
 
 export function stripFakeToolCallXml(text: string): string {
@@ -264,52 +265,65 @@ export class StreamTextSanitizer {
   process(delta: string): string {
     this.buffer += delta
 
-    // If the buffer contains any fake tool call tag markers
-    const hasToolTag =
+    // 1. If buffer has any complete fake tool call blocks or closed tags
+    const hasClosedFakeTag =
+      this.buffer.includes('</invoke>') ||
+      this.buffer.includes('</tool_call>') ||
+      this.buffer.includes('</tool_calls>') ||
+      this.buffer.includes('</function>') ||
+      this.buffer.includes('</tool-search>') ||
+      this.buffer.includes('<tool_call>') ||
+      this.buffer.includes('<tool_calls>') ||
+      this.buffer.includes('<tool-search>') ||
+      this.buffer.includes('/>')
+
+    if (hasClosedFakeTag) {
+      const cleaned = stripFakeToolCallXml(this.buffer)
+      this.buffer = ''
+      return cleaned
+    }
+
+    // 2. If buffer has an unclosed fake tool tag (<tool_call... or </tool_call...)
+    const hasOpenToolTag =
       this.buffer.includes('<tool_call') ||
+      this.buffer.includes('</tool_call') ||
       this.buffer.includes('<tool_calls') ||
+      this.buffer.includes('</tool_calls') ||
       this.buffer.includes('<invoke') ||
+      this.buffer.includes('</invoke') ||
       this.buffer.includes('<function') ||
-      this.buffer.includes('<tool-search')
+      this.buffer.includes('</function') ||
+      this.buffer.includes('<tool-search') ||
+      this.buffer.includes('</tool-search')
 
-    if (hasToolTag) {
-      // If the fake tool call block has closed
-      const hasClosed =
-        this.buffer.includes('</invoke') ||
-        this.buffer.includes('</tool_call') ||
-        this.buffer.includes('</function') ||
-        this.buffer.includes('</tool-search>')
-
-      if (hasClosed) {
+    if (hasOpenToolTag) {
+      // If buffer is growing very large (> 300 chars) or has double newline, flush cleaned
+      if (this.buffer.length > 300 || this.buffer.includes('\n\n')) {
         const cleaned = stripFakeToolCallXml(this.buffer)
         this.buffer = ''
         return cleaned
       }
-
-      // If it hasn't closed yet, but buffer has grown large (> 250 chars) or has double newline,
-      // it might be an unclosed fake tag followed by real text
-      if (this.buffer.length > 250 || this.buffer.includes('\n\n')) {
-        const cleaned = stripFakeToolCallXml(this.buffer)
-        this.buffer = ''
-        return cleaned
-      }
-
-      // Still accumulating the fake tool call XML block — hold in buffer
+      // Hold in buffer until the tag completes
       return ''
     }
 
-    // Check if buffer ends with a partial tag starting with '<'
+    // 3. Check if buffer ends with a partial tag starting with '<'
     const lastOpenBracket = this.buffer.lastIndexOf('<')
     if (lastOpenBracket !== -1 && !this.buffer.includes('>', lastOpenBracket)) {
       const potentialTag = this.buffer.slice(lastOpenBracket)
-      if (
+      const matchesPotential =
         '<tool_call'.startsWith(potentialTag) ||
+        '</tool_call'.startsWith(potentialTag) ||
         '<tool_calls'.startsWith(potentialTag) ||
-        '</invoke'.startsWith(potentialTag) ||
+        '</tool_calls'.startsWith(potentialTag) ||
         '<invoke'.startsWith(potentialTag) ||
+        '</invoke'.startsWith(potentialTag) ||
         '<function'.startsWith(potentialTag) ||
-        '<tool-search'.startsWith(potentialTag)
-      ) {
+        '</function'.startsWith(potentialTag) ||
+        '<tool-search'.startsWith(potentialTag) ||
+        '</tool-search'.startsWith(potentialTag)
+
+      if (matchesPotential) {
         // Emit everything before the partial tag, hold partial tag in buffer
         const safe = this.buffer.slice(0, lastOpenBracket)
         this.buffer = potentialTag
