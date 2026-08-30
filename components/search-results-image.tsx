@@ -87,54 +87,6 @@ const useFilteredImages = (images: SearchResultImage[]) => {
     ids: []
   })
 
-  const [state, setState] = useState<FilteredImagesState>(() => ({
-    key: '',
-    status: normalizedImages.length === 0 ? 'empty' : 'loading',
-    images: []
-  }))
-
-  useEffect(() => {
-    if (normalizedImages.length === 0 || typeof window === 'undefined') {
-      return
-    }
-
-    if (state.key === normalizedKey) {
-      return
-    }
-
-    let cancelled = false
-
-    const preloadImage = (image: NormalizedImage) =>
-      new Promise<NormalizedImage | null>(resolve => {
-        if (!image.url) {
-          resolve(null)
-          return
-        }
-
-        const img = new window.Image()
-        img.onload = () => resolve(image)
-        img.onerror = () => resolve(null)
-        img.src = image.url
-      })
-
-    Promise.all(normalizedImages.map(preloadImage)).then(results => {
-      if (cancelled) {
-        return
-      }
-
-      const validImages = results.filter(Boolean) as NormalizedImage[]
-      setState({
-        key: normalizedKey,
-        status: validImages.length === 0 ? 'empty' : 'ready',
-        images: validImages
-      })
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [normalizedImages, normalizedKey, state.key])
-
   const removeImage = useCallback(
     (id: string) => {
       setRemovedState(prevState => {
@@ -147,23 +99,13 @@ const useFilteredImages = (images: SearchResultImage[]) => {
     [normalizedKey]
   )
 
-  const sourceImages =
-    state.key === normalizedKey && state.status !== 'loading'
-      ? state.images
-      : normalizedImages
-  const removedIds = removedState.key === normalizedKey ? removedState.ids : []
-  const visibleImages = sourceImages.filter(
-    image => !removedIds.includes(image.id)
-  )
-  const status: FilterStatus =
-    visibleImages.length === 0
-      ? 'empty'
-      : state.key === normalizedKey && state.status !== 'loading'
-        ? state.status
-        : normalizedImages.length === 0
-          ? 'empty'
-          : 'loading'
-  const displayImages = status === 'loading' ? normalizedImages : visibleImages
+  const visibleImages = useMemo(() => {
+    const removedIds =
+      removedState.key === normalizedKey ? removedState.ids : []
+    return normalizedImages.filter(image => !removedIds.includes(image.id))
+  }, [normalizedImages, normalizedKey, removedState])
+  const status: FilterStatus = visibleImages.length === 0 ? 'empty' : 'ready'
+  const displayImages = visibleImages
 
   return {
     status,
@@ -250,7 +192,6 @@ export const SearchResultsImageSection: React.FC<
     useFilteredImages(images)
 
   const filteredCount = filteredImages.length
-  const isLoading = status === 'loading'
 
   const { current } = useCarouselMetrics({
     api,
@@ -259,14 +200,12 @@ export const SearchResultsImageSection: React.FC<
     setSelectedIndex
   })
 
-  if (status === 'empty') {
-    return <div className="text-muted-foreground">No images found</div>
+  if (status === 'empty' || displayImages.length === 0) {
+    return null
   }
 
   const handleSelect = (index: number) => {
-    if (!isLoading) {
-      setSelectedIndex(index)
-    }
+    setSelectedIndex(index)
   }
 
   const renderImageGrid = (
@@ -280,7 +219,7 @@ export const SearchResultsImageSection: React.FC<
         const actualIndex = startIndex + index
         const cornerClasses = cornerClassForIndex(actualIndex, isFullMode)
 
-        if (isLoading || !image.url) {
+        if (!image.url) {
           return (
             <div key={image.id} className="aspect-video">
               <div

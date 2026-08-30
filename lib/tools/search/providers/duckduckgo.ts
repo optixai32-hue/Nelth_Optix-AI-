@@ -247,7 +247,7 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
       return data.results
         .slice(0, maxResults)
         .map(item => ({
-          url: item.image || item.thumbnail || item.url || '',
+          url: item.thumbnail || item.image || item.url || '',
           description: item.title || cleanQuery
         }))
         .filter(img => isValidUrl(img.url))
