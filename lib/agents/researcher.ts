@@ -401,8 +401,10 @@ function detectQuickIntent(
   document: boolean
 } {
   const artifact = detectArtifactIntent(text)
+  const webImage = isWebImageSearch(text)
 
-  const image = Boolean(imageAttachment) || IMAGE_INTENT_RE.test(text)
+  const image =
+    Boolean(imageAttachment) || (!webImage && IMAGE_INTENT_RE.test(text))
 
   // A genuine document-format request (pdf/docx/xlsx/pptx, invoice, report, …)
   // or read/analyze/summarize a document. Generic "file"/"fichier" alone is NOT
@@ -420,9 +422,10 @@ function detectQuickIntent(
   let code = artifact.isCode
   if (image || isDocFormat) code = false
 
-  const hasCurrentInfoKeyword = /\b(search|cherche|recherch|actualit[eé]|news|price|prix|weather|m[eé]t[eé]o|current|recent|latest|last|today|aujourd'hui|en\s+direct|live|2026|2025)\b/i.test(
-    text
-  )
+  const hasCurrentInfoKeyword =
+    /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualit[eé]s?|news|price|prix|weather|m[eé]t[eé]o|current|recent|latest|last|today|aujourd'hui|en\s+direct|live|2026|2025)\b/i.test(
+      text
+    )
 
   let search: boolean
   if (code) {
@@ -432,7 +435,7 @@ function detectQuickIntent(
   } else if (image || document) {
     search = false
   } else {
-    search = hasCurrentInfoKeyword
+    search = hasCurrentInfoKeyword || webImage
   }
 
   // WEB IMAGE SEARCH: a request to FIND existing images on the web must use the
