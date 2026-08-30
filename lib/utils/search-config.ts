@@ -19,30 +19,29 @@ export function isGeneralSearchProviderAvailable(): boolean {
 }
 
 export function getGeneralSearchProviderName(): string {
-  const type = resolveSearchProviderType()
-  return type === 'nelthweb' ? 'NelthWeb' : 'DuckDuckGo'
+  return '4get'
 }
 
 /**
- * NelthWeb supports image search via content_types: ['image'].
+ * 4get supports image search via content_types: ['image'].
  */
 export function supportsMultimediaContentTypes(): boolean {
   return true
 }
 
 export function getSearchTypeDescription(): string {
-  return `Search type: general and optimized both use NelthWeb. Web results come with inline citations. When the user explicitly asks for images/pictures/photos, ALWAYS set content_types to ["image"] (or ["web","image"] to also get web links).`
+  return `Search type: general and optimized both use 4get (https://4get.sudovanilla.org). Web results come with inline citations. When the user explicitly asks for images/pictures/photos, ALWAYS set content_types to ["image"] (or ["web","image"] to also get web links).`
 }
 
 export function getSearchToolDescription(): string {
-  return `Search the web (and images) using NelthWeb. When the user wants images, set content_types:["image"] (or ["web","image"] for both). Otherwise use ["web"].`
+  return `Search the web (and images) using 4get. When the user wants images, set content_types:["image"] (or ["web","image"] for both). Otherwise use ["web"].`
 }
 
 export function getContentTypesGuidance(): string {
   return `- **Images / pictures / photos:**
-  - When the user asks for images (e.g. "show me images of cats", "picture of the Eiffel Tower"), set content_types: ["image"].
+  - When the user asks for images (e.g. "show me images of cats", "recherche image de..."), set content_types: ["image"].
   - To get both web results AND images, set content_types: ["web","image"].
-  - Images are returned by NelthWeb and displayed in a gallery below the search results.
+  - Images are returned by 4get and displayed in a gallery above the response.
 - **Normal web search:** use content_types: ["web"] (default).
 - Both type="general" and type="optimized" support images.`
 }

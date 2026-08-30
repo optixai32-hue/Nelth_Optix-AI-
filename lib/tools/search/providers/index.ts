@@ -1,38 +1,25 @@
 import { SearchProvider } from './base'
-import { DuckDuckGoSearchProvider } from './duckduckgo'
-import { NelthWebSearchProvider } from './nelthweb'
+import { FourGetSearchProvider } from './fourget'
 
-export type SearchProviderType = 'duckduckgo' | 'nelthweb'
+export type SearchProviderType = '4get' | 'fourget'
 
 /**
  * Resolves the configured search provider from environment variables.
- * Defaults to 'duckduckgo'.
+ * Defaults to '4get' (https://4get.sudovanilla.org).
  */
 export function resolveSearchProviderType(): SearchProviderType {
-  const configured = (
-    process.env.SEARCH_PROVIDER ||
-    process.env.SEARCH_API ||
-    ''
-  ).toLowerCase()
-  if (configured === 'nelthweb') {
-    return 'nelthweb'
-  }
-  return 'duckduckgo'
+  return '4get'
 }
 
 /**
- * Creates the search provider based on configuration or explicit type.
+ * Creates the search provider (4get).
  */
 export function createSearchProvider(
-  type?: SearchProviderType
+  _type?: SearchProviderType
 ): SearchProvider {
-  const providerType = type ?? resolveSearchProviderType()
-  if (providerType === 'nelthweb') {
-    return new NelthWebSearchProvider()
-  }
-  return new DuckDuckGoSearchProvider()
+  return new FourGetSearchProvider()
 }
 
-export { DuckDuckGoSearchProvider, NelthWebSearchProvider }
+export { FourGetSearchProvider }
 export type { SearchProvider }
 

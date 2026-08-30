@@ -15,7 +15,7 @@ export const searchSchema = z.object({
     .optional()
     .default(['web'])
     .describe(
-      'Types of content to include in search results. Use ["web"] for normal web search, ["image"] for image-only results, or ["web","image"] to get both web links and images. The configured provider (DuckDuckGo) supports image results for any type.'
+      'Types of content to include in search results. Use ["web"] for normal web search, ["image"] for image-only results, or ["web","image"] to get both web links and images. The configured provider (4get) supports image results for any type.'
     ),
   max_results: z
     .number()
