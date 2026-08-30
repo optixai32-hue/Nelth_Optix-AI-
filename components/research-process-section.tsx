@@ -41,6 +41,7 @@ import {
   StepsTrigger
 } from './prompt-kit/steps'
 import { ShimmerSkeleton } from './ui/shimmer-skeleton'
+import { SearchResultsImageSection } from './search-results-image'
 import { ToolSection } from './tool-section'
 
 // Message part types
@@ -311,7 +312,9 @@ function ToolStep({
   // Web search: render with the ChainOfThought component, listing result
   // sources as badges (collapsible to the full SearchSection details).
   if (isSearch) {
-    const output = part.state === 'output-available' ? (part.output as any) : undefined
+    const output =
+      part.state === 'output-available' ? (part.output as any) : undefined
+    const images = Array.isArray(output?.images) ? output.images : []
     const sources: string[] = [
       ...(output?.results ?? []).map((r: any) => r.url).filter(Boolean),
       ...(output?.videos ?? []).map((v: any) => v.url).filter(Boolean)
@@ -331,33 +334,40 @@ function ToolStep({
     )
 
     return (
-      <ChainOfThought
-        data-testid="tool-section"
-        defaultOpen={isOpen}
-        onOpenChange={onOpenChange}
-        className="not-prose"
-      >
-        <ChainOfThoughtHeader>
-          {`Web search: ${query}`}
-        </ChainOfThoughtHeader>
-        <ChainOfThoughtContent>
-          <ChainOfThoughtStep
-            icon={LucideSearchIcon}
-            label={`Searching for "${query}"`}
-            status={output ? 'complete' : 'active'}
-          >
-            {hostnames.length > 0 && (
-              <ChainOfThoughtSearchResults>
-                {hostnames.map(host => (
-                  <ChainOfThoughtSearchResult key={host}>
-                    {host}
-                  </ChainOfThoughtSearchResult>
-                ))}
-              </ChainOfThoughtSearchResults>
-            )}
-          </ChainOfThoughtStep>
-        </ChainOfThoughtContent>
-      </ChainOfThought>
+      <div className="space-y-3">
+        <ChainOfThought
+          data-testid="tool-section"
+          defaultOpen={isOpen}
+          onOpenChange={onOpenChange}
+          className="not-prose"
+        >
+          <ChainOfThoughtHeader>
+            {`Web search: ${query}`}
+          </ChainOfThoughtHeader>
+          <ChainOfThoughtContent>
+            <ChainOfThoughtStep
+              icon={LucideSearchIcon}
+              label={`Searching for "${query}"`}
+              status={output ? 'complete' : 'active'}
+            >
+              {hostnames.length > 0 && (
+                <ChainOfThoughtSearchResults>
+                  {hostnames.map(host => (
+                    <ChainOfThoughtSearchResult key={host}>
+                      {host}
+                    </ChainOfThoughtSearchResult>
+                  ))}
+                </ChainOfThoughtSearchResults>
+              )}
+            </ChainOfThoughtStep>
+          </ChainOfThoughtContent>
+        </ChainOfThought>
+        {images.length > 0 && (
+          <div className="my-2 not-prose">
+            <SearchResultsImageSection images={images} query={query} />
+          </div>
+        )}
+      </div>
     )
   }
 
