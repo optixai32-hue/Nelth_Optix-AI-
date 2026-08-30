@@ -6,17 +6,21 @@
  * image search. No API key / third-party provider is used anymore.
  */
 
-import { resolveSearchProviderType } from '@/lib/tools/search/providers'
+import {
+  resolveSearchProviderType,
+  SearchProviderType
+} from '@/lib/tools/search/providers'
 
 /**
- * NelthWeb is always available (public API, no key required).
+ * NelthWeb / DuckDuckGo is always available (no key required).
  */
 export function isGeneralSearchProviderAvailable(): boolean {
   return true
 }
 
 export function getGeneralSearchProviderName(): string {
-  return 'NelthWeb'
+  const type = resolveSearchProviderType()
+  return type === 'nelthweb' ? 'NelthWeb' : 'DuckDuckGo'
 }
 
 /**
@@ -54,7 +58,7 @@ export function getSearchStrategyGuidance(): string {
 /**
  * Returns the resolved search provider type.
  */
-export function getGeneralSearchProviderType(): 'nelthweb' | null {
+export function getGeneralSearchProviderType(): SearchProviderType | null {
   return resolveSearchProviderType()
 }
 

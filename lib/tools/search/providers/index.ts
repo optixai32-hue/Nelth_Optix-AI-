@@ -1,25 +1,38 @@
 import { SearchProvider } from './base'
+import { DuckDuckGoSearchProvider } from './duckduckgo'
 import { NelthWebSearchProvider } from './nelthweb'
 
-export type SearchProviderType = 'nelthweb'
+export type SearchProviderType = 'duckduckgo' | 'nelthweb'
 
 /**
- * The only search backend is now NelthWeb. This kept the previous resolver
- * signature so the rest of the app (search.ts, search-config.ts) is unaffected.
+ * Resolves the configured search provider from environment variables.
+ * Defaults to 'duckduckgo'.
  */
 export function resolveSearchProviderType(): SearchProviderType {
-  return 'nelthweb'
+  const configured = (
+    process.env.SEARCH_PROVIDER ||
+    process.env.SEARCH_API ||
+    ''
+  ).toLowerCase()
+  if (configured === 'nelthweb') {
+    return 'nelthweb'
+  }
+  return 'duckduckgo'
 }
 
 /**
- * Always returns the NelthWeb search provider. No fallback chain — NelthWeb is the
- * single source of truth for web + image search.
+ * Creates the search provider based on configuration or explicit type.
  */
 export function createSearchProvider(
-  _type?: SearchProviderType
+  type?: SearchProviderType
 ): SearchProvider {
-  return new NelthWebSearchProvider()
+  const providerType = type ?? resolveSearchProviderType()
+  if (providerType === 'nelthweb') {
+    return new NelthWebSearchProvider()
+  }
+  return new DuckDuckGoSearchProvider()
 }
 
-export { NelthWebSearchProvider }
+export { DuckDuckGoSearchProvider, NelthWebSearchProvider }
 export type { SearchProvider }
+

@@ -5,7 +5,10 @@ import { SearchResults } from '@/lib/types'
 import { getSearchToolDescription } from '@/lib/utils/search-config'
 import { logToolPayload } from '@/lib/utils/usage-logging'
 
-import { createSearchProvider } from './search/providers'
+import {
+  createSearchProvider,
+  resolveSearchProviderType
+} from './search/providers'
 
 /**
  * Creates a search tool with the appropriate schema for the given model.
@@ -61,9 +64,9 @@ export function createSearchTool(fullModel: string) {
         }
       }
 
-      // All search now goes through the NelthWeb provider.
+      const providerType = resolveSearchProviderType()
       console.log(
-        `Using search API: nelthweb, Type: ${type}, Search Depth: ${effectiveSearchDepth}`
+        `Using search API: ${providerType}, Type: ${type}, Search Depth: ${effectiveSearchDepth}`
       )
 
       try {
