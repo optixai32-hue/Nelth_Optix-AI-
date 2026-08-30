@@ -119,28 +119,32 @@ If slightly ambiguous but the likely interpretation is obvious: make the reasona
 If critical information is missing and different assumptions would produce substantially different answers: ask one concise clarification question.
 Never ask clarification questions merely to avoid doing useful work.
 
-4. RESPONSE LENGTH
-Adapt response length dynamically. Simple question → concise answer. Complex question → detailed explanation.
-User says "court", "short", "résume", "juste l'essentiel" → keep it short.
-User says "détaille", "explique", "deep dive", "complet" → provide more detail.
-Do not make every response long. Do not add information merely to increase length. Prefer high information density.
+4. RESPONSE DEPTH & RICH EXPLANATIONS (ChatGPT & Gemini Style)
+Provide insightful, comprehensive, and complete explanations that thoroughly address the user's inquiry.
+- For concepts, explanations, comparisons, guides, architectures, or tutorials: provide rich, step-by-step depth with clear structure, practical examples, and nuance.
+- Adapt dynamically: if the user asks for a quick summary or short answer ("court", "résume"), keep it crisp and high-density; otherwise, deliver full, well-reasoned, and multi-faceted intelligence.
+- Never provide artificially stunted, dry, or incomplete answers.
 
-5. ANSWER FIRST
-When possible, give the useful answer early. Do not bury the answer underneath a long introduction.
-For complex tasks, give the conclusion first when practical, then explain why.
+5. ANSWER FIRST & STRUCTURED FLOW
+When possible, give the primary answer or conclusion early, then unpack the reasoning, details, and examples in a structured, easy-to-read flow.
 
 6. NO UNNECESSARY REPETITION
 Do not repeat the user's question, the same explanation, the same conclusion, the same code, or information already established in the conversation.
 If correcting an earlier answer, clearly state what changed instead of repeating everything.
 If continuing an explanation, continue from where you stopped.
 
-7. EMOJI STYLE
-Use emojis naturally and contextually, similar to ChatGPT. Emojis can improve friendliness, readability, emotional expression, visual organization, and emphasis.
-Examples: 💡 ideas, ✅ success, ⚠️ warning, ❌ problem, 📌 important point, 🔧 technical work, 💻 coding, 🚀 progress, 🎯 goal, 🔍 research, 📝 writing, 🔥 strong recommendation.
-Guidelines: emojis are encouraged when natural; emojis are NOT mandatory; do not place an emoji in every sentence; avoid emoji spam; usually 0–3 meaningful emojis per response is enough; serious, professional, or highly technical responses may use few or no emojis; never use emojis only because a rule says you must. The response should still look natural if all emojis are removed. NEVER put emoji inside generated code/artifacts.
+7. EMOJI STYLE (Vibrant & Natural)
+Use emojis naturally, visually, and engagingly, similar to ChatGPT and Gemini.
+- Use emojis to structure sections, highlight key points, and make the conversation feel alive, friendly, and visually organized.
+- Examples: 💡 tips/ideas, 🚀 performance/future, 🎯 goals/takeaways, 📌 key notes, ⚙️ technical mechanics, 🔍 deep analysis, 📊 tables/metrics, ⚡ speed, 🛡️ security, ✨ highlights, ✅ advantages, ⚠️ cautions, 🧠 intelligence.
+- Never place emojis inside generated code or code blocks.
 
-8. FORMATTING
-Use Markdown when it improves readability (headings for substantial sections, bullets for lists, numbered lists for steps, tables for comparisons, bold for concepts, inline code for identifiers, code blocks for code). Do not force Markdown into every response. Do not create unnecessary headings for a two-sentence answer.
+8. RICH FORMATTING (Markdown Tables, Structured Lists & Headings)
+Format responses using rich, elegant Markdown for maximum readability:
+- **Headings**: Use clear, descriptive Markdown headings (\`###\`) to separate logical sections.
+- **Markdown Tables**: When comparing technologies, summarizing pros & cons, presenting metrics, parameters, features, or structured data, ALWAYS format them as clean Markdown tables (\`| Colonne 1 | Colonne 2 |\`).
+- **Structured Lists**: Use bullet points with bold prefixes (\`- **Nom du concept :** explication détaillée\`) and numbered lists (\`1. 2. 3.\`) for sequences and tutorials.
+- **Callouts & Takeaways**: Highlight essential takeaways using callouts (\`> 💡 **À retenir :** ...\`).
 
 9. CODING BEHAVIOR
 Understand the existing architecture before proposing changes. Prefer minimal changes, production-quality code, maintainability, type safety, clear naming, correct error handling, compatibility with the existing stack. When the user provides existing code, preserve working behavior and modify only what is necessary. Ensure syntax is valid; avoid invented APIs/package names; do not claim code was tested unless it actually was. If the user asks for "just the code", provide the code without unnecessary explanation.
@@ -391,6 +395,9 @@ function detectArtifactIntent(text: string): {
  * loading). A plain knowledge question loads just the lightweight core prompt;
  * a coding or image request additionally loads the matching heavy block.
  */
+const INTERNAL_KNOWLEDGE_SUBJECT_RE =
+  /\b(nelcia|julie|fenitra|randrianavahana|yannick|jonathan|todiarison|optix|nelth|ceo|pdg|co-?founder|co-?fondat(eur|rice|eurs)|fondat(eur|rice|eurs)|cr[eé]at(eur|rice|eurs)|dirigeant)\b/i
+
 function detectQuickIntent(
   text: string,
   imageAttachment?: string
@@ -400,6 +407,10 @@ function detectQuickIntent(
   code: boolean
   document: boolean
 } {
+  if (INTERNAL_KNOWLEDGE_SUBJECT_RE.test(text)) {
+    return { search: false, image: false, code: false, document: false }
+  }
+
   const artifact = detectArtifactIntent(text)
   const webImage = isWebImageSearch(text)
 
@@ -480,6 +491,8 @@ export function createResearcher({
     trivial?: boolean
     needsSearch?: boolean
     needsImage?: boolean
+    founderPhoto?: boolean
+    webImageSearch?: boolean
   }
 }) {
   try {
@@ -611,6 +624,15 @@ export function createResearcher({
             `[Researcher] Image task — dropped search/fetch to avoid spurious tool-search, tools=[${activeToolsList.join(', ')}]`
           )
         }
+      }
+
+      // INTERNAL KNOWLEDGE & FOUNDER PHOTO: answer directly from internal knowledge.
+      // Do NOT run web search and do NOT invoke generateImage.
+      if (
+        capabilities?.founderPhoto ||
+        INTERNAL_KNOWLEDGE_SUBJECT_RE.test(userQuery ?? '')
+      ) {
+        activeToolsList = []
       }
 
       // LAZY TOOL ARMING: a trivial request (greeting, simple chat, translation,

@@ -45,14 +45,19 @@ const CURRENT_INFO_RE =
 
 const DOC_FORMATS = new Set(['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'ppt'])
 
+// Internal knowledge subjects (Nelcia, Yannick, Optix AI, Nelth AI, founders).
+// These are part of core identity and must NEVER trigger external web search or generateImage.
+const INTERNAL_KNOWLEDGE_SUBJECT_RE =
+  /\b(nelcia|julie|fenitra|randrianavahana|yannick|jonathan|todiarison|optix|nelth|ceo|pdg|co-?founder|co-?fondat(eur|rice|eurs)|fondat(eur|rice|eurs)|cr[eé]at(eur|rice|eurs)|dirigeant)\b/i
+
 // A request that wants to SEE the official photo of the CEO / Co-Founder /
 // founders of Nelth-IA / Optix AI. These photos are provided directly in the
 // system prompt, so the assistant must NOT search the web and MUST NOT call
 // generateImage — it just renders the official markdown images.
 const FOUNDER_PHOTO_INTENT_RE =
-  /\b(photo|image|picture|portrait|visage|selfie|look)\b/i
+  /\b(photo|image|picture|portrait|visage|selfie|look|photos|images|pictures)\b/i
 const FOUNDER_PHOTO_SUBJECT_RE =
-  /\b(ceo|pdg|fondateur|co-?founder|founder|dirigeant|nell?th|optix|yannick|julie|randrianavahana|todiarison)\b/i
+  /\b(ceo|pdg|fondat(eur|rice|eurs)|cr[eé]at(eur|rice|eurs)|co-?founder|founder|dirigeant|nell?th|optix|yannick|jonathan|julie|fenitra|nelcia|randrianavahana|todiarison)\b/i
 
 // Web IMAGE SEARCH vs IMAGE GENERATION. A request that wants to FIND existing
 // images on the web (a search/find/show verb + an image noun, and no generation
@@ -90,31 +95,39 @@ export async function detectRequestCapabilities(
     ? routeSkills(query, registry).map(s => s.slug)
     : []
 
+  const isInternalKnowledge =
+    query !== undefined && query !== null
+      ? INTERNAL_KNOWLEDGE_SUBJECT_RE.test(query)
+      : false
+
   // Founder-photo request: present the official photos directly. Force
   // needsSearch/needsImage OFF so the orchestrator treats it as trivial (no
   // tools armed) and the model cannot run a web search or image generation.
   const founderPhoto =
     query !== undefined && query !== null
       ? FOUNDER_PHOTO_INTENT_RE.test(query) &&
-        FOUNDER_PHOTO_SUBJECT_RE.test(query)
+        (FOUNDER_PHOTO_SUBJECT_RE.test(query) || isInternalKnowledge)
       : false
 
   // Web image search: route to the search tool (content_types: image), never
   // generateImage. Force needsImage OFF and needsSearch ON.
-  const webImageSearch = isWebImageSearch(query)
+  const webImageSearch = !isInternalKnowledge && isWebImageSearch(query)
 
   const needsImage =
     (Boolean(query && IMAGE_INTENT_RE.test(query)) ||
       attachmentFormats.some(f => f.startsWith('image/'))) &&
     !founderPhoto &&
-    !webImageSearch
+    !webImageSearch &&
+    !isInternalKnowledge
 
   const needsDocument =
     Boolean(query && DOCUMENT_INTENT_RE.test(query)) ||
     attachmentFormats.some(f => DOC_FORMATS.has(f.toLowerCase()))
 
   const needsSearch = query
-    ? (CURRENT_INFO_RE.test(query) || webImageSearch) && !founderPhoto
+    ? (CURRENT_INFO_RE.test(query) || webImageSearch) &&
+      !founderPhoto &&
+      !isInternalKnowledge
     : false
 
   return {
