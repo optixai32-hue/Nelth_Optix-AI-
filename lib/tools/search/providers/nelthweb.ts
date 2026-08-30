@@ -45,6 +45,8 @@ function buildUrl(
   return `${NELTHWEB_BASE}${path}?${usp.toString()}`
 }
 
+const NELTHWEB_TIMEOUT_MS = 12000
+
 async function fetchWithRetry(
   url: string,
   maxRetries = 3,
@@ -52,8 +54,14 @@ async function fetchWithRetry(
 ): Promise<Response> {
   let lastError: Error | null = null
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), NELTHWEB_TIMEOUT_MS)
     try {
-      const res = await fetch(url, { cache: 'no-store' })
+      const res = await fetch(url, {
+        cache: 'no-store',
+        signal: controller.signal
+      })
+      clearTimeout(timeout)
       if (res.ok) return res
       // Retry on server errors (5xx) and rate limits (429)
       if (res.status >= 500 || res.status === 429) {
@@ -65,7 +73,9 @@ async function fetchWithRetry(
       // Non-retryable error — return the response so caller can handle it
       return res
     } catch (err) {
+      clearTimeout(timeout)
       lastError = err instanceof Error ? err : new Error(String(err))
+      // AbortError means the request timed out — treat as retryable transient failure
       if (attempt < maxRetries) {
         const delay = baseDelayMs * 2 ** attempt + Math.random() * 200
         await new Promise(resolve => setTimeout(resolve, delay))
