@@ -371,16 +371,12 @@ export async function createChatStreamResponse(
 
       const agentStream = result.toUIMessageStream()
 
-      // Surface the preloaded web-search results as a synthetic `tool-search` part
-      // so the Sources panel and inline citation map render LIVE. We forward the
-      // agent stream chunk-by-chunk and append the search part at the END (after the
-      // assistant text and the message `start` part): writing a tool part first broke
-      // stricter SSE clients (mobile). A complete input -> output tool sequence is
-      // emitted so the client accepts it as a finished tool result.
-      const syntheticSearchInput = {
-        type: 'tool-search' as const,
+      // Surface the preloaded web-search results as synthetic tool chunks
+      // so the Sources panel and inline citation map render LIVE.
+      const syntheticSearchInputChunk = {
+        type: 'tool-input-available' as const,
         toolCallId: 'preloaded-search',
-        state: 'input-available' as const,
+        toolName: 'search',
         input: {
           query: userQuery,
           type: 'optimized',
@@ -389,17 +385,9 @@ export async function createChatStreamResponse(
           search_depth: 'basic'
         }
       }
-      const syntheticSearchOutput = {
-        type: 'tool-search' as const,
+      const syntheticSearchOutputChunk = {
+        type: 'tool-output-available' as const,
         toolCallId: 'preloaded-search',
-        state: 'output-available' as const,
-        input: {
-          query: userQuery,
-          type: 'optimized',
-          content_types: ['web'],
-          max_results: 10,
-          search_depth: 'basic'
-        },
         output: { ...searchResultsForCitation, state: 'complete' }
       }
 
@@ -418,40 +406,50 @@ export async function createChatStreamResponse(
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
           try {
-            // Surface the preloaded web-search results as synthetic tool-search parts
-            // IMMEDIATELY at the start of the stream so the UI shows the search process
-            // and populates citation maps & sources before/while text is generated!
-            if (
-              searchResultsForCitation &&
-              searchResultsForCitation.results.length > 0
-            ) {
-              try {
-                writer.write(
-                  syntheticSearchInput as unknown as Parameters<
-                    typeof writer.write
-                  >[0]
-                )
-                writer.write(
-                  syntheticSearchOutput as unknown as Parameters<
-                    typeof writer.write
-                  >[0]
-                )
-                writtenPartCount += 2
-              } catch (writeErr) {
-                console.error(
-                  '[Stream] failed to write initial search parts:',
-                  writeErr
-                )
-              }
-            }
-
             const reader = (
               agentStream as unknown as ReadableStream<unknown>
             ).getReader()
+            let searchChunksEmitted = false
+
             while (true) {
               const { done, value } = await reader.read()
               if (done) break
               const part = value as { type?: string } | undefined
+
+              // Pass stream start through first, then immediately emit the preloaded
+              // search results so the client renders the search card and sources
+              // before text generation begins
+              if (
+                part &&
+                typeof part.type === 'string' &&
+                (part.type === 'start' || part.type === 'start-step')
+              ) {
+                writer.write(
+                  value as unknown as Parameters<typeof writer.write>[0]
+                )
+                writtenPartCount++
+
+                if (
+                  !searchChunksEmitted &&
+                  searchResultsForCitation &&
+                  searchResultsForCitation.results.length > 0
+                ) {
+                  searchChunksEmitted = true
+                  writer.write(
+                    syntheticSearchInputChunk as unknown as Parameters<
+                      typeof writer.write
+                    >[0]
+                  )
+                  writer.write(
+                    syntheticSearchOutputChunk as unknown as Parameters<
+                      typeof writer.write
+                    >[0]
+                  )
+                  writtenPartCount += 2
+                }
+                continue
+              }
+
               if (
                 isNonThinkingModel &&
                 part &&
@@ -525,22 +523,27 @@ export async function createChatStreamResponse(
             searchResultsForCitation &&
             searchResultsForCitation.results.length > 0
           ) {
-            responseMessage.parts = [
-              ...(responseMessage.parts ?? []),
-              {
-                type: 'tool-search',
-                toolCallId: 'preloaded-search',
-                state: 'output-available',
-                input: {
-                  query: userQuery,
-                  type: 'optimized',
-                  content_types: ['web'],
-                  max_results: 10,
-                  search_depth: 'basic'
-                },
-                output: { ...searchResultsForCitation, state: 'complete' }
-              } as unknown as (typeof responseMessage.parts)[number]
-            ]
+            const hasSearch = responseMessage.parts?.some(
+              (p: any) => p.type === 'tool-search'
+            )
+            if (!hasSearch) {
+              responseMessage.parts = [
+                ...(responseMessage.parts ?? []),
+                {
+                  type: 'tool-search',
+                  toolCallId: 'preloaded-search',
+                  state: 'output-available',
+                  input: {
+                    query: userQuery,
+                    type: 'optimized',
+                    content_types: ['web'],
+                    max_results: 10,
+                    search_depth: 'basic'
+                  },
+                  output: { ...searchResultsForCitation, state: 'complete' }
+                } as unknown as (typeof responseMessage.parts)[number]
+              ]
+            }
           }
           // Post-processing (skill enforcement, Firebase/DB persistence, tracing
           // flush) runs in the background and does NOT block the SSE stream from
