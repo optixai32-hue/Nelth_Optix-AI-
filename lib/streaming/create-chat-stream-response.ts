@@ -222,14 +222,11 @@ export async function createChatStreamResponse(
       // in a loop. So we fetch results server-side and feed them as text. To still
       // show citations, we ALSO surface these results as a synthetic `tool-search`
       // UI part in the stream (see below), which drives the Sources panel and the
-      // inline citation map.
-      // For the weak model we preload on ALL non-greeting queries (not just
-      // regex-matched ones) because it cannot search on its own at all. A query
-      // like "sources d'images d'Elon Musk" fails every intent regex but still
-      // needs real results — without them the model hallucinates [n] citations.
-      const shouldPreloadSearch =
-        caps.needsSearch ||
-        (isNonThinkingModel && !isPureGreeting(userQuery))
+      // Preloaded search: when the request requires web search (caps.needsSearch
+      // is true), we fetch results server-side and provide them directly to the model.
+      // We ALSO surface these results as synthetic tool chunks in the stream so the
+      // UI displays the search process, Sources panel, and inline citations.
+      const shouldPreloadSearch = Boolean(caps.needsSearch)
       let preloadedSearchContext: string | undefined
       let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
       if (shouldPreloadSearch) {
