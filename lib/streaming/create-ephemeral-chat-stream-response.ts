@@ -24,7 +24,13 @@ import {
   extractAttachmentFormats} from '@/lib/skills/document-runtime'
 import { stripEmojiFromCodeInMessage } from '@/lib/skills/enforce-stream'
 import { search as runWebSearch } from '@/lib/tools/search'
-import { getImageAttachmentUrl, getTextFromParts, isPureGreeting, stripFakeToolCallXmlFromMessage } from '@/lib/utils/message-utils'
+import {
+  getImageAttachmentUrl,
+  getTextFromParts,
+  isPureGreeting,
+  StreamTextSanitizer,
+  stripFakeToolCallXmlFromMessage
+} from '@/lib/utils/message-utils'
 import { isTracingEnabled } from '@/lib/utils/telemetry'
 
 import {
@@ -279,11 +285,25 @@ export async function createEphemeralChatStreamResponse(
               agentStream as unknown as ReadableStream<unknown>
             ).getReader()
             let searchChunksEmitted = false
+            const textSanitizer = new StreamTextSanitizer()
 
             while (true) {
               const { done, value } = await reader.read()
-              if (done) break
-              const part = value as { type?: string } | undefined
+              if (done) {
+                const remaining = textSanitizer.flush()
+                if (remaining) {
+                  writer.write({
+                    type: 'text-delta',
+                    id: 'txt-0',
+                    delta: remaining
+                  } as unknown as Parameters<typeof writer.write>[0])
+                  streamErrorSuppression.wroteContent = true
+                }
+                break
+              }
+              const part = value as
+                | { type?: string; delta?: string; id?: string }
+                | undefined
 
               // Pass stream start through first, then immediately emit preloaded search
               if (
@@ -323,12 +343,25 @@ export async function createEphemeralChatStreamResponse(
               ) {
                 continue
               }
-              // Skip error parts emitted by the agent stream — they would
-              // otherwise be written to the client and rendered as
-              // "We could not generate a response" even when real answer
-              // content was already delivered. The AI SDK v5 emits several
-              // error part types: 'error', 'tool-error', 'tool-input-error',
-              // 'tool-output-error'.
+
+              // Real-time filtering of fake XML tool-call text leaks
+              if (
+                part &&
+                part.type === 'text-delta' &&
+                typeof part.delta === 'string'
+              ) {
+                const cleanDelta = textSanitizer.process(part.delta)
+                if (cleanDelta) {
+                  writer.write({
+                    ...part,
+                    delta: cleanDelta
+                  } as unknown as Parameters<typeof writer.write>[0])
+                  streamErrorSuppression.wroteContent = true
+                }
+                continue
+              }
+
+              // Skip error parts emitted by the agent stream
               if (
                 part &&
                 typeof part.type === 'string' &&
@@ -346,7 +379,7 @@ export async function createEphemeralChatStreamResponse(
               if (
                 part &&
                 typeof part.type === 'string' &&
-                (part.type === 'text' || part.type === 'text-delta')
+                part.type === 'text'
               ) {
                 streamErrorSuppression.wroteContent = true
               }

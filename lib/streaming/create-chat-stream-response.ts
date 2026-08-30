@@ -35,7 +35,13 @@ import {
   shouldTruncateMessages,
   truncateMessages
 } from '../utils/context-window'
-import { getImageAttachmentUrl, getTextFromParts, isPureGreeting, stripFakeToolCallXmlFromMessage } from '../utils/message-utils'
+import {
+  getImageAttachmentUrl,
+  getTextFromParts,
+  isPureGreeting,
+  StreamTextSanitizer,
+  stripFakeToolCallXmlFromMessage
+} from '../utils/message-utils'
 import { perfLog, perfTime } from '../utils/perf-logging'
 import { isUsageLogging, logUsage } from '../utils/usage-logging'
 
@@ -407,11 +413,26 @@ export async function createChatStreamResponse(
               agentStream as unknown as ReadableStream<unknown>
             ).getReader()
             let searchChunksEmitted = false
+            const textSanitizer = new StreamTextSanitizer()
 
             while (true) {
               const { done, value } = await reader.read()
-              if (done) break
-              const part = value as { type?: string } | undefined
+              if (done) {
+                const remaining = textSanitizer.flush()
+                if (remaining) {
+                  writer.write({
+                    type: 'text-delta',
+                    id: 'txt-0',
+                    delta: remaining
+                  } as unknown as Parameters<typeof writer.write>[0])
+                  wroteContent = true
+                  writtenPartCount++
+                }
+                break
+              }
+              const part = value as
+                | { type?: string; delta?: string; id?: string }
+                | undefined
 
               // Pass stream start through first, then immediately emit the preloaded
               // search results so the client renders the search card and sources
@@ -455,12 +476,29 @@ export async function createChatStreamResponse(
               ) {
                 continue
               }
+
+              // Real-time filtering of fake XML tool-call text leaks
+              if (
+                part &&
+                part.type === 'text-delta' &&
+                typeof part.delta === 'string'
+              ) {
+                const cleanDelta = textSanitizer.process(part.delta)
+                if (cleanDelta) {
+                  writer.write({
+                    ...part,
+                    delta: cleanDelta
+                  } as unknown as Parameters<typeof writer.write>[0])
+                  writtenPartCount++
+                  wroteContent = true
+                }
+                continue
+              }
+
               // Skip error parts emitted by the agent stream — they would
               // otherwise be written to the client and rendered as
               // "We could not generate a response" even when real answer
-              // content was already delivered. The AI SDK v5 emits several
-              // error part types: 'error', 'tool-error', 'tool-input-error',
-              // 'tool-output-error'.
+              // content was already delivered.
               if (
                 part &&
                 typeof part.type === 'string' &&
@@ -479,7 +517,7 @@ export async function createChatStreamResponse(
               if (
                 part &&
                 typeof part.type === 'string' &&
-                (part.type === 'text' || part.type === 'text-delta')
+                part.type === 'text'
               ) {
                 wroteContent = true
               }

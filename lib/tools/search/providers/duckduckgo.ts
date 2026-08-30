@@ -258,6 +258,42 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
     }
   }
 
+  private async searchInstantAnswerApi(query: string): Promise<SearchResultItem[]> {
+    try {
+      const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`
+      const res = await this.fetchWithTimeout(url)
+      if (!res.ok) return []
+      const data = (await res.json()) as {
+        AbstractText?: string
+        AbstractURL?: string
+        Heading?: string
+        RelatedTopics?: Array<{ Text?: string; FirstURL?: string }>
+      }
+      const results: SearchResultItem[] = []
+      if (data.AbstractText && data.AbstractURL && isValidUrl(data.AbstractURL)) {
+        results.push({
+          title: data.Heading || data.AbstractURL,
+          url: data.AbstractURL,
+          content: data.AbstractText
+        })
+      }
+      if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
+        for (const topic of data.RelatedTopics) {
+          if (topic.Text && topic.FirstURL && isValidUrl(topic.FirstURL)) {
+            results.push({
+              title: topic.Text.slice(0, 80),
+              url: topic.FirstURL,
+              content: topic.Text
+            })
+          }
+        }
+      }
+      return results
+    } catch {
+      return []
+    }
+  }
+
   async search(
     query: string,
     maxResults = 10,
@@ -291,6 +327,15 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
         webResults = await this.searchHtmlGet(query, maxResults)
       } catch (err) {
         console.warn('[DuckDuckGo] HTML GET search error:', err)
+      }
+    }
+
+    // 3. If still 0, try DuckDuckGo Instant Answer API
+    if (webResults.length === 0) {
+      try {
+        webResults = await this.searchInstantAnswerApi(query)
+      } catch (err) {
+        console.warn('[DuckDuckGo] Instant Answer API error:', err)
       }
     }
 

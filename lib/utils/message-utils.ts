@@ -210,18 +210,25 @@ export function hasToolCalls(message: UIMessage | null): boolean {
 
 // Fake XML tool-call blocks the weak non-thinking model emits as text instead of
 // native tool calls. These leak into the final answer and are rendered as raw
-// <tool_call>…</tool_call> markup. Strip them so the user never sees them.
-const FAKE_TOOL_CALL_RE = /<tool_call\b[^>]*>[\s\S]*?<\/tool_call>/gi
-const FAKE_FUNCTION_CALL_RE = /<function\b[^>]*>[\s\S]*?<\/function>/gi
-const FAKE_TOOL_SEARCH_RE =
-  /<tool-search\b[^>]*>[\s\S]*?<\/tool-search>/gi
+// <tool_call>…</tool_call> or <tool_calls:id>… markup. Strip them completely so the
+// user never sees them.
+const FAKE_TOOL_PATTERNS = [
+  /<tool_calls?[:\s\w-]*>[\s\S]*?(?:<\/tool_calls?[:\s\w-]*>|<\/invoke[:\s\w-]*>|(?=<tool_calls?[:\s\w-]*>)|$)/gi,
+  /<tool_call[:\s\w-]*>[\s\S]*?(?:<\/tool_call[:\s\w-]*>|<\/invoke[:\s\w-]*>|(?=<tool_calls?[:\s\w-]*>)|$)/gi,
+  /<invoke[:\s\w-]*>[\s\S]*?(?:<\/invoke[:\s\w-]*>|$)/gi,
+  /<function\b[^>]*>[\s\S]*?(?:<\/function>|$)/gi,
+  /<tool-search\b[^>]*>[\s\S]*?(?:<\/tool-search>|$)/gi,
+  /<\/?(?:tool_calls?|invoke|function|tool-search)[:\s\w-]*\/?>/gi
+]
 
 export function stripFakeToolCallXml(text: string): string {
   if (!text) return text
-  return text
-    .replace(FAKE_TOOL_CALL_RE, '')
-    .replace(FAKE_FUNCTION_CALL_RE, '')
-    .replace(FAKE_TOOL_SEARCH_RE, '')
+  let result = text
+  for (const pattern of FAKE_TOOL_PATTERNS) {
+    result = result.replace(pattern, '')
+  }
+  return result
+    .replace(/^[ \t]*search">.*$/gim, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
@@ -241,6 +248,88 @@ export function stripFakeToolCallXmlFromMessage(message: {
     }
   }
   return changed
+}
+
+/**
+ * Real-time streaming sanitizer to strip fake tool-call pseudo-XML tokens
+ * as text chunks arrive from the model during SSE streaming.
+ */
+export class StreamTextSanitizer {
+  private buffer = ''
+
+  /**
+   * Processes an incoming text delta. Returns the sanitized text delta
+   * safe to immediately stream to the client.
+   */
+  process(delta: string): string {
+    this.buffer += delta
+
+    // If the buffer contains any fake tool call tag markers
+    const hasToolTag =
+      this.buffer.includes('<tool_call') ||
+      this.buffer.includes('<tool_calls') ||
+      this.buffer.includes('<invoke') ||
+      this.buffer.includes('<function') ||
+      this.buffer.includes('<tool-search')
+
+    if (hasToolTag) {
+      // If the fake tool call block has closed
+      const hasClosed =
+        this.buffer.includes('</invoke') ||
+        this.buffer.includes('</tool_call') ||
+        this.buffer.includes('</function') ||
+        this.buffer.includes('</tool-search>')
+
+      if (hasClosed) {
+        const cleaned = stripFakeToolCallXml(this.buffer)
+        this.buffer = ''
+        return cleaned
+      }
+
+      // If it hasn't closed yet, but buffer has grown large (> 250 chars) or has double newline,
+      // it might be an unclosed fake tag followed by real text
+      if (this.buffer.length > 250 || this.buffer.includes('\n\n')) {
+        const cleaned = stripFakeToolCallXml(this.buffer)
+        this.buffer = ''
+        return cleaned
+      }
+
+      // Still accumulating the fake tool call XML block — hold in buffer
+      return ''
+    }
+
+    // Check if buffer ends with a partial tag starting with '<'
+    const lastOpenBracket = this.buffer.lastIndexOf('<')
+    if (lastOpenBracket !== -1 && !this.buffer.includes('>', lastOpenBracket)) {
+      const potentialTag = this.buffer.slice(lastOpenBracket)
+      if (
+        '<tool_call'.startsWith(potentialTag) ||
+        '<tool_calls'.startsWith(potentialTag) ||
+        '</invoke'.startsWith(potentialTag) ||
+        '<invoke'.startsWith(potentialTag) ||
+        '<function'.startsWith(potentialTag) ||
+        '<tool-search'.startsWith(potentialTag)
+      ) {
+        // Emit everything before the partial tag, hold partial tag in buffer
+        const safe = this.buffer.slice(0, lastOpenBracket)
+        this.buffer = potentialTag
+        return safe
+      }
+    }
+
+    const output = this.buffer
+    this.buffer = ''
+    return output
+  }
+
+  /**
+   * Flushes any remaining clean text at stream end.
+   */
+  flush(): string {
+    const remaining = stripFakeToolCallXml(this.buffer)
+    this.buffer = ''
+    return remaining
+  }
 }
 
 // Detect pure greetings / short chat messages that do NOT need web search.
