@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 const FALLBACK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" fill="none"><rect width="400" height="300" fill="#18181b"/><path d="M160 130a20 20 0 100-40 20 20 0 000 40zm-40 90l35-45 25 30 35-45 65 60H120z" fill="#3f3f46"/></svg>`
 
@@ -8,7 +8,8 @@ const FETCH_HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-  'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7'
+  'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+  Referer: 'https://duckduckgo.com/'
 }
 
 function isValidHttpUrl(str: string): boolean {

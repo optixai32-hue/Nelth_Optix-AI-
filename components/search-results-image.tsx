@@ -142,6 +142,9 @@ const cornerClassForIndex = (actualIndex: number, isFullMode: boolean) => {
   return ''
 }
 
+const FALLBACK_DATA_URI =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" fill="none"><rect width="400" height="300" fill="%2318181b"/><path d="M160 130a20 20 0 100-40 20 20 0 000 40zm-40 90l35-45 25 30 35-45 65 60H120z" fill="%233f3f46"/></svg>'
+
 export const SearchResultsImageSection: React.FC<
   SearchResultsImageSectionProps
 > = ({ images, query, displayMode = 'preview' }) => {
@@ -192,6 +195,11 @@ export const SearchResultsImageSection: React.FC<
                       className={`h-full w-full object-cover shadow-sm ${cornerClasses}`}
                       referrerPolicy="no-referrer"
                       loading="lazy"
+                      onError={e => {
+                        if (e.currentTarget.src !== FALLBACK_DATA_URI) {
+                          e.currentTarget.src = FALLBACK_DATA_URI
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -231,6 +239,11 @@ export const SearchResultsImageSection: React.FC<
                             className="max-w-full max-h-[70vh] object-contain rounded-md"
                             referrerPolicy="no-referrer"
                             loading="lazy"
+                            onError={e => {
+                              if (e.currentTarget.src !== FALLBACK_DATA_URI) {
+                                e.currentTarget.src = FALLBACK_DATA_URI
+                              }
+                            }}
                           />
                           <ImageCreditOverlay
                             url={img.url}
