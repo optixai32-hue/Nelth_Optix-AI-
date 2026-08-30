@@ -246,11 +246,16 @@ export class DuckDuckGoSearchProvider implements SearchProvider {
       if (!data.results || !Array.isArray(data.results)) return []
       return data.results
         .slice(0, maxResults)
-        .map(item => ({
-          url: item.thumbnail || item.image || item.url || '',
-          description: item.title || cleanQuery
-        }))
-        .filter(img => isValidUrl(img.url))
+        .map(item => {
+          const thumb = item.thumbnail || ''
+          const full = item.image || item.url || ''
+          const proxiedUrl = `/api/image-proxy?thumb=${encodeURIComponent(thumb)}&url=${encodeURIComponent(full)}`
+          return {
+            url: proxiedUrl,
+            description: item.title || cleanQuery
+          }
+        })
+        .filter(img => Boolean(img.url))
     } catch {
       return []
     }
