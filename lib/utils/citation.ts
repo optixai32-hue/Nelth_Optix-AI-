@@ -96,21 +96,50 @@ export function extractCitationMapsFromMessages(
  * Display text uses domain name instead of number (e.g., [google](url))
  */
 /**
+ * Expand grouped citations like `[1, 2, 5]` or `[1,2]` into separate `[1] [2] [5]`.
+ */
+function expandGroupedCitations(content: string): string {
+  return content.replace(
+    /\[\s*(\d{1,2}(?:\s*,\s*\d{1,2})+)\s*\](?!\()/g,
+    (_m, group) => {
+      const numbers = group
+        .split(',')
+        .map((n: string) => n.trim())
+        .filter(Boolean)
+      return numbers.map((n: string) => `[${n}]`).join(' ')
+    }
+  )
+}
+
+/**
  * Weak/reasoning models (e.g. Nelth-3.5) often emit bare `[n]` citations
- * instead of the full `[n](#toolCallId)` syntax the renderer needs. When a
- * message has exactly ONE citation map (the synthetic `preloaded-search` part),
- * rewrite those bare tokens into `[n](#toolCallId)` so they resolve to the real
- * source URL. Tokens already followed by `(#...)` and real markdown links like
- * `[google](url)` are left untouched (the `(?!\()` lookahead skips them).
+ * (e.g. `[1]`, `[2][3][4]`, `[1, 2]`) instead of the full `[n](#toolCallId)` syntax.
+ * Rewrite these bare tokens into `[n](#toolCallId)` matching against all available
+ * citation maps so they resolve to the real source URL. Tokens already followed
+ * by `(#...)` and real markdown links like `[google](url)` are left untouched.
  */
 function normalizeBareCitations(
   content: string,
   citationMaps: Record<string, Record<number, SearchResultItem>>
 ): string {
   const toolCallIds = Object.keys(citationMaps)
-  if (toolCallIds.length !== 1) return content
-  const id = toolCallIds[0]
-  return content.replace(/\[(\d{1,2})\](?!\()/g, (_m, n) => `[${n}](#${id})`)
+  if (toolCallIds.length === 0) return content
+
+  const expanded = expandGroupedCitations(content)
+
+  return expanded.replace(/\[\s*(\d{1,2})\s*\](?!\()/g, (_m, numStr) => {
+    const num = parseInt(numStr, 10)
+    // Find which tool call has citation `num`
+    let targetId = 'preloaded-search'
+    if (citationMaps['preloaded-search']?.[num]) {
+      targetId = 'preloaded-search'
+    } else {
+      // Find any toolCallId that has this citation number
+      const foundId = toolCallIds.find(id => citationMaps[id]?.[num])
+      targetId = foundId || toolCallIds[toolCallIds.length - 1]
+    }
+    return `[${num}](#${targetId})`
+  })
 }
 
 export function processCitations(

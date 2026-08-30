@@ -262,6 +262,28 @@ describe('processCitations', () => {
 
       expect(result).toBe('See [google](https://www.google.com)')
     })
+
+    it('resolves bare [n] citations and consecutive [1][2] citations', () => {
+      const maps = extractCitationMaps(
+        messageWithSearchPart({ results, images: [], query: 'q' })
+      )
+      const result = processCitations('Sources: [1][2]', maps)
+
+      expect(result).toBe(
+        'Sources: [google](https://www.google.com)[github](https://docs.github.com)'
+      )
+    })
+
+    it('resolves grouped citations [1, 2]', () => {
+      const maps = extractCitationMaps(
+        messageWithSearchPart({ results, images: [], query: 'q' })
+      )
+      const result = processCitations('Sources: [1, 2]', maps)
+
+      expect(result).toBe(
+        'Sources: [google](https://www.google.com) [github](https://docs.github.com)'
+      )
+    })
   })
 
   describe('isCitationLabel', () => {

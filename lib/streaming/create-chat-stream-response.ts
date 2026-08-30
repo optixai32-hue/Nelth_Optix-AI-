@@ -235,8 +235,11 @@ export async function createChatStreamResponse(
       if (shouldPreloadSearch) {
         const searchResult = await runWebSearch(userQuery, 10, 'basic')
         preloadedSearchContext = searchResult.results
-          .map(result => `- ${result.title}: ${result.url}\n  ${result.content}`)
-          .join('\n')
+          .map(
+            (result, i) =>
+              `[${i + 1}] ${result.title}: ${result.url}\n  ${result.content}`
+          )
+          .join('\n\n')
         searchResultsForCitation = searchResult
       }
 
@@ -415,7 +418,36 @@ export async function createChatStreamResponse(
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
           try {
-            const reader = (agentStream as unknown as ReadableStream<unknown>).getReader()
+            // Surface the preloaded web-search results as synthetic tool-search parts
+            // IMMEDIATELY at the start of the stream so the UI shows the search process
+            // and populates citation maps & sources before/while text is generated!
+            if (
+              searchResultsForCitation &&
+              searchResultsForCitation.results.length > 0
+            ) {
+              try {
+                writer.write(
+                  syntheticSearchInput as unknown as Parameters<
+                    typeof writer.write
+                  >[0]
+                )
+                writer.write(
+                  syntheticSearchOutput as unknown as Parameters<
+                    typeof writer.write
+                  >[0]
+                )
+                writtenPartCount += 2
+              } catch (writeErr) {
+                console.error(
+                  '[Stream] failed to write initial search parts:',
+                  writeErr
+                )
+              }
+            }
+
+            const reader = (
+              agentStream as unknown as ReadableStream<unknown>
+            ).getReader()
             while (true) {
               const { done, value } = await reader.read()
               if (done) break
@@ -439,10 +471,15 @@ export async function createChatStreamResponse(
                 typeof part.type === 'string' &&
                 (part.type === 'error' || part.type.endsWith('-error'))
               ) {
-                console.error('[Stream] skipping error part from agent stream:', part)
+                console.error(
+                  '[Stream] skipping error part from agent stream:',
+                  part
+                )
                 continue
               }
-              writer.write(value as unknown as Parameters<typeof writer.write>[0])
+              writer.write(
+                value as unknown as Parameters<typeof writer.write>[0]
+              )
               writtenPartCount++
               if (
                 part &&
@@ -459,19 +496,6 @@ export async function createChatStreamResponse(
             )
             if (!wroteContent) {
               throw streamErr
-            }
-          } finally {
-            if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
-              try {
-                writer.write(
-                  syntheticSearchInput as unknown as Parameters<typeof writer.write>[0]
-                )
-                writer.write(
-                  syntheticSearchOutput as unknown as Parameters<typeof writer.write>[0]
-                )
-              } catch {
-                /* writer already closed */
-              }
             }
           }
         },

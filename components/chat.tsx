@@ -212,7 +212,15 @@ export function Chat({
           message: publicError.error
         })
       } else {
-        toast.error(publicError.error)
+        const lastMsg = messages[messages.length - 1]
+        const hasDeliveredAssistantContent =
+          lastMsg?.role === 'assistant' &&
+          lastMsg.parts?.some(
+            (p: any) => p.type === 'text' && p.text && p.text.trim().length > 0
+          )
+        if (!hasDeliveredAssistantContent) {
+          toast.error(publicError.error)
+        }
       }
     },
     experimental_throttle: 100,

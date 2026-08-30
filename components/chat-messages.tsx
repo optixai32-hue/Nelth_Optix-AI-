@@ -321,9 +321,18 @@ export function ChatMessages({
                 <ChatFooterMessage isLoading={isLoading} />
               </div>
             )}
-            {sectionIndex === sections.length - 1 && (
-              <ChatError error={error} />
-            )}
+            {sectionIndex === sections.length - 1 && error && (() => {
+              const hasDeliveredAssistantContent = section.assistantMessages.some(
+                m =>
+                  m.parts?.some(
+                    (p: any) =>
+                      p.type === 'text' && p.text && p.text.trim().length > 0
+                  )
+              )
+              return !hasDeliveredAssistantContent ? (
+                <ChatError error={error} />
+              ) : null
+            })()}
           </div>
         ))}
       </div>

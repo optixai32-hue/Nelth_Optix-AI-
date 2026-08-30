@@ -170,8 +170,11 @@ export async function createEphemeralChatStreamResponse(
       if (shouldPreloadSearch) {
         const searchResult = await runWebSearch(userQuery, 10, 'basic')
         preloadedSearchContext = searchResult.results
-          .map(result => `- ${result.title}: ${result.url}\n  ${result.content}`)
-          .join('\n')
+          .map(
+            (result, i) =>
+              `[${i + 1}] ${result.title}: ${result.url}\n  ${result.content}`
+          )
+          .join('\n\n')
         searchResultsForCitation = searchResult
       }
 
@@ -291,7 +294,32 @@ export async function createEphemeralChatStreamResponse(
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
           try {
-            const reader = (agentStream as unknown as ReadableStream<unknown>).getReader()
+            if (
+              searchResultsForCitation &&
+              searchResultsForCitation.results.length > 0
+            ) {
+              try {
+                writer.write(
+                  syntheticSearchInput as unknown as Parameters<
+                    typeof writer.write
+                  >[0]
+                )
+                writer.write(
+                  syntheticSearchOutput as unknown as Parameters<
+                    typeof writer.write
+                  >[0]
+                )
+              } catch (writeErr) {
+                console.error(
+                  '[Ephemeral] failed to write initial search parts:',
+                  writeErr
+                )
+              }
+            }
+
+            const reader = (
+              agentStream as unknown as ReadableStream<unknown>
+            ).getReader()
             while (true) {
               const { done, value } = await reader.read()
               if (done) break
@@ -315,10 +343,15 @@ export async function createEphemeralChatStreamResponse(
                 typeof part.type === 'string' &&
                 (part.type === 'error' || part.type.endsWith('-error'))
               ) {
-                console.error('[Ephemeral] skipping error part from agent stream:', part)
+                console.error(
+                  '[Ephemeral] skipping error part from agent stream:',
+                  part
+                )
                 continue
               }
-              writer.write(value as unknown as Parameters<typeof writer.write>[0])
+              writer.write(
+                value as unknown as Parameters<typeof writer.write>[0]
+              )
               if (
                 part &&
                 typeof part.type === 'string' &&
@@ -326,14 +359,6 @@ export async function createEphemeralChatStreamResponse(
               ) {
                 streamErrorSuppression.wroteContent = true
               }
-            }
-            if (searchResultsForCitation && searchResultsForCitation.results.length > 0) {
-              writer.write(
-                syntheticSearchInput as unknown as Parameters<typeof writer.write>[0]
-              )
-              writer.write(
-                syntheticSearchOutput as unknown as Parameters<typeof writer.write>[0]
-              )
             }
           } catch (streamErr) {
             console.error(
