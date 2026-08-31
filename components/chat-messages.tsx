@@ -71,8 +71,31 @@ export function ChatMessages({
   const isMobile = useMediaQuery('(max-width: 767px)')
 
   // Show the shimmer loading label only for the Nelth-3.5 (non-thinking) model.
-  // This gives the user visual feedback during the latency before the first token.
+  // The label is intentionally DELAYED 500ms after 'submitted' status:
+  //   - Simple questions (bonjour, math, translation) → response in <300ms → label never appears
+  //   - Skill-heavy requests (code, design, complex) → response in 1-3s → label appears at 500ms
+  // This matches the user expectation: label = "reading skills", not "every response".
   const isNonThinkingModel = Boolean(selectedModelKey?.includes('hy3:free'))
+  const [showNelthLabel, setShowNelthLabel] = useState(false)
+  const nelthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (nelthTimerRef.current) {
+      clearTimeout(nelthTimerRef.current)
+      nelthTimerRef.current = null
+    }
+    if (status === 'submitted' && isNonThinkingModel) {
+      // Delay: if response arrives in <500ms the label never shows
+      nelthTimerRef.current = setTimeout(() => setShowNelthLabel(true), 500)
+    } else {
+      // Streaming started or response complete → begin fade-out
+      setShowNelthLabel(false)
+    }
+    return () => {
+      if (nelthTimerRef.current) clearTimeout(nelthTimerRef.current)
+    }
+  }, [status, isNonThinkingModel])
+
   const [scrollViewportHeight, setScrollViewportHeight] = useState(0)
   const [mobileFollowUpTopClearance, setMobileFollowUpTopClearance] = useState(
     MOBILE_FOLLOW_UP_TOP_CLEARANCE_FALLBACK
@@ -320,19 +343,31 @@ export function ChatMessages({
                 </div>
               )
             })}
-            {/* Show assistant logo and footer message after assistant messages */}
+            {/* Show assistant logo and loading/footer message after assistant messages */}
             {showAssistantLogo && sectionIndex === sections.length - 1 && (
               <div className="flex items-center gap-3 py-1 md:py-4">
                 <AnimatedLogo
                   className="size-10 shrink-0 text-foreground dark:text-white"
                   animate={isLoading}
                 />
-                {/* Shimmer label: only for Nelth-3.5 while waiting for first token */}
-                {isLoading && isNonThinkingModel ? (
-                  <NelthLoadingLabel />
-                ) : (
-                  <ChatFooterMessage isLoading={isLoading} />
-                )}
+                {/* Shimmer label — appears only after 500ms in 'submitted' state
+                    (skill-heavy requests only) and fades out smoothly when
+                    the first token arrives. opacity + max-height transition
+                    gives a collapse effect so it doesn't leave a gap. */}
+                <span
+                  aria-hidden={!showNelthLabel}
+                  style={{
+                    opacity: showNelthLabel ? 1 : 0,
+                    maxHeight: showNelthLabel ? '2rem' : '0',
+                    overflow: 'hidden',
+                    transition: 'opacity 350ms ease, max-height 350ms ease',
+                    display: 'block',
+                  }}
+                >
+                  {isNonThinkingModel && <NelthLoadingLabel />}
+                </span>
+                {/* Footer tips — only shown when label is not active */}
+                {!showNelthLabel && <ChatFooterMessage isLoading={isLoading} />}
               </div>
             )}
             {sectionIndex === sections.length - 1 && error && (() => {
