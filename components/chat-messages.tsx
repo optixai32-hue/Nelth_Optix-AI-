@@ -90,6 +90,24 @@ export function ChatMessages({
     )
   }, [sections])
 
+  // True for greetings, emoji-only, and short messages (≤2 words).
+  // The shimmer label should NEVER appear for these — even if Nelth-3.5 takes
+  // 600ms on a slow day, showing "Lecture des compétences..." for "bonjour"
+  // would confuse the user.
+  const isTrivialQuery = useMemo(() => {
+    const latestSection = sections.at(-1)
+    const query =
+      (latestSection?.userMessage.parts as any[] | undefined)
+        ?.find((p: any) => p.type === 'text')
+        ?.text?.trim() ?? ''
+    if (!query) return true
+    const wordCount = query.split(/\s+/).filter(Boolean).length
+    if (wordCount <= 2) return true
+    return /^(bonjour|salut|hi|hello|hey|bonsoir|coucou|merci|thanks?|ok|oui|non|yes|no|hola|allo|allô|good morning|bonne nuit|good night)[\s!?,.]*/i.test(
+      query
+    )
+  }, [sections])
+
   const [showNelthLabel, setShowNelthLabel] = useState(false)
   const nelthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Guard: prevents the 500ms timer from restarting on every re-render while we are
@@ -97,7 +115,8 @@ export function ChatMessages({
   const labelScheduledRef = useRef(false)
 
   useEffect(() => {
-    const shouldShow = isNonThinkingModel && isLoading && !hasFirstToken
+    const shouldShow =
+      isNonThinkingModel && isLoading && !hasFirstToken && !isTrivialQuery
 
     if (shouldShow && !labelScheduledRef.current) {
       // First time entering the "waiting for skills" window — arm the 500ms timer once.
@@ -119,7 +138,7 @@ export function ChatMessages({
         nelthTimerRef.current = null
       }
     }
-  }, [isNonThinkingModel, isLoading, hasFirstToken])
+  }, [isNonThinkingModel, isLoading, hasFirstToken, isTrivialQuery])
 
   const [scrollViewportHeight, setScrollViewportHeight] = useState(0)
   const [mobileFollowUpTopClearance, setMobileFollowUpTopClearance] = useState(
