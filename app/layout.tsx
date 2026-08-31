@@ -100,10 +100,24 @@ export default async function RootLayout({
       </head>
       <body
         className={cn(
-          'fixed top-0 left-0 right-0 bottom-0 inset-0 w-full h-full min-h-screen flex flex-col font-sans antialiased overflow-hidden overscroll-x-none bg-background text-foreground',
+          'w-full font-sans antialiased bg-background text-foreground',
           fontSans.variable
         )}
+        style={{ margin: 0, padding: 0 }}
       >
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            WebkitOverflowScrolling: 'touch'
+          } as React.CSSProperties}
+        >
         <I18nProvider initialLocale={locale}>
           <ThemeProvider
             attribute="class"
@@ -141,6 +155,7 @@ export default async function RootLayout({
           <Analytics />
           </ThemeProvider>
         </I18nProvider>
+        </div>
       </body>
     </html>
   )
