@@ -97,7 +97,12 @@ const VISUAL_KEYWORDS = [
 export function isVisualQuery(query: string): boolean {
   const tokens = keywordTokens(query)
   const normalized = query.toLowerCase()
-  return VISUAL_KEYWORDS.some(k => tokens.has(k) || normalized.includes(k))
+  return VISUAL_KEYWORDS.some(k => {
+    if (k.includes(' ') || k.includes('-')) {
+      return normalized.includes(k)
+    }
+    return tokens.has(k)
+  })
 }
 
 /**
@@ -131,7 +136,12 @@ const CODE_KEYWORDS = [
 export function isCodeQuery(query: string): boolean {
   const tokens = keywordTokens(query)
   const normalized = query.toLowerCase()
-  return CODE_KEYWORDS.some(k => tokens.has(k) || normalized.includes(k))
+  return CODE_KEYWORDS.some(k => {
+    if (k.includes(' ') || k.includes('-')) {
+      return normalized.includes(k)
+    }
+    return tokens.has(k)
+  })
 }
 
 /**

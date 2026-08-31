@@ -28,10 +28,25 @@ function isValidUrl(raw: string): boolean {
   }
 }
 
+function cleanResultUrl(raw: string): string {
+  const archiveMatch = raw.match(
+    /^https?:\/\/web\.archive\.org\/web\/(?:[0-9*]+\/)?(https?[:%].*)$/i
+  )
+  if (archiveMatch) {
+    try {
+      const decoded = decodeURIComponent(archiveMatch[1])
+      if (isValidUrl(decoded)) return decoded
+    } catch {
+      // fallback
+    }
+  }
+  return raw
+}
+
 /**
  * 4get Search Provider (https://4get.sudovanilla.org).
  * Open-source, high-privacy, fast metasearch engine supporting both
- * web text search and high-resolution image search.
+ * web text search and high-resolution image search with multi-scraper fallback.
  */
 export class FourGetSearchProvider implements SearchProvider {
   private baseUrl = FOURGET_BASE_URL
@@ -63,151 +78,182 @@ export class FourGetSearchProvider implements SearchProvider {
   }
 
   /**
-   * Performs a web search on 4get.
+   * Performs a web search on 4get with multi-scraper fallback (yep, yandex, brave, ddg).
    */
   private async searchWeb(
     query: string,
     maxResults: number
   ): Promise<SearchResultItem[]> {
-    const url = `${this.baseUrl}/web?s=${encodeURIComponent(query)}`
-    const res = await this.fetchWithTimeout(url)
+    const scrapers = ['yep', 'yandex', 'brave', 'ddg']
 
-    if (!res.ok) {
-      throw new Error(`4get search failed: ${res.status} ${res.statusText}`)
-    }
+    for (const scraper of scrapers) {
+      try {
+        const url = `${this.baseUrl}/web?s=${encodeURIComponent(query)}&scraper=${scraper}`
+        const res = await this.fetchWithTimeout(url)
 
-    const html = await res.text()
-    const results: SearchResultItem[] = []
+        if (!res.ok) continue
 
-    // 1. Instant Answer / Wikipedia summary
-    const answerMatch = html.match(
-      /<div class="answer">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/
-    )
-    if (answerMatch) {
-      const answerBlock = answerMatch[1]
-      const titleMatch = answerBlock.match(
-        /<div class="answer-title"><a[^>]*href="([^"]*)"[^>]*><h1>([\s\S]*?)<\/h1>/
-      )
-      const descMatch = answerBlock.match(
-        /<div class="description">([\s\S]*?)(?:<a|<div|<\/div>|$)/
-      )
-
-      if (titleMatch && descMatch) {
-        const title = stripHtml(titleMatch[2])
-        const rawUrl = titleMatch[1]
-        const content = stripHtml(descMatch[1])
-        if (title && content && isValidUrl(rawUrl)) {
-          results.push({
-            title,
-            url: rawUrl,
-            content
-          })
+        const html = await res.text()
+        if (html.includes('This scraper returned an error')) {
+          continue
         }
+
+        const results: SearchResultItem[] = []
+
+        // 1. Instant Answer / Wikipedia summary
+        const answerMatch = html.match(
+          /<div class="answer">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/
+        )
+        if (answerMatch) {
+          const answerBlock = answerMatch[1]
+          const titleMatch = answerBlock.match(
+            /<div class="answer-title"><a[^>]*href="([^"]*)"[^>]*><h1>([\s\S]*?)<\/h1>/
+          )
+          const descMatch = answerBlock.match(
+            /<div class="description">([\s\S]*?)(?:<a|<div|<\/div>|$)/
+          )
+
+          if (titleMatch && descMatch) {
+            const title = stripHtml(titleMatch[2])
+            const rawUrl = cleanResultUrl(titleMatch[1])
+            const content = stripHtml(descMatch[1])
+            if (title && content && isValidUrl(rawUrl)) {
+              results.push({
+                title,
+                url: rawUrl,
+                content
+              })
+            }
+          }
+        }
+
+        // 2. Parse organic <div class="text-result">
+        const resultBlocks = html.split('<div class="text-result">').slice(1)
+        for (const block of resultBlocks) {
+          if (results.length >= maxResults) break
+
+          const hrefMatch = block.match(/<a\b[^>]*\bhref="([^"]+)"[^>]*>/i)
+          const titleMatch =
+            block.match(/<div\b[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+            block.match(/<h\d\b[^>]*>([\s\S]*?)<\/h\d>/i)
+          const descMatch =
+            block.match(/<div\b[^>]*class="[^"]*description[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+            block.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)
+
+          if (hrefMatch && titleMatch && descMatch) {
+            const rawUrl = cleanResultUrl(hrefMatch[1])
+            const title = stripHtml(titleMatch[1])
+            const content = stripHtml(descMatch[1])
+
+            if (
+              isValidUrl(rawUrl) &&
+              title &&
+              content &&
+              !results.some(r => r.url === rawUrl)
+            ) {
+              results.push({
+                title,
+                url: rawUrl,
+                content
+              })
+            }
+          }
+        }
+
+        if (results.length > 0) {
+          return results
+        }
+      } catch (err) {
+        console.warn(`[4get] Web scraper ${scraper} failed:`, err)
       }
     }
 
-    // 2. Parse organic <div class="text-result">
-    const resultBlocks = html.split('<div class="text-result">').slice(1)
-    for (const block of resultBlocks) {
-      if (results.length >= maxResults) break
-
-      const hrefMatch = block.match(/<a\s+href="([^"]+)"\s+class="hover"/i)
-      const titleMatch = block.match(/<div\s+class="title">([\s\S]*?)<\/div>/i)
-      const descMatch = block.match(/<div\s+class="description">([\s\S]*?)<\/div>/i)
-
-      if (hrefMatch && titleMatch && descMatch) {
-        const rawUrl = hrefMatch[1]
-        const title = stripHtml(titleMatch[1])
-        const content = stripHtml(descMatch[1])
-
-        if (
-          isValidUrl(rawUrl) &&
-          title &&
-          content &&
-          !results.some(r => r.url === rawUrl)
-        ) {
-          results.push({
-            title,
-            url: rawUrl,
-            content
-          })
-        }
-      }
-    }
-
-    return results
+    return []
   }
 
   /**
-   * Performs an image search on 4get.
+   * Performs an image search on 4get with multi-scraper fallback.
    */
   private async searchImages(
     query: string,
     maxResults: number
   ): Promise<SearchResultImage[]> {
-    const url = `${this.baseUrl}/images?s=${encodeURIComponent(query)}`
-    const res = await this.fetchWithTimeout(url)
+    const scrapers = ['brave', 'yep', 'ddg', 'unsplash', 'yandex']
 
-    if (!res.ok) {
-      throw new Error(`4get image search failed: ${res.status} ${res.statusText}`)
-    }
+    for (const scraper of scrapers) {
+      try {
+        const url = `${this.baseUrl}/images?s=${encodeURIComponent(query)}&scraper=${scraper}`
+        const res = await this.fetchWithTimeout(url)
 
-    const html = await res.text()
-    const images: SearchResultImage[] = []
+        if (!res.ok) continue
 
-    const imageBlocks = html.split('<div class="image-wrapper"').slice(1)
-    for (const block of imageBlocks) {
-      if (images.length >= maxResults) break
+        const html = await res.text()
+        if (html.includes('This scraper returned an error')) {
+          continue
+        }
 
-      const dataJsonMatch = block.match(/data-json="([^"]+)"/)
-      const titleMatch =
-        block.match(/title="([^"]*)"/) ||
-        block.match(/<div class="description">([\s\S]*?)<\/div>/)
-      const title = titleMatch ? stripHtml(titleMatch[1]) : 'Image'
+        const images: SearchResultImage[] = []
+        const imageBlocks = html.split('<div class="image-wrapper"').slice(1)
 
-      let fullUrl = ''
+        for (const block of imageBlocks) {
+          if (images.length >= maxResults) break
 
-      if (dataJsonMatch) {
-        try {
-          const unescaped = dataJsonMatch[1]
-            .replace(/&quot;/g, '"')
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&#039;/g, "'")
-          const parsed = JSON.parse(unescaped)
-          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.url) {
-            fullUrl = parsed[0].url
+          const dataJsonMatch = block.match(/data-json="([^"]+)"/)
+          const titleMatch =
+            block.match(/title="([^"]*)"/) ||
+            block.match(/<div class="description">([\s\S]*?)<\/div>/)
+          const title = titleMatch ? stripHtml(titleMatch[1]) : 'Image'
+
+          let fullUrl = ''
+
+          if (dataJsonMatch) {
+            try {
+              const unescaped = dataJsonMatch[1]
+                .replace(/&quot;/g, '"')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&#039;/g, "'")
+              const parsed = JSON.parse(unescaped)
+              if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.url) {
+                fullUrl = parsed[0].url
+              }
+            } catch {
+              // ignore
+            }
           }
-        } catch {
-          // ignore
-        }
-      }
 
-      if (!fullUrl) {
-        const thumbLinkMatch = block.match(
-          /<a\s+href="([^"]+)"[^>]*class="thumb"/i
-        )
-        if (thumbLinkMatch && isValidUrl(thumbLinkMatch[1])) {
-          fullUrl = thumbLinkMatch[1]
-        }
-      }
+          if (!fullUrl) {
+            const thumbLinkMatch = block.match(
+              /<a\s+href="([^"]+)"[^>]*class="thumb"/i
+            )
+            if (thumbLinkMatch && isValidUrl(thumbLinkMatch[1])) {
+              fullUrl = thumbLinkMatch[1]
+            }
+          }
 
-      if (fullUrl && isValidUrl(fullUrl)) {
-        // Route image through DDG/4get edge proxy to guarantee 100% reliable rendering without hotlinking blocks
-        const reliableUrl = `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(fullUrl)}&f=1&nofb=1`
+          if (fullUrl && isValidUrl(fullUrl)) {
+            const reliableUrl = `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(fullUrl)}&f=1&nofb=1`
 
-        if (!images.some(img => (typeof img === 'string' ? img : img.url) === reliableUrl)) {
-          images.push({
-            url: reliableUrl,
-            description: title,
-            title
-          })
+            if (!images.some(img => (typeof img === 'string' ? img : img.url) === reliableUrl)) {
+              images.push({
+                url: reliableUrl,
+                description: title,
+                title
+              })
+            }
+          }
         }
+
+        if (images.length > 0) {
+          return images
+        }
+      } catch (err) {
+        console.warn(`[4get] Image scraper ${scraper} failed:`, err)
       }
     }
 
-    return images
+    return []
   }
 
   async search(
