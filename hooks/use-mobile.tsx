@@ -14,9 +14,19 @@ export function useIsMobile() {
     const onChange = () => {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT || isAndroidPhone)
     }
-    mql.addEventListener('change', onChange)
+    if (typeof mql.addEventListener === 'function') {
+      mql.addEventListener('change', onChange)
+    } else if (typeof (mql as any).addListener === 'function') {
+      ;(mql as any).addListener(onChange)
+    }
     onChange()
-    return () => mql.removeEventListener('change', onChange)
+    return () => {
+      if (typeof mql.removeEventListener === 'function') {
+        mql.removeEventListener('change', onChange)
+      } else if (typeof (mql as any).removeListener === 'function') {
+        ;(mql as any).removeListener(onChange)
+      }
+    }
   }, [])
 
   return !!isMobile

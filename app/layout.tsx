@@ -91,9 +91,16 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){if(typeof window==="undefined")return;if(!window.queueMicrotask){window.queueMicrotask=function(cb){Promise.resolve().then(cb).catch(function(e){setTimeout(function(){throw e},0)})}}if(!Array.prototype.at){Array.prototype.at=function(n){var len=this.length,k=n>=0?n:len+n;return(k<0||k>=len)?undefined:this[k]}}if(!String.prototype.at){String.prototype.at=function(n){var len=this.length,k=n>=0?n:len+n;return(k<0||k>=len)?"":this.charAt(k)}}if(!Object.hasOwn){Object.hasOwn=function(obj,prop){return Object.prototype.hasOwnProperty.call(obj,prop)}}if(!window.crypto){window.crypto={}}if(!window.crypto.randomUUID){window.crypto.randomUUID=function(){return"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0,v=c==="x"?r:(r&3|8);return v.toString(16)})}}if(!window.structuredClone){window.structuredClone=function(obj){return obj===undefined?undefined:JSON.parse(JSON.stringify(obj))}}})();`
+          }}
+        />
+      </head>
       <body
         className={cn(
-          'fixed inset-0 flex flex-col font-sans antialiased overflow-hidden overscroll-x-none',
+          'fixed top-0 left-0 right-0 bottom-0 inset-0 w-full h-full min-h-screen flex flex-col font-sans antialiased overflow-hidden overscroll-x-none bg-background text-foreground',
           fontSans.variable
         )}
       >

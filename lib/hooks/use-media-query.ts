@@ -16,9 +16,19 @@ export function useMediaQuery(query: string): boolean {
 
       const mql = window.matchMedia(query)
       const handler = () => onStoreChange()
-      mql.addEventListener('change', handler)
+      if (typeof mql.addEventListener === 'function') {
+        mql.addEventListener('change', handler)
+      } else if (typeof (mql as any).addListener === 'function') {
+        ;(mql as any).addListener(handler)
+      }
 
-      return () => mql.removeEventListener('change', handler)
+      return () => {
+        if (typeof mql.removeEventListener === 'function') {
+          mql.removeEventListener('change', handler)
+        } else if (typeof (mql as any).removeListener === 'function') {
+          ;(mql as any).removeListener(handler)
+        }
+      }
     },
     () => {
       if (typeof window === 'undefined') {

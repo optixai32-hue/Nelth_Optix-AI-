@@ -212,7 +212,14 @@ function ThemeProviderInner({
 
     let isMounted = true
 
-    window.queueMicrotask(() => {
+    const runTask =
+      typeof window !== 'undefined' && typeof window.queueMicrotask === 'function'
+        ? window.queueMicrotask.bind(window)
+        : (cb: () => void) => {
+            Promise.resolve().then(cb).catch(() => setTimeout(cb, 0))
+          }
+
+    runTask(() => {
       if (!isMounted) {
         return
       }
@@ -407,7 +414,9 @@ function disableTransitions(nonce?: string) {
   return () => {
     window.getComputedStyle(document.body)
     window.setTimeout(() => {
-      document.head.removeChild(style)
+      if (style.parentNode) {
+        style.parentNode.removeChild(style)
+      }
     }, 1)
   }
 }
