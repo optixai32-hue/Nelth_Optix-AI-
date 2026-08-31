@@ -1,11 +1,11 @@
 import type { SkillMeta, SkillSelection } from './types'
 
 /** Hard caps to protect the model context (progressive disclosure). */
-export const MAX_SKILLS = 5
-export const MAX_REFS_PER_SKILL = 4
-export const GLOBAL_MAX_REFS = 8
+export const MAX_SKILLS = 1
+export const MAX_REFS_PER_SKILL = 2
+export const GLOBAL_MAX_REFS = 2
 /** Minimum score for a skill to be considered relevant. */
-const SCORE_THRESHOLD = 2
+const SCORE_THRESHOLD = 3
 
 /**
  * Common words that must NOT drive routing. Many SKILL.md descriptions contain
@@ -326,6 +326,7 @@ const SWITCH_AWAY_PATTERN =
  *
  * A request that clearly switches domain (SWITCH_AWAY_PATTERN) is never a follow-up.
  */
+// Questions that are informational/conversational inquiries must never inherit code artifact continuity.
 export type FollowUpIntent =
   | 'MODIFY_EXISTING'
   | 'ADD_TO_EXISTING'
@@ -333,10 +334,14 @@ export type FollowUpIntent =
   | 'REBUILD_REQUEST'
   | 'NEW_PROJECT'
 
+const INFORMATIONAL_INQUIRY_PATTERN =
+  /^(qui|quoi|pourquoi|comment|quand|o[uù]|combien|est[- ]ce\s+que|c'est\s+quoi|qu'est[- ]ce|raconte|explique|traduis|donne[- ]moi|dis[- ]moi|who|what|why|how|when|where|is\s+there|tell\s+me|explain|translate)\b/i
+
 export function classifyFollowUpIntent(query: string): FollowUpIntent | null {
   const q = query.toLowerCase().trim()
   if (!q) return null
   if (SWITCH_AWAY_PATTERN.test(q)) return null
+  if (INFORMATIONAL_INQUIRY_PATTERN.test(q)) return null
 
   if (ADD_KEYWORDS.some(k => q.includes(k)) || ADD_PATTERN.test(q)) {
     return 'ADD_TO_EXISTING'
@@ -350,9 +355,6 @@ export function classifyFollowUpIntent(query: string): FollowUpIntent | null {
   if (MODIFY_KEYWORDS.some(k => q.includes(k)) || MODIFY_PATTERN.test(q)) {
     return 'MODIFY_EXISTING'
   }
-  // A very short message in a follow-up context is treated as a continuation
-  // (edit in place — the safest default when the scope is unspecified).
-  if (q.split(/\s+/).filter(Boolean).length <= 4) return 'MODIFY_EXISTING'
   return null
 }
 

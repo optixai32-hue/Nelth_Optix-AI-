@@ -452,7 +452,7 @@ ${lines}`
       // model edits THE EXISTING code instead of "not having access" and rebuilding
       // from scratch. This is the CODE-FIRST source of truth. Bounded to keep the
       // context sane; a truncation note is added when the code was cut.
-      const MAX_PREV_CODE = 24000
+      const MAX_PREV_CODE = 8000
       let currentArtifactBlock = ''
       const rawPrevCode = (previousCode ?? '').trim()
       if (hasDesignSkill && rawPrevCode) {
