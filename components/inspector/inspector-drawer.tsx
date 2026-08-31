@@ -55,7 +55,7 @@ export function InspectorDrawer() {
       }}
       modal={true}
     >
-      <DrawerContent className="h-[90svh] max-h-[90svh] p-0 md:hidden">
+      <DrawerContent className="h-[90vh] h-[90svh] max-h-[90vh] max-h-[90svh] p-0 md:hidden">
         <DrawerTitle asChild>
           <VisuallyHidden>{getTitle()}</VisuallyHidden>
         </DrawerTitle>

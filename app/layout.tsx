@@ -1,3 +1,4 @@
+import '@/lib/polyfills'
 import type { Metadata, Viewport } from 'next'
 import { Inter as FontSans } from 'next/font/google'
 import { headers } from 'next/headers'
@@ -63,7 +64,8 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   minimumScale: 1,
-  maximumScale: 1
+  maximumScale: 1,
+  viewportFit: 'cover'
 }
 
 export default async function RootLayout({

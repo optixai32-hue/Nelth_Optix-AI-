@@ -82,9 +82,10 @@ export function ChatMessages({
   // True once the latest assistant message contains at least one non-empty text part.
   // Recomputed only when sections change (not on every render tick).
   const hasFirstToken = useMemo(() => {
-    const latestSection = sections.at(-1)
+    const latestSection = sections[sections.length - 1]
+    const latestMsg = latestSection?.assistantMessages[latestSection.assistantMessages.length - 1]
     return Boolean(
-      latestSection?.assistantMessages.at(-1)?.parts?.some(
+      latestMsg?.parts?.some(
         (p: any) => p.type === 'text' && typeof p.text === 'string' && p.text.trim().length > 0
       )
     )
@@ -95,7 +96,7 @@ export function ChatMessages({
   // 600ms on a slow day, showing "Lecture des compétences..." for "bonjour"
   // would confuse the user.
   const isTrivialQuery = useMemo(() => {
-    const latestSection = sections.at(-1)
+    const latestSection = sections[sections.length - 1]
     const query =
       (latestSection?.userMessage.parts as any[] | undefined)
         ?.find((p: any) => p.type === 'text')
@@ -180,7 +181,7 @@ export function ChatMessages({
   const latestSectionMinHeight =
     isMobile && scrollViewportHeight > 0
       ? `${Math.max(0, scrollViewportHeight - mobileFollowUpTopClearance)}px`
-      : `calc(100dvh - ${
+      : `calc(100vh - ${
           isMobile
             ? MOBILE_LATEST_SECTION_OFFSET_FALLBACK
             : DESKTOP_LATEST_SECTION_OFFSET
@@ -199,7 +200,7 @@ export function ChatMessages({
   if (!sections.length) return null
 
   // Keep the assistant logo visible for the latest section after generation
-  const latestSection = sections.at(-1)
+  const latestSection = sections[sections.length - 1]
   const showAssistantLogo = Boolean(
     latestSection && (isLoading || latestSection.assistantMessages.length > 0)
   )

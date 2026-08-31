@@ -159,7 +159,7 @@ const SidebarProvider = React.forwardRef<
               } as React.CSSProperties
             }
             className={cn(
-              'group/sidebar-wrapper flex h-[100dvh] w-full has-data-[variant=inset]:bg-sidebar',
+              'group/sidebar-wrapper flex h-screen h-[100dvh] w-full has-data-[variant=inset]:bg-sidebar',
               // Prevent flash during hydration
               !isHydrated && 'opacity-0',
               isHydrated && 'opacity-100 transition-opacity duration-150',
@@ -260,7 +260,7 @@ const Sidebar = React.forwardRef<
         />
         <div
           className={cn(
-            'fixed inset-y-0 z-10 hidden h-[100dvh] w-(--sidebar-width) transition-[left,right,width] duration-[120ms] ease-[var(--motion-ease-out)] md:flex',
+            'fixed inset-y-0 z-10 hidden h-screen h-[100dvh] w-(--sidebar-width) transition-[left,right,width] duration-[120ms] ease-[var(--motion-ease-out)] md:flex',
             side === 'left'
               ? 'left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]'
               : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',
