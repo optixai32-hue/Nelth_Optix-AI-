@@ -1,5 +1,23 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Transpile client libraries containing modern ES2022+ syntax for full
+  // compatibility with older iOS Safari and older Android WebViews.
+  transpilePackages: [
+    '@ai-sdk/react',
+    '@assistant-ui/react',
+    'lucide-react',
+    '@tabler/icons-react',
+    '@hugeicons/react',
+    'sonner',
+    'motion',
+    'radix-ui',
+    '@paralleldrive/cuid2',
+    'clsx',
+    'tailwind-merge',
+    'class-variance-authority',
+    'react-textarea-autosize',
+    'streamdown'
+  ],
   // Keep Node-only server SDKs out of the bundle (they use crypto/network
   // modules that don't survive Next.js bundling). `imagekit` authenticates
   // server-side with the private key and must run in the Node runtime.
