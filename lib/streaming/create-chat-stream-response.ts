@@ -39,6 +39,7 @@ import {
   getImageAttachmentUrl,
   getTextFromParts,
   isPureGreeting,
+  resolveContextualSearchQuery,
   StreamTextSanitizer,
   stripFakeToolCallXmlFromMessage
 } from '../utils/message-utils'
@@ -236,7 +237,11 @@ export async function createChatStreamResponse(
       let preloadedSearchContext: string | undefined
       let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
       if (shouldPreloadSearch) {
-        const searchResult = await runWebSearch(userQuery, 10, 'basic')
+        const effectiveSearchQuery = resolveContextualSearchQuery(
+          userQuery,
+          messagesToModel
+        )
+        const searchResult = await runWebSearch(effectiveSearchQuery, 10, 'basic')
         preloadedSearchContext = searchResult.results
           .map(
             (result, i) =>

@@ -1,11 +1,11 @@
 import type { SkillMeta, SkillSelection } from './types'
 
 /** Hard caps to protect the model context (progressive disclosure). */
-export const MAX_SKILLS = 1
-export const MAX_REFS_PER_SKILL = 2
-export const GLOBAL_MAX_REFS = 2
+export const MAX_SKILLS = 5
+export const MAX_REFS_PER_SKILL = 4
+export const GLOBAL_MAX_REFS = 8
 /** Minimum score for a skill to be considered relevant. */
-const SCORE_THRESHOLD = 3
+const SCORE_THRESHOLD = 2
 
 /**
  * Common words that must NOT drive routing. Many SKILL.md descriptions contain

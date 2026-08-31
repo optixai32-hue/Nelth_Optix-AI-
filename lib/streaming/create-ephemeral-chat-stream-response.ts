@@ -28,6 +28,7 @@ import {
   getImageAttachmentUrl,
   getTextFromParts,
   isPureGreeting,
+  resolveContextualSearchQuery,
   StreamTextSanitizer,
   stripFakeToolCallXmlFromMessage
 } from '@/lib/utils/message-utils'
@@ -169,7 +170,11 @@ export async function createEphemeralChatStreamResponse(
       let preloadedSearchContext: string | undefined
       let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
       if (shouldPreloadSearch) {
-        const searchResult = await runWebSearch(userQuery, 10, 'basic')
+        const effectiveSearchQuery = resolveContextualSearchQuery(
+          userQuery,
+          messages
+        )
+        const searchResult = await runWebSearch(effectiveSearchQuery, 10, 'basic')
         preloadedSearchContext = searchResult.results
           .map(
             (result, i) =>

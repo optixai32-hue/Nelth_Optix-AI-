@@ -361,3 +361,46 @@ export function isPureGreeting(query: string): boolean {
   if (trimmed.length > 40) return false
   return PURE_GREETING_RE.test(trimmed)
 }
+
+/**
+ * Expands short follow-up search queries (e.g. "recherche leur image", "combien ça coûte ?")
+ * with the subject/entities from previous conversation turns.
+ */
+export function resolveContextualSearchQuery(
+  userQuery: string,
+  history: UIMessage[] = []
+): string {
+  const q = userQuery.trim()
+  if (!q) return ''
+
+  const hasPronounOrFollowUp =
+    /\b(leur|leurs|son|sa|ses|ça|ce|cet|cette|ces|eux|elle|elles|il|ils|lui|it|its|they|their|them|this|that|these|those|images?|photos?|pictures?|prix|combien|caract[eé]ristiques?)\b/i.test(
+      q
+    )
+
+  if (history.length > 1 && (hasPronounOrFollowUp || q.split(/\s+/).length <= 4)) {
+    const previousUserMessages = history
+      .slice(0, -1)
+      .filter(m => m.role === 'user')
+    const lastUser = previousUserMessages[previousUserMessages.length - 1]
+    if (lastUser) {
+      const prevText = getTextFromParts(lastUser.parts).trim()
+      if (prevText) {
+        const cleanPrev = prevText
+          .replace(
+            /\b(cherche|recherche|trouve|search|find|show|montre|donne|donne-moi|give|qu'est[- ]ce|what\s+is|what\s+did|tell\s+me|about)\b/gi,
+            ''
+          )
+          .replace(/[?!.]+$/, '')
+          .trim()
+
+        if (/\b(images?|photos?|pictures?|illustrations?)\b/i.test(q)) {
+          return `${cleanPrev} images`
+        }
+        return `${cleanPrev} ${q}`
+      }
+    }
+  }
+
+  return q
+}
