@@ -174,7 +174,7 @@ export async function createEphemeralChatStreamResponse(
           userQuery,
           messages
         )
-        const searchResult = await runWebSearch(effectiveSearchQuery, 10, 'basic')
+        const searchResult = await runWebSearch(effectiveSearchQuery, isNonThinkingModel ? 7 : 10, 'basic')
         preloadedSearchContext = searchResult.results
           .map(
             (result, i) =>

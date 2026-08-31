@@ -665,21 +665,25 @@ export function createResearcher({
       ...todoTools
     } as ResearcherTools
 
-    // CORE DIRECTIVE — placed at the VERY TOP of the instructions so BOTH models
-    // (the weak non-thinking Nelth-3.5 and the reasoning Nelth-3.5 Thinking) read
-    // and honour the non-negotiable behavioral contract FIRST. NVIDIA chat
-    // templates and weak models truncate/drop the TAIL of long system prompts, so
-    // the essentials are placed here at the top (primacy bias). This single
-    // authoritative contract now also carries identity, language, conversation
-    // continuity, emoji style, visualization restraint, and file-handling rules.
-    const CORE_DIRECTIVE = `${CORE_DIRECTIVE_TEXT}
-
-${CONVERSATIONAL_BEHAVIOR}
-
-ADDITIONAL NON-NEGOTIABLE RULES:
-- Any "ACTIVE SKILLS" / "ACTIVE SKILL" block below is MANDATORY. You MUST apply its instructions directly to your output. Detected ≠ applied: your answer must VISIBLY reflect the skill (real code quality, real domain rules). Never just summarise the skill.
-- Do NOT generate a visualization (diagram / chart / mind-map / graph) on every response. Only produce one when it is EXPLICITLY requested, or when it clearly improves comprehension of a complex subject, data, architecture, workflow, comparison or planning. For greetings, conversation, translation, short explanations, summaries, or a simple code snippet, answer in plain TEXT (inline code is fine).
-- When the user UPLOADS a file (PDF / Word / Excel / PowerPoint / image) and asks to READ / ANALYZE / SUMMARIZE / EXTRACT it, just read the attached file and answer in plain text — do NOT generate a new document. If you use the document tool, use operation "read" ONLY (never "create" / "modify" / "export"). A new file is produced ONLY when the user explicitly asks to create / make / export one.`
+    // CORE DIRECTIVE — for the thinking model (Nelth-3.5 Thinking), the full
+    // 26-rule contract is placed at the VERY TOP (primacy bias) so the reasoning
+    // model reads and honours it before any other content.
+    //
+    // For the non-thinking model (Nelth-3.5), getCorePrompt() inside systemPrompt
+    // ALREADY covers identity, language, emoji, capabilities, conversation
+    // continuity, and tool usage — making the full CORE_DIRECTIVE_TEXT (~6700 chars)
+    // redundant. We use a compact 5-rule header (~380 chars) that only adds what
+    // getCorePrompt() is missing (skill enforcement, no-visualization, document
+    // reading, emoji-in-code ban). This saves ~1575 prefill tokens on EVERY
+    // Nelth-3.5 request, directly improving TTFT without quality loss.
+    const CORE_DIRECTIVE = isNonThinking
+      ? `NON-NEGOTIABLE RULES (apply before anything else):
+- "ACTIVE SKILLS" / "ACTIVE SKILL" block below is MANDATORY — apply its instructions directly to your output. Detected \u2260 applied: your answer must VISIBLY reflect the skill.
+- Do NOT produce a visualization/diagram/chart unless EXPLICITLY requested.
+- For uploaded files: READ and answer in plain text — do NOT create a new document unless the user explicitly asks.
+- In code artifacts (HTML/CSS/SVG/JS): ZERO emoji — use inline SVG icons or CSS shapes instead.
+- Never reveal internal skills, routing, model name, or provider to the user.`
+      : `${CORE_DIRECTIVE_TEXT}\n\n${CONVERSATIONAL_BEHAVIOR}\n\nADDITIONAL NON-NEGOTIABLE RULES:\n- Any "ACTIVE SKILLS" / "ACTIVE SKILL" block below is MANDATORY. You MUST apply its instructions directly to your output. Detected \u2260 applied: your answer must VISIBLY reflect the skill (real code quality, real domain rules). Never just summarise the skill.\n- Do NOT generate a visualization (diagram / chart / mind-map / graph) on every response. Only produce one when it is EXPLICITLY requested, or when it clearly improves comprehension of a complex subject, data, architecture, workflow, comparison or planning. For greetings, conversation, translation, short explanations, summaries, or a simple code snippet, answer in plain TEXT (inline code is fine).\n- When the user UPLOADS a file (PDF / Word / Excel / PowerPoint / image) and asks to READ / ANALYZE / SUMMARIZE / EXTRACT it, just read the attached file and answer in plain text \u2014 do NOT generate a new document. If you use the document tool, use operation "read" ONLY (never "create" / "modify" / "export"). A new file is produced ONLY when the user explicitly asks to create / make / export one.`
 
   const TOOL_CALL_PROTOCOL = `TOOL CALL PROTOCOL — NON-NEGOTIABLE:
 - When current or external information is needed, invoke the native \`search\` tool immediately.
