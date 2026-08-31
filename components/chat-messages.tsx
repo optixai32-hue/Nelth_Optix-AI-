@@ -12,6 +12,7 @@ import { extractCitationMapsFromMessages } from '@/lib/utils/citation'
 import { AnimatedLogo } from './ui/animated-logo'
 import { ChatError } from './chat-error'
 import { ChatFooterMessage } from './chat-footer-message'
+import { NelthLoadingLabel } from './nelth-loading-label'
 import { RenderMessage } from './render-message'
 import { UploadedFileList } from './uploaded-file-list'
 
@@ -36,6 +37,9 @@ interface ChatMessagesProps {
   reload?: (messageId: string) => Promise<void | string | null | undefined>
   error?: Error | string | null | undefined
   onQuoteContext?: (text: string) => void
+  /** The model selection cookie value (e.g. "tencent:tencent/hy3:free").
+   *  When it contains "hy3:free", the Nelth-3.5 loading label is shown. */
+  selectedModelKey?: string
 }
 
 const DESKTOP_LATEST_SECTION_OFFSET = 196
@@ -54,7 +58,8 @@ export function ChatMessages({
   onUpdateMessage,
   reload,
   error,
-  onQuoteContext
+  onQuoteContext,
+  selectedModelKey
 }: ChatMessagesProps) {
   // Track user-modified states (when user explicitly opens/closes)
   const [userModifiedStates, setUserModifiedStates] = useState<
@@ -64,6 +69,10 @@ export function ChatMessages({
   const toolCountCacheRef = useRef<Map<string, number>>(new Map())
   const isLoading = status === 'submitted' || status === 'streaming'
   const isMobile = useMediaQuery('(max-width: 767px)')
+
+  // Show the shimmer loading label only for the Nelth-3.5 (non-thinking) model.
+  // This gives the user visual feedback during the latency before the first token.
+  const isNonThinkingModel = Boolean(selectedModelKey?.includes('hy3:free'))
   const [scrollViewportHeight, setScrollViewportHeight] = useState(0)
   const [mobileFollowUpTopClearance, setMobileFollowUpTopClearance] = useState(
     MOBILE_FOLLOW_UP_TOP_CLEARANCE_FALLBACK
@@ -318,7 +327,12 @@ export function ChatMessages({
                   className="size-10 shrink-0 text-foreground dark:text-white"
                   animate={isLoading}
                 />
-                <ChatFooterMessage isLoading={isLoading} />
+                {/* Shimmer label: only for Nelth-3.5 while waiting for first token */}
+                {isLoading && isNonThinkingModel ? (
+                  <NelthLoadingLabel />
+                ) : (
+                  <ChatFooterMessage isLoading={isLoading} />
+                )}
               </div>
             )}
             {sectionIndex === sections.length - 1 && error && (() => {

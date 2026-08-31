@@ -636,6 +636,7 @@ export function Chat({
           reload={handleReloadFrom}
           error={error}
           onQuoteContext={handleQuoteContext}
+          selectedModelKey={modelSelectorData?.selectedModelKey}
         />
         <ChatPanel
           chatId={chatId}
