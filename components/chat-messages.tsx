@@ -71,30 +71,55 @@ export function ChatMessages({
   const isMobile = useMediaQuery('(max-width: 767px)')
 
   // Show the shimmer loading label only for the Nelth-3.5 (non-thinking) model.
-  // The label is intentionally DELAYED 500ms after 'submitted' status:
-  //   - Simple questions (bonjour, math, translation) → response in <300ms → label never appears
-  //   - Skill-heavy requests (code, design, complex) → response in 1-3s → label appears at 500ms
-  // This matches the user expectation: label = "reading skills", not "every response".
+  // The label is intentionally DELAYED 500ms and only shown while waiting for the
+  // first real text token in the UI:
+  //   - Simple questions (bonjour, math)  → response in <300ms  → label never appears
+  //   - Skill-heavy requests (code, design) → 1-3s latency → label shows at 500ms
+  //   - Label hides ONLY when actual text appears in the message (not on status change)
+  //     so it doesn't vanish before the user sees any content.
   const isNonThinkingModel = Boolean(selectedModelKey?.includes('hy3:free'))
+
+  // True once the latest assistant message contains at least one non-empty text part.
+  // Recomputed only when sections change (not on every render tick).
+  const hasFirstToken = useMemo(() => {
+    const latestSection = sections.at(-1)
+    return Boolean(
+      latestSection?.assistantMessages.at(-1)?.parts?.some(
+        (p: any) => p.type === 'text' && typeof p.text === 'string' && p.text.trim().length > 0
+      )
+    )
+  }, [sections])
+
   const [showNelthLabel, setShowNelthLabel] = useState(false)
   const nelthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Guard: prevents the 500ms timer from restarting on every re-render while we are
+  // still in the "should show" window (e.g. while sections stream in but no text yet).
+  const labelScheduledRef = useRef(false)
 
   useEffect(() => {
-    if (nelthTimerRef.current) {
-      clearTimeout(nelthTimerRef.current)
-      nelthTimerRef.current = null
-    }
-    if (status === 'submitted' && isNonThinkingModel) {
-      // Delay: if response arrives in <500ms the label never shows
+    const shouldShow = isNonThinkingModel && isLoading && !hasFirstToken
+
+    if (shouldShow && !labelScheduledRef.current) {
+      // First time entering the "waiting for skills" window — arm the 500ms timer once.
+      labelScheduledRef.current = true
       nelthTimerRef.current = setTimeout(() => setShowNelthLabel(true), 500)
-    } else {
-      // Streaming started or response complete → begin fade-out
+    } else if (!shouldShow) {
+      // First token arrived OR response complete OR not non-thinking → hide & reset.
+      labelScheduledRef.current = false
+      if (nelthTimerRef.current) {
+        clearTimeout(nelthTimerRef.current)
+        nelthTimerRef.current = null
+      }
       setShowNelthLabel(false)
     }
+
     return () => {
-      if (nelthTimerRef.current) clearTimeout(nelthTimerRef.current)
+      if (nelthTimerRef.current) {
+        clearTimeout(nelthTimerRef.current)
+        nelthTimerRef.current = null
+      }
     }
-  }, [status, isNonThinkingModel])
+  }, [isNonThinkingModel, isLoading, hasFirstToken])
 
   const [scrollViewportHeight, setScrollViewportHeight] = useState(0)
   const [mobileFollowUpTopClearance, setMobileFollowUpTopClearance] = useState(
