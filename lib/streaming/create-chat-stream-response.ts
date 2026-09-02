@@ -193,7 +193,8 @@ export async function createChatStreamResponse(
       // the capability detector already flagged needsSearch, in which case we
       // preload too). This prevents the model from hallucinating current info
       // it no longer has in its weights.
-      const isNonThinkingModel = model.id === 'tencent/hy3:free'
+      const isNonThinkingModel =
+        model.id === 'tencent/hy3:free' || model.id === 'minimax/minimax-m3:free'
 
       // A skill is needed only when one matched (LEVEL 1) or an attachment forces
       // it (e.g. an uploaded document). Everything else (greetings, simple chat,

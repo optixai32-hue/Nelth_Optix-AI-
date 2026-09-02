@@ -638,7 +638,9 @@ export function createResearcher({
 
       const isNonThinking =
         modelConfig?.id === 'tencent/hy3:free' ||
+        modelConfig?.id === 'minimax/minimax-m3:free' ||
         model.includes('tencent/hy3:free') ||
+        model.includes('minimax/minimax-m3:free') ||
         modelConfig?.id?.includes('hy3:free')
 
       // LAZY TOOL ARMING: for non-thinking models, a trivial request arms no tools.

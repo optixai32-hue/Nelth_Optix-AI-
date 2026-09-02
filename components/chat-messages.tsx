@@ -77,7 +77,10 @@ export function ChatMessages({
   //   - Skill-heavy requests (code, design) → 1-3s latency → label shows at 500ms
   //   - Label hides ONLY when actual text appears in the message (not on status change)
   //     so it doesn't vanish before the user sees any content.
-  const isNonThinkingModel = Boolean(selectedModelKey?.includes('hy3:free'))
+  const isNonThinkingModel = Boolean(
+    selectedModelKey?.includes('hy3:free') ||
+      selectedModelKey?.includes('minimax-m3:free')
+  )
 
   // True once the latest assistant message contains at least one non-empty text part.
   // Recomputed only when sections change (not on every render tick).

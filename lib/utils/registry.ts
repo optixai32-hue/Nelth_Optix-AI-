@@ -25,7 +25,10 @@ function normalizeOpenAICompatibleBaseURL(raw: string): string {
 // budget is contradictory. Skills are applied via the prompt layer
 // (researcher.ts), which instructs the model to output the COMPLETE artifact
 // directly (no separate "design brief").
-const NELTH_NON_THINKING_MODEL = 'tencent/hy3:free'
+const NELTH_NON_THINKING_MODELS = new Set([
+  'tencent/hy3:free',
+  'minimax/minimax-m3:free'
+])
 
 const NELTH_NON_THINKING_BODY = {
   temperature: 0.9,
@@ -166,8 +169,9 @@ const nelthFetch: typeof fetch = async (input, init) => {
       const parsed = JSON.parse(init.body) as Record<string, any>
       if (
         typeof parsed?.model === 'string' &&
-        (parsed.model === NELTH_NON_THINKING_MODEL ||
-          parsed.model.endsWith('/hy3:free'))
+        (NELTH_NON_THINKING_MODELS.has(parsed.model) ||
+          parsed.model.endsWith('/hy3:free') ||
+          parsed.model.endsWith('/minimax-m3:free'))
       ) {
         // Tencent/Hunyuan models served via the Kilo gateway disable thinking
         // with `enable_thinking: false` sent as a TOP-LEVEL request field (Hunyuan
