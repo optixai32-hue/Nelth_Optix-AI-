@@ -175,7 +175,14 @@ export async function createEphemeralChatStreamResponse(
           userQuery,
           messages
         )
-        const searchResult = await runWebSearch(effectiveSearchQuery, isNonThinkingModel ? 7 : 10, 'basic')
+        const searchResult = await runWebSearch(
+          effectiveSearchQuery,
+          isNonThinkingModel ? 7 : 10,
+          'basic',
+          [],
+          [],
+          caps.webImageSearch ? ['image'] : ['web']
+        )
         preloadedSearchContext = searchResult.results
           .map(
             (result, i) =>
@@ -183,7 +190,17 @@ export async function createEphemeralChatStreamResponse(
           )
           .join('\n\n')
         if (searchResult.images && searchResult.images.length > 0) {
-          preloadedSearchContext += `\n\nIMAGES DISPONIBLES DANS LA GALERIE:\n${searchResult.images.length} images ont été trouvées et sont affichées dans la galerie au-dessus.\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: Ne liste PAS de liens de banques d'images (comme Getty, iStock, Adobe Stock) dans ton texte. Présente simplement et brièvement le sujet de façon naturelle.`
+          const imageLines = searchResult.images
+            .map((image, i) => {
+              const imageUrl = typeof image === 'string' ? image : image.url
+              const imageLabel =
+                typeof image === 'string'
+                  ? 'Image'
+                  : image.title || image.description || 'Image'
+              return `[${i + 1}] ${imageLabel}: ${imageUrl}`
+            })
+            .join('\n')
+          preloadedSearchContext += `\n\nIMAGES DISPONIBLES:\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: utilise les URLs d'images ci-dessus dans ta réponse markdown; ne dis pas que les images sont indisponibles.`
         }
         searchResultsForCitation = searchResult
       }
@@ -267,7 +284,7 @@ export async function createEphemeralChatStreamResponse(
         input: {
           query: userQuery,
           type: 'optimized',
-          content_types: ['web'],
+          content_types: caps.webImageSearch ? ['image'] : ['web'],
           max_results: 10,
           search_depth: 'basic'
         }

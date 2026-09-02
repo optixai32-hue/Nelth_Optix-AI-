@@ -145,13 +145,14 @@ export async function search(
   maxResults: number = 10,
   searchDepth: 'basic' | 'advanced' = 'basic',
   includeDomains: string[] = [],
-  excludeDomains: string[] = []
+  excludeDomains: string[] = [],
+  contentTypes: Array<'web' | 'video' | 'image' | 'news'> = ['web']
 ): Promise<SearchResults> {
   const result = await searchTool.execute?.(
     {
       query,
       type: 'general',
-      content_types: ['web'],
+      content_types: contentTypes,
       max_results: maxResults,
       search_depth: searchDepth,
       include_domains: includeDomains,
