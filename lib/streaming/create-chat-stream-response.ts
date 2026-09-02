@@ -260,14 +260,21 @@ export async function createChatStreamResponse(
           const imageLines = searchResult.images
             .map((image, i) => {
               const imageUrl = typeof image === 'string' ? image : image.url
-              const imageLabel =
+              const imageData =
                 typeof image === 'string'
-                  ? 'Image'
-                  : image.title || image.description || 'Image'
-              return `[${i + 1}] ${imageLabel}: ${imageUrl}`
+                  ? { url: imageUrl }
+                  : {
+                      url: imageUrl,
+                      ...(image.sourceUrl && { sourceUrl: image.sourceUrl }),
+                      ...(image.title && { title: image.title }),
+                      ...(image.description && {
+                        description: image.description
+                      })
+                    }
+              return `[${i + 1}] ${JSON.stringify(imageData)}`
             })
             .join('\n')
-          preloadedSearchContext += `\n\nIMAGES DISPONIBLES:\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: utilise les URLs d'images ci-dessus dans ta réponse markdown; ne dis pas que les images sont indisponibles.`
+          preloadedSearchContext += `\n\nIMAGES DISPONIBLES:\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: utilise ces images dans un bloc \`\`\`spec de type Grid avec des éléments Image, conformément à INLINE IMAGE EMBEDDING. Ne produis jamais de syntaxe Markdown ![alt](url), ne liste pas les URLs en texte et ne dis pas que les images sont indisponibles.`
         }
         searchResultsForCitation = searchResult
       }
