@@ -351,7 +351,9 @@ export async function createEphemeralChatStreamResponse(
                 if (
                   !searchChunksEmitted &&
                   searchResultsForCitation &&
-                  searchResultsForCitation.results.length > 0
+                  (searchResultsForCitation.results.length > 0 ||
+                    searchResultsForCitation.images.length > 0 ||
+                    (searchResultsForCitation.videos?.length ?? 0) > 0)
                 ) {
                   searchChunksEmitted = true
                   writer.write(
