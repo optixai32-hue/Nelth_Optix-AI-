@@ -703,12 +703,11 @@ export function createResearcher({
     // the COMPLETE code, not a brief — while still letting the skill's quality
     // guidance shape the result.
     const ARTIFACT_OUTPUT_RULE = `MANDATORY OUTPUT RULE (applies even when a skill is active):
-When the request is to build or generate CODE, a webpage, a UI, an SVG, an app, or any visual artifact, your response MUST BE ONLY the COMPLETE, runnable artifact in a single fenced code block (e.g. \`\`\`html / \`\`\`svg / \`\`\`css). Forbidding all of the following:
-- NO "Design System", "Visual Elements", "Responsive Layout", "Design Direction", "Color Tokens", "How to Use", or any other prose plan/section BEFORE or AFTER the code.
+  When the request is to build or generate CODE, a webpage, a UI, an SVG, an app, or any visual artifact, provide a complete ChatGPT-style answer: first give a clear, detailed explanation of what was built, the design direction, the main features, the important technical choices, responsive behavior, accessibility, and how to run or customize it; then provide the COMPLETE, runnable artifact in a single fenced code block (e.g. \`\`\`html / \`\`\`svg / \`\`\`css). If the user explicitly asks for "code only" or equivalent, omit the explanation and return only the complete code.
 - NO emoji section headers (🚀 🎨 🖼️ 📱 💻 🔍 🌐) describing the design.
 - NO "Related Questions" / "Related" list.
 - ZERO emoji glyphs (🚀 ⭐ 🎨 💡 🔥 ✨ 📱 🖥️ etc.) INSIDE the fenced code block itself. In HTML/CSS/SVG/JS use inline \`<svg>\` icons, CSS \`::before\`/\`::after\` with text characters, or CSS shapes. Emoji are allowed ONLY as on-page prose text inside \`<p>\`, \`<h1-h6>\`, \`<li>\` tags that contain real surrounding text.
-Put EVERY design decision (colors, typography, layout, copy, hover/focus states, responsive rules, accessibility) DIRECTLY inside the code. The code is the primary answer, but you SHOULD add a SHORT description (1–3 sentences) right before the code block explaining what you built and its main features. Keep it brief — do NOT write a multi-section design brief and do NOT use emoji section headers. Output the complete, runnable file.`
+  Put EVERY design decision (colors, typography, layout, copy, hover/focus states, responsive rules, accessibility) DIRECTLY inside the code, and explain those decisions clearly before the code. Use useful headings and organized sections when they improve readability. Do not artificially shorten the explanation or reduce it to a 1–3 sentence summary. Output the complete, runnable file.`
 
     // Layer the on-demand skill expertise (selected by the Skill Router) onto
     // the system instructions. This stays lightweight: skillContext is empty
@@ -748,19 +747,15 @@ Put EVERY design decision (colors, typography, layout, copy, hover/focus states,
     // contain a generic "OUTPUT FORMAT (MANDATORY)" + "Emoji usage" section that
     // tells the model to lead with a `##` heading and an emoji — for a coding
     // request that conflicts with "output only the code", and the weak
-    // non-thinking model resolves the conflict by emitting a "design brief"
-    // (## heading + ### Design System + emoji) before the code. Those sections
-    // sit in the MIDDLE of systemPrompt, so a recency-biased model follows them
-    // over the ARTIFACT_OUTPUT_RULE at the top. Re-stating the rule LAST (most
-    // recent) makes the code-only constraint win. Kept short so it survives
-    // trailing-context truncation better than a long skill block would.
+    // The final rule resolves conflicting format instructions from individual
+    // skills and keeps the requested explanation paired with the full artifact.
     if (artifactIntent.isCode) {
       instructions += `\n\nFINAL OVERRIDE — CODE/ARTIFACT REQUEST:
-Ignore the "OUTPUT FORMAT", "Emoji usage", and every "keep it short" / brevity / "1-3 paragraphs" instruction above. Your answer centers on ONE fenced code block containing the COMPLETE, runnable, production-grade artifact (e.g. \`\`\`html); a short intro and conclusion sentence around it are allowed (see below). Length and brevity limits DO NOT apply to code — a minimal/beginner stub or a few placeholder lines is a FAILURE.
+    Ignore the "OUTPUT FORMAT", "Emoji usage", and every "keep it short" / brevity / "1-3 paragraphs" instruction above. Give a complete, detailed ChatGPT-style explanation before ONE fenced code block containing the COMPLETE, runnable, production-grade artifact (e.g. \`\`\`html). Explain the implementation, design decisions, features, responsive behavior, accessibility, and how to use or customize it. Length and brevity limits DO NOT apply to code or its useful explanation — a minimal/beginner stub or a few placeholder lines is a FAILURE.
 Requirements for the artifact:
 - Build the FULL, ultra-modern, professional implementation. For a webpage/landing page it MUST include a sticky nav bar, a hero with gradient background + CTA, a features grid (3-4 cards), a showcase/about section, a testimonials block, a stats or pricing section, an FAQ, a final CTA band, and a multi-column footer. Every section needs real copy, a coherent token-based design system (CSS variables), hover/focus states, tasteful transitions, working JS interactions (menu toggle, smooth scroll, counters/animations on scroll), and full responsive breakpoints down to mobile.
 - ZERO emoji glyphs (🚀 ⭐ 🎨 💡 etc.) anywhere inside the code block. Replace every emoji icon with an inline \`<svg>\` (heroicon, box-icon style, or a simple hand-crafted \`<path>\`) or a CSS-only shape/decoration. Emoji in real prose copy inside \`<p>\`/\`<h*>\` tags are fine.
-- Add a SHORT description (1–3 sentences) directly before the code block explaining what you built and its key features (e.g. "Voici votre page d'accueil responsive : une hero avec CTA, une grille de fonctionnalités, des témoignages et un footer multi-colonnes."). Optionally one closing sentence (e.g. "Dis-moi si tu veux des ajustements."). Keep it brief and natural — like ChatGPT. Forbidden: \`##\` / \`###\` headings, emoji section headers, a "Design System" / "Visual Elements" plan, or any multi-paragraph brief. The code block itself stays complete and untouched.`
+- Provide a full explanation before the code using clear headings when useful. Cover the design direction, structure, key features, technical implementation, responsive behavior, accessibility, and usage/customization notes. Do not reduce this to a short description or a one-paragraph summary. The code block itself stays complete and untouched.`
     }
 
     if (process.env.SKILL_ROUTER_DEBUG === 'true') {
