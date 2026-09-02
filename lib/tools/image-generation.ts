@@ -310,9 +310,19 @@ async function persistGeneratedImage(
 }
 
 let clientPromise: Promise<any> | null = null
-function getGradioClient() {
+function getBaiduDateHeaders(): Record<string, string> {
+  const now = new Date().toISOString()
+  return { date: now, 'x-bce-date': now }
+}
+
+function getGradioClient(forceReconnect = false) {
+  if (forceReconnect) {
+    clientPromise = null
+  }
   if (!clientPromise) {
-    clientPromise = Client.connect(HF_SPACE)
+    clientPromise = Client.connect(HF_SPACE, {
+      headers: getBaiduDateHeaders()
+    })
   }
   return clientPromise
 }
@@ -434,7 +444,7 @@ async function generateViaGradio(
   size: string,
   seed: number
 ): Promise<{ imageUrl: string; revisedPrompt: string }> {
-  const client = await getGradioClient()
+  let client = await getGradioClient()
   const args = {
     // `seed` is provided by the model (the AI generates a random value each
     // call so every image differs). -1 is the Space's "Random" sentinel.
@@ -452,7 +462,7 @@ async function generateViaGradio(
   // content-moderation rejections (errorCode 40000 / "内容不合规").
   let result: any
   let lastErr: unknown
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
       result = await client.predict('/generate_image', args)
       lastErr = undefined
@@ -461,7 +471,12 @@ async function generateViaGradio(
       const msg = err instanceof Error ? err.message : String(err)
       if (/内容不合规|40000|not compliant/i.test(msg)) throw err
       lastErr = err
-      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+      if (/MissingDateHeader|x-bce-date|date header/i.test(msg)) {
+        client = await getGradioClient(true)
+      }
+      if (attempt < 4) {
+        await new Promise(r => setTimeout(r, 800 * 2 ** attempt))
+      }
     }
   }
   if (lastErr) throw lastErr
