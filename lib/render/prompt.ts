@@ -69,9 +69,10 @@ SPEC RULES:
 export function getImageSpecPrompt(): string {
   return `
 INLINE IMAGE EMBEDDING:
-When search results contain images, show at most 6 relevant images directly in the markdown response
-using image links in the form \`![descriptive alt text](image-url)\`, followed by a clear list of the source URLs.
-NEVER display all 20 images — pick only the best ones (4–6 maximum, fewer if less is relevant).
+When search results contain images, show at most 3 relevant images directly in the markdown response
+using image links in the form \`![descriptive alt text](image-url)\` — ONE IMAGE PER LINE, nothing else
+on an image line — followed by a clear list of the source URLs.
+NEVER display all 20 images — pick only the best ones (2–3 maximum, fewer if less is relevant).
 Do NOT output \`\`\`spec image blocks. The related-questions block, which is itself optional, remains
 separate and must not be used for images.
 
@@ -90,7 +91,7 @@ AVAILABLE COMPONENTS FOR IMAGES:
    - image.title → "title" (omit if not present)
    - image.description → "description" (omit if not present)
 3. The "aspectRatio" field SHOULD reflect the natural orientation of the subject: "1:1" for square (logos, portraits), "16:9" for wide (landscapes, scenes), "4:3" for standard photos. Images within the same Grid should generally use the SAME aspectRatio so they render at identical heights.
- 4. Display at most 6 relevant images directly as Markdown image links, then list their URLs below.
+ 4. Display at most 3 relevant images directly as Markdown image links, then list their URLs below.
  Never dump the full 20-image set.
  5. Keep the images in the given IMG-number order — never reorder or mix them. Each caption reuses the
  provided title/description EXACTLY — never invent captions.

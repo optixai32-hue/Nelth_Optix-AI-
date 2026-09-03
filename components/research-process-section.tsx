@@ -363,8 +363,8 @@ function ToolStep({
           </ChainOfThoughtContent>
         </ChainOfThought>
         {/* No gallery grid for image searches (20 candidates): images are
-            shown directly in the answer Markdown instead. */}
-        {images.length > 0 && images.length <= 6 && (
+            shown directly in the answer instead. */}
+        {images.length > 0 && images.length <= 3 && (
           <div className="my-2 not-prose">
             <SearchResultsImageSection images={images} query={query} />
           </div>

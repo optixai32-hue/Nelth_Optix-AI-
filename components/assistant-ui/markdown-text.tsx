@@ -4,6 +4,8 @@ import { createContext, useContext, useState } from "react";
 
 import type { Components } from "streamdown";
 
+import { cn } from "@/lib/utils";
+
 import { CodeBlock } from "./code-block";
 
 /**
@@ -48,6 +50,7 @@ function MarkdownImage({
       loading="lazy"
       onError={() => setStage((s) => s + 1)}
       {...props}
+      className={cn("rounded-xl border border-border/40 shadow-sm", props.className)}
     />
   );
 }

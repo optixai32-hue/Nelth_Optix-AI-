@@ -10,6 +10,7 @@ import {
 } from 'streamdown'
 
 import { mergeStreamdownSpecRenderer } from '@/lib/render/streamdown-spec'
+import { groupMarkdownImages } from '@/lib/render/group-markdown-images'
 import { wrapBareSpecBlocks } from '@/lib/render/wrap-bare-spec'
 import type { SearchResultItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -36,9 +37,10 @@ export function MarkdownMessage({
   className?: string
   citationMaps?: Record<string, Record<number, SearchResultItem>>
 }) {
-  // Process citations to replace [number](#toolCallId) with [number](actual-url)
-  const processedMessage = wrapBareSpecBlocks(
-    processCitations(message || '', citationMaps || {})
+  // Process citations to replace [number](#toolCallId) with [number](actual-url).
+  // Consecutive Markdown images become a modern gallery grid (spec fence).
+  const processedMessage = groupMarkdownImages(
+    wrapBareSpecBlocks(processCitations(message || '', citationMaps || {}))
   )
 
   const streamdownProps = useMemo<Partial<StreamdownProps>>(

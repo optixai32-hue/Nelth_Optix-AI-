@@ -49,22 +49,29 @@ export const Image: ComponentFn<CatalogType, 'Image'> = ({ props }) => {
         })
       }}
     >
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            'w-full cursor-pointer overflow-hidden rounded-lg bg-muted',
-            aspectRatioClass[aspectRatio]
-          )}
-        >
-          <img
-            src={src}
-            alt={alt}
-            className="h-full w-full object-cover shadow-sm"
-            onError={() => setErrored(true)}
-          />
-        </button>
-      </DialogTrigger>
+      <figure className="m-0 flex h-full flex-col overflow-hidden rounded-lg bg-muted">
+        <DialogTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              'w-full flex-1 cursor-pointer overflow-hidden',
+              aspectRatioClass[aspectRatio]
+            )}
+          >
+            <img
+              src={src}
+              alt={alt}
+              className="h-full w-full object-cover shadow-sm transition-transform duration-300 hover:scale-[1.03]"
+              onError={() => setErrored(true)}
+            />
+          </button>
+        </DialogTrigger>
+        {title ? (
+          <figcaption className="line-clamp-2 px-2 py-1.5 text-xs leading-snug text-muted-foreground">
+            {title}
+          </figcaption>
+        ) : null}
+      </figure>
       <DialogContent className="w-auto max-w-[90vw] border-0 bg-transparent p-0 shadow-none gap-0 sm:max-w-[90vw]">
         <DialogHeader className="sr-only">
           <DialogTitle>{alt}</DialogTitle>

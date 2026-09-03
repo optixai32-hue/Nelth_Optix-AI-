@@ -146,11 +146,11 @@ export function SearchSection({
           )}
           <div className="flex-1">
             {/* Image gallery only for small sets. Image searches fetch 20
-                candidates shown directly in the answer Markdown — no 20-grid. */}
+                candidates shown directly in the answer — no 20-grid. */}
             {searchResults &&
               searchResults.images &&
               searchResults.images.length > 0 &&
-              searchResults.images.length <= 6 && (
+              searchResults.images.length <= 3 && (
                 <Section>
                   <SearchResultsImageSection
                     images={searchResults.images}
