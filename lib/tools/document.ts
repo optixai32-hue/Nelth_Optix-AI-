@@ -108,6 +108,10 @@ export const documentTool = tool({
         }
         const name = fileName || defaultName(fmt)
         const stored = await storeDocument(buffer, name, mimeForFormat(fmt))
+        // Permanent cloud URL when available (survives serverless instances);
+        // otherwise the instance-local download route.
+        const downloadUrl =
+          stored.publicUrl ?? `/api/documents/${stored.id}`
         return {
           success: true,
           format: fmt,
@@ -116,8 +120,8 @@ export const documentTool = tool({
             fileName: stored.fileName,
             mimeType: stored.mimeType,
             size: stored.size,
-            downloadUrl: `/api/documents/${stored.id}`,
-            downloadMarkdown: downloadMarkdown(stored.id, stored.fileName)
+            downloadUrl,
+            downloadMarkdown: `[${stored.fileName}](${downloadUrl})`
           },
           validation: validation.meta
         }
@@ -146,8 +150,9 @@ export const documentTool = tool({
           fileName: stored.fileName,
           mimeType: stored.mimeType,
           size: stored.size,
-          downloadUrl: `/api/documents/${stored.id}`,
-          downloadMarkdown: downloadMarkdown(stored.id, stored.fileName)
+          downloadUrl:
+            stored.publicUrl ?? `/api/documents/${stored.id}`,
+          downloadMarkdown: `[${stored.fileName}](${stored.publicUrl ?? `/api/documents/${stored.id}`})`
         },
         validation: validation.meta
       }
@@ -159,15 +164,6 @@ export const documentTool = tool({
 
 function defaultName(format: DocumentFormat): string {
   return `document.${format}`
-}
-
-/**
- * Ready-to-paste markdown link for the generated artifact. Returned verbatim to
- * the model so it presents a correct, clickable download link (single slash,
- * proper [text](url) form) instead of a malformed/duplicated-slash URL.
- */
-function downloadMarkdown(id: string, fileName: string): string {
-  return `[${fileName}](/api/documents/${id})`
 }
 
 /**
