@@ -233,11 +233,13 @@ export class FourGetSearchProvider implements SearchProvider {
           }
 
           if (fullUrl && isValidUrl(fullUrl)) {
-            const reliableUrl = `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(fullUrl)}&f=1&nofb=1`
-
-            if (!images.some(img => (typeof img === 'string' ? img : img.url) === reliableUrl)) {
+            // Use the ORIGINAL direct image URL. The DuckDuckGo
+            // external-content proxy was tried before but its hotlinked URLs
+            // fail to load in browsers (403/broken renders), so direct URLs
+            // are primary (client falls back to the proxy on error).
+            if (!images.some(img => (typeof img === 'string' ? img : img.url) === fullUrl)) {
               images.push({
-                url: reliableUrl,
+                url: fullUrl,
                 description: title,
                 title
               })

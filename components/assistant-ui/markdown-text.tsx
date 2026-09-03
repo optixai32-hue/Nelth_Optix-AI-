@@ -1,10 +1,56 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useState } from "react";
 
 import type { Components } from "streamdown";
 
 import { CodeBlock } from "./code-block";
+
+/**
+ * Build the DuckDuckGo external-content proxy URL for a direct image URL.
+ * Used ONLY as a client-side fallback when the direct URL fails to load.
+ */
+function ddgProxyUrl(src: string): string | null {
+  if (!/^https?:\/\//i.test(src)) return null;
+  if (src.includes("external-content.duckduckgo.com")) return null;
+  return `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(src)}&f=1&nofb=1`;
+}
+
+/**
+ * Robust Markdown image: loads the direct URL with no-referrer (hotlink
+ * friendly), falls back once to the DDG proxy, then degrades gracefully to
+ * the alt text instead of a broken-image icon.
+ */
+function MarkdownImage({
+  src,
+  alt,
+  ...props
+}: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const [stage, setStage] = useState(0);
+  const direct = typeof src === "string" ? src : "";
+
+  if (!direct) {
+    return alt ? <span>{alt}</span> : null;
+  }
+  if (stage >= 2) {
+    return alt ? (
+      <span className="text-sm text-muted-foreground">{alt}</span>
+    ) : null;
+  }
+
+  const url = stage === 0 ? direct : (ddgProxyUrl(direct) ?? direct);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt={alt ?? ""}
+      referrerPolicy="no-referrer"
+      loading="lazy"
+      onError={() => setStage((s) => s + 1)}
+      {...props}
+    />
+  );
+}
 
 /**
  * Fenced code blocks are wrapped in a `pre` element by the Markdown renderer,
@@ -37,7 +83,7 @@ function InlineCode({ children }: { children?: React.ReactNode }) {
  * `npm install` flowing naturally inside the text.
  */
 export const defaultComponents: Components = {
-  pre: ({ children }) => (
+  img: MarkdownImage as Components["img"],  pre: ({ children }) => (
     <InPreContext.Provider value={true}>{children}</InPreContext.Provider>
   ),
   code: (({ node, className, children, ...props }) => {

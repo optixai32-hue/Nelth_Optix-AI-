@@ -386,6 +386,11 @@ export function resolveContextualSearchQuery(
     if (lastUser) {
       const prevText = getTextFromParts(lastUser.parts).trim()
       if (prevText) {
+        // Never merge with a pure greeting: "bonjour" then "Elon Musk" must
+        // search "Elon Musk", NOT "bonjour Elon Musk" / "bonjour images".
+        if (isPureGreeting(prevText)) {
+          return q
+        }
         const cleanPrev = prevText
           .replace(
             /\b(cherche|recherche|trouve|search|find|show|montre|donne|donne-moi|give|qu'est[- ]ce|what\s+is|what\s+did|tell\s+me|about)\b/gi,
@@ -395,6 +400,12 @@ export function resolveContextualSearchQuery(
           .trim()
 
         if (/\b(images?|photos?|pictures?|illustrations?)\b/i.test(q)) {
+          // The query mentions images BUT may already carry its own subject
+          // (e.g. "montre-moi une image d'Elon Musk"). In that case keep the
+          // current query as-is — do NOT replace it with "<prev> images".
+          if (hasOwnImageSubject(q)) {
+            return q
+          }
           return `${cleanPrev} images`
         }
         return `${cleanPrev} ${q}`
@@ -403,4 +414,85 @@ export function resolveContextualSearchQuery(
   }
 
   return q
+}
+
+/**
+ * Returns true when an image-related query already names its own subject
+ * (e.g. "image d'Elon Musk", "photos de la Tour Eiffel"). Strips command
+ * verbs, image words and stopwords — if anything meaningful remains, the
+ * subject is in the current query and history must NOT override it.
+ */
+function hasOwnImageSubject(query: string): boolean {
+  const stopwords = new Set([
+    'de',
+    'des',
+    'du',
+    'la',
+    'le',
+    'les',
+    'un',
+    'une',
+    'moi',
+    'me',
+    'te',
+    'toi',
+    'nous',
+    'vous',
+    'stp',
+    'svp',
+    'please',
+    'avec',
+    'with',
+    'sur',
+    'pour',
+    'for',
+    'the',
+    'a',
+    'an',
+    'of',
+    'et',
+    'en',
+    'une',
+    'quelques',
+    'quelque',
+    'des',
+    'ce',
+    'cette',
+    'ces',
+    'cela',
+    'celui',
+    'celle',
+    'ceux',
+    'celles',
+    'leur',
+    'leurs',
+    'son',
+    'sa',
+    'ses',
+    'eux',
+    'elle',
+    'elles',
+    'ils',
+    'lui',
+    'on',
+    'mon',
+    'ma',
+    'mes',
+    'ton',
+    'ta',
+    'tes'
+  ])
+  const cleaned = query
+    .toLowerCase()
+    .replace(
+      /\b(cherche|recherche|chercher|trouve|trouver|montre(?:-moi)?|montrez|affiche|affichez|donne(?:-moi)?|donnez|veux|voir|search|find|show|give|get)\b/gi,
+      ' '
+    )
+    .replace(/\b(images?|photos?|pictures?|illustrations?|visuels?|dessins?)\b/gi, ' ')
+    .replace(/[’']/g, ' ')
+    .replace(/[^a-zàâäéèêëîïôöùûüç0-9\s-]/gi, ' ')
+  const meaningful = cleaned
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !stopwords.has(w))
+  return meaningful.length > 0
 }

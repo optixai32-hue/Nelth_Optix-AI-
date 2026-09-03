@@ -82,8 +82,8 @@ AVAILABLE COMPONENTS FOR IMAGES:
 - Grid: { columns: 1 | 2 | 3 | 4, gap?: "xs" | "sm" | "md" | "lg" } - A fixed-column container that reserves cell widths upfront so streaming images don't reflow.
 - Image: { src: string, sourceUrl?: string, title?: string, description?: string, aspectRatio?: "1:1" | "16:9" | "4:3" }
 
- IMAGE LINK RULES:
-1. The UI gallery uses image URLs taken verbatim from the search tool's "images" array — NEVER fabricate or guess URLs.
+  IMAGE LINK RULES:
+1. Image URLs MUST be taken verbatim from the search tool's "images" array — NEVER fabricate, guess, or rewrite URLs.
 2. The UI maps tool output fields to image metadata, copying values EXACTLY without rewording:
    - image.url → "src"
    - image.sourceUrl → "sourceUrl" (omit if not present in the tool output — do NOT invent)
