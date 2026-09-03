@@ -117,18 +117,18 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
   const slugs = skillCtx.activated.map(a => a.slug)
   const bodies = skillCtx.activated.map(a => a.objective)
 
-  // Nelth-3.5 (tencent/hy3:free) is the weak non-thinking model. It tends to
-  // "apply the skills a little" — i.e. it produces a structurally-valid answer
-  // that ignores the active skill's substance. We therefore FORCE a
-  // reinforcement pass for it even when the first validation passes, so the
-  // ACTIVE SKILLS are genuinely applied.
+  // Nelth-3.5 (tencent/hy3:free) and minimax-m3:free are the weak non-thinking
+  // models. They tend to "apply the skills a little" — i.e. they produce a
+  // structurally-valid answer that ignores the active skill's substance. We
+  // therefore FORCE a reinforcement pass for them even when the first
+  // validation passes, so the ACTIVE SKILLS are genuinely applied.
   //
   // Nelth-3.5 Thinking (stepfun/step-3.7-flash:free, served from the Kilo gateway) is a stronger reasoning
   // model, BUT in practice it also ignores the active skill's substance on its
   // first pass (e.g. it emits emoji section headers / emoji-as-icon and does
   // NOT apply skills-main). So it is NO LONGER trusted and is held to the same
   // standard: it is forced through the skill-application reinforcement pass too.
-  const isWeakModel = /(tencent\/hy3|hy3:free)/i.test(model)
+  const isWeakModel = /(tencent\/hy3|hy3:free|minimax)/i.test(model)
   const isThinkingModel = /(stepfun|step-3\.7-flash|nelth-3\.5 thinking|thinking)/i.test(
     model
   )

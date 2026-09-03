@@ -228,6 +228,11 @@ export async function createEphemeralChatStreamResponse(
         // fingerprint so follow-ups ("another version") keep the skill active.
         // Only resolved when a skill is actually in play for this request.
         prevCtx = await getPreviousDesignContext(messages, lastUser?.id)
+        // NOTE (parity with the main chat path): do NOT pass `compact` for ANY
+        // model. The checklist-only context makes models ignore the skill
+        // substance for code (design brief instead of complete code), and it
+        // also drops the operationalPrompt entirely. Both models read the FULL
+        // SKILL.md body + operational prompt so code skills are genuinely applied.
         skillCtx = await buildSkillContext(
           userQuery,
           'minimal',
@@ -235,7 +240,7 @@ export async function createEphemeralChatStreamResponse(
           prevCtx.slugs,
           prevCtx.designSummary,
           prevCtx.previousCode,
-          `${model.providerId}:${model.id}`.includes('tencent/hy3:free')
+          false
         )
       }
 
