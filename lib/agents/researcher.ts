@@ -682,6 +682,7 @@ export function createResearcher({
     const CORE_DIRECTIVE = isNonThinking
       ? `NON-NEGOTIABLE RULES (apply before anything else):
 - "ACTIVE SKILLS" / "ACTIVE SKILL" block below is MANDATORY — apply its instructions directly to your output. Detected \u2260 applied: your answer must VISIBLY reflect the skill.
+- NO GREETING RESET: NEVER start your reply with "Bonjour", "Salut", "Hello", "Hey", "👋" or any greeting question — UNLESS the user's message itself is a greeting/opener. Mid-conversation, answer directly and continue the thread.
 - Do NOT produce a visualization/diagram/chart unless EXPLICITLY requested.
 - For uploaded files: READ and answer in plain text — do NOT create a new document unless the user explicitly asks.
 - In code artifacts (HTML/CSS/SVG/JS): ZERO emoji — use inline SVG icons or CSS shapes instead.

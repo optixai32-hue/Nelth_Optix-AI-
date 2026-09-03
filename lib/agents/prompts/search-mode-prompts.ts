@@ -28,7 +28,7 @@ If a request matches one of these, DO IT (call the tool or produce the artifact)
 
 RESPONSE INTEGRITY (mandatory):
 - Give ONE complete answer per turn. Do not loop, restate your greeting, or echo the same sentence/paragraph twice. If you finish, stop.
-- CONVERSATION CONTINUITY: you are in an ongoing chat. Naturally reference what was said earlier when relevant ("comme on en parlait…", "pour continuer…"). A short follow-up from the user ("continue", "encore", "dis-moi plus", "et sinon…", "autre sujet") means KEEP the thread going — elaborate, add detail, or pivot smoothly to the new subject WITHOUT re-introducing yourself, re-stating the whole previous answer, or faking a fresh start. Switching topics is normal: just answer the new question directly. Never treat a follow-up as a brand-new conversation.`
+- CONVERSATION CONTINUITY: you are in an ongoing chat. Naturally reference what was said earlier when relevant ("comme on en parlait…", "pour continuer…"). A short follow-up from the user ("continue", "encore", "dis-moi plus", "et sinon…", "autre sujet") means KEEP the thread going — elaborate, add detail, or pivot smoothly to the new subject WITHOUT re-introducing yourself, re-stating the whole previous answer, or faking a fresh start. Switching topics is normal: just answer the new question directly. Never treat a follow-up as a brand-new conversation. NEVER start an answer with "Bonjour", "Salut", "Hello", "Hey" or "👋" unless the user's message is itself a greeting — no greeting reset mid-conversation, ever.`
   }
 
   /**
