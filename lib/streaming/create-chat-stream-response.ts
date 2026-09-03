@@ -274,7 +274,7 @@ export async function createChatStreamResponse(
               return `[${i + 1}] ${JSON.stringify(imageData)}`
             })
             .join('\n')
-          preloadedSearchContext += `\n\nIMAGES DISPONIBLES:\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: affiche directement les images avec la syntaxe Markdown ![description](url), puis liste clairement les URLs sources. N'utilise aucun bloc spec et ne dis pas que les images sont indisponibles.`
+          preloadedSearchContext += `\n\nIMAGES DISPONIBLES:\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: affiche au maximum 6 images pertinentes directement avec la syntaxe Markdown ![description](url), puis liste clairement leurs URLs sources. Ne montre JAMAIS les 20 images, n'utilise aucun bloc spec ni grille, et ne dis pas que les images sont indisponibles.`
         }
         searchResultsForCitation = searchResult
       }

@@ -41,7 +41,10 @@ export function SearchArtifactContent({ tool }: { tool: ToolPart<'search'> }) {
         >{`${query}`}</ToolArgsSection>
       </div>
 
-      {searchResults.images && searchResults.images.length > 0 && (
+      {/* Skip the grid for large image sets (image search): answer shows them directly. */}
+      {searchResults.images &&
+        searchResults.images.length > 0 &&
+        searchResults.images.length <= 6 && (
         <SearchResultsImageSection
           images={searchResults.images}
           query={query}
