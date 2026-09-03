@@ -36,7 +36,14 @@ export const SKILLS_MAIN_ROUTING: Record<string, SkillsMainRouting> = {
       'hero section',
       'responsive design',
       'design system',
-      'creative direction'
+      'creative direction',
+      'site web',
+      'page web',
+      'site vitrine',
+      "page d'accueil",
+      'portfolio',
+      'créer un site',
+      'creer un site'
     ],
     relatedSkills: ['web-artifacts-builder', 'theme-factory', 'canvas-design']
   },
@@ -55,7 +62,12 @@ export const SKILLS_MAIN_ROUTING: Record<string, SkillsMainRouting> = {
       'build a web',
       'build an app',
       'self-contained html',
-      'interactive demo'
+      'interactive demo',
+      'prototype interactif',
+      'démo interactive',
+      'demo interactive',
+      'application web',
+      'application interactive'
     ],
     relatedSkills: ['frontend-design', 'webapp-testing']
   },
@@ -134,7 +146,11 @@ export const SKILLS_MAIN_ROUTING: Record<string, SkillsMainRouting> = {
       'creative coding',
       '2d canvas',
       'visual',
-      'banner'
+      'banner',
+      'jeu canvas',
+      'affiche',
+      'bannière',
+      'banniere'
     ],
     relatedSkills: ['frontend-design', 'algorithmic-art']
   },
@@ -148,7 +164,53 @@ export const SKILLS_MAIN_ROUTING: Record<string, SkillsMainRouting> = {
       'shader',
       'processing',
       'p5',
-      'generative art'
+      'generative art',
+      'art génératif',
+      'art generatif',
+      'génératif',
+      'generatif'
+    ],
+    relatedSkills: ['canvas-design', 'frontend-design']
+  },
+  'game-developer': {
+    domain: 'game',
+    triggers: [
+      'game',
+      'video game',
+      'jeu',
+      'jeux',
+      'jouer',
+      'jouable',
+      'mini-jeu',
+      'mini jeu',
+      'jeu vidéo',
+      'jeu video',
+      'snake',
+      'tetris',
+      'pong',
+      'pacman',
+      'pac-man',
+      'casse-briques',
+      'casse briques',
+      'space invaders',
+      'flappy',
+      'platformer',
+      'jeu de plateforme',
+      'tower defense',
+      'morpion',
+      'démineur',
+      'demineur',
+      'minesweeper',
+      '2048',
+      'échecs',
+      'echecs',
+      'jeu de mémoire',
+      'jeu de memoire',
+      'memory game',
+      'runner',
+      'jeu de course',
+      'quiz game',
+      'jeu quiz'
     ],
     relatedSkills: ['canvas-design', 'frontend-design']
   },

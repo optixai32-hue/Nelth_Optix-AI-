@@ -330,6 +330,71 @@ export function validateJs(js: string): Violation[] {
 }
 
 // ---------------------------------------------------------------------------
+// Web-game validation (game-developer / canvas skills)
+// ---------------------------------------------------------------------------
+
+const GAME_INTENT_RE =
+  /\b(game|video game|jeu|jeux|snake|tetris|pong|pac-?man|platformer|jouable|mini-?jeu)\b/i
+
+/**
+ * Validate a single-file web game (HTML + JS): loop, canvas, inputs,
+ * self-containment. Only hard-fails on missing loop/canvas; softer
+ * expectations (keyboard+touch, no hotlinked assets) are warnings so the
+ * refinement loop improves them without blocking valid games.
+ */
+export function validateWebGame(html: string, js: string): Violation[] {
+  const violations: Violation[] = []
+  const combined = `${html}\n${js}`
+
+  const hasCanvas = /<canvas[\s>]/i.test(html)
+  const hasLoop =
+    /requestAnimationFrame/i.test(combined) ||
+    /setInterval\s*\(/.test(combined)
+
+  if (html && !hasCanvas) {
+    violations.push({
+      rule: 'game.no-canvas',
+      severity: 'error',
+      detail:
+        'Web game without a <canvas> element. Render the game on a canvas.'
+    })
+  }
+  if (!hasLoop) {
+    violations.push({
+      rule: 'game.no-loop',
+      severity: 'error',
+      detail:
+        'Web game without a game loop (no requestAnimationFrame / setInterval). Drive updates on requestAnimationFrame with delta-time.'
+    })
+  }
+
+  const hasKeyboard = /key(down|up|press)/i.test(combined)
+  const hasTouch = /touch(start|end|move)|pointer(down|move)/i.test(combined)
+  if (!hasKeyboard && !hasTouch) {
+    violations.push({
+      rule: 'game.no-input',
+      severity: 'warning',
+      detail:
+        'No keyboard or touch input detected. Support BOTH keyboard (arrows/WASD/space) and touch controls.'
+    })
+  }
+
+  const externalAsset =
+    /https?:\/\/[^\s'")<>]+\.(png|jpe?g|gif|webp|mp3|wav|ogg|mp4|woff2?)\b/i.exec(
+      combined
+    )
+  if (externalAsset) {
+    violations.push({
+      rule: 'game.external-asset',
+      severity: 'warning',
+      detail: `Hotlinked asset (${externalAsset[0].slice(0, 80)}) — the game must be self-contained with zero network dependencies. Inline or synthesize assets instead.`
+    })
+  }
+
+  return violations
+}
+
+// ---------------------------------------------------------------------------
 // Generic / templated design detection
 // ---------------------------------------------------------------------------
 
@@ -518,6 +583,34 @@ export function validateGeneratedOutput(
             'This was a modification/add request, but the output looks like a fresh generic hero→features→testimonial→cta→footer template instead of an edit of the existing code. Preserve the previous structure, sections and functionality; change ONLY the requested scope.'
         })
       }
+    }
+  }
+
+  // Web-game validation: runs when a game skill is active, or when the query
+  // itself asks for a game (both models go through the same gate). Canvas-only
+  // generative art (canvas-design without game intent) only gets the
+  // self-containment warning — a static rendering needs no game loop.
+  const wantsGame =
+    opts.slugs?.includes('game-developer') ||
+    (opts.query ? GAME_INTENT_RE.test(opts.query) : false)
+  if (wantsGame && (hasHtml || hasJs)) {
+    const jsContent = blocks
+      .filter(b => ['js', 'javascript', 'ts', 'typescript'].includes(b.lang))
+      .map(b => b.code)
+      .join('\n')
+    violations.push(...validateWebGame(hasHtml ? htmlContent : content, jsContent))
+  } else if (
+    opts.slugs?.includes('canvas-design') &&
+    (hasHtml || hasJs)
+  ) {
+    for (const v of validateWebGame(
+      hasHtml ? htmlContent : content,
+      blocks
+        .filter(b => ['js', 'javascript', 'ts', 'typescript'].includes(b.lang))
+        .map(b => b.code)
+        .join('\n')
+    )) {
+      if (v.rule === 'game.external-asset') violations.push(v)
     }
   }
 

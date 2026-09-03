@@ -161,4 +161,65 @@ describe('validate.ts — follow-up intent rules (spec §3/§4/§7)', () => {
       expect(r.violations.some(v => v.rule === 'design.not-responsive')).toBe(true)
     })
   })
+
+  describe('web-game validation (game-developer)', () => {
+    const goodGame = (extraJs = '') =>
+      '```html\n<canvas id="g" width="400" height="400"></canvas>\n```\n' +
+      '```js\nconst c = document.getElementById("g");\n' +
+      'window.addEventListener("keydown", e => {});\n' +
+      'function loop(t) { requestAnimationFrame(loop); }\n' +
+      'requestAnimationFrame(loop);' +
+      extraJs +
+      '\n```'
+
+    it('PASSES a complete canvas game with loop + keyboard', () => {
+      const r = validateGeneratedOutput(goodGame(), {
+        slugs: ['game-developer'],
+        query: 'crée un jeu snake'
+      })
+      expect(
+        r.violations.filter(v => v.rule.startsWith('game.'))
+      ).toHaveLength(0)
+    })
+
+    it('FAILS a game without canvas and without loop', () => {
+      const content =
+        '```html\n<div id="game">click</div>\n```\n' +
+        '```js\ndocument.getElementById("game").textContent = "hi";\n```'
+      const r = validateGeneratedOutput(content, {
+        slugs: ['game-developer'],
+        query: 'make a game'
+      })
+      expect(r.passed).toBe(false)
+      expect(r.violations.some(v => v.rule === 'game.no-canvas')).toBe(true)
+      expect(r.violations.some(v => v.rule === 'game.no-loop')).toBe(true)
+    })
+
+    it('WARNS on missing inputs and hotlinked assets without failing', () => {
+      const content =
+        '```html\n<canvas id="g"></canvas>\n```\n' +
+        '```js\nfunction loop(t) { requestAnimationFrame(loop); }\n' +
+        'requestAnimationFrame(loop);\n' +
+        'const img = new Image(); img.src = "https://example.com/sprite.png";\n```'
+      const r = validateGeneratedOutput(content, {
+        slugs: ['game-developer'],
+        query: 'jeu'
+      })
+      expect(r.violations.some(v => v.rule === 'game.no-input')).toBe(true)
+      expect(r.violations.some(v => v.rule === 'game.external-asset')).toBe(true)
+      // Warnings only → still passes.
+      expect(r.passed).toBe(true)
+    })
+
+    it('does not apply game rules to non-game code', () => {
+      const content =
+        '```html\n<div class="card">hi</div>\n```\n' +
+        '```js\ndocument.querySelector(".card").textContent = "hi";\n```'
+      const r = validateGeneratedOutput(content, {
+        slugs: ['frontend-design'],
+        query: 'une carte de visite'
+      })
+      expect(r.violations.some(v => v.rule.startsWith('game.'))).toBe(false)
+    })
+  })
 })

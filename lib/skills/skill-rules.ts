@@ -110,6 +110,23 @@ const VALIDATION_BY_SLUG: Record<string, string[]> = {
     'Responsive and accessible (semantics, contrast, focus order), with interactive states.',
     'FINAL QUALITY GATE: frontend-design = PASS only if skill loaded + design principles applied + code functional + no emoji-as-icon + responsive + distinctive. Loading the SKILL.md alone is NOT a successful execution.',
     'MODIFICATION SCOPE: on a modification request the existing code is edited in place; structure, design, content, components and assets are preserved and only the requested scope is changed (no full regeneration, no spontaneous redesign). BEFORE vs AFTER: structure / sections / content / components / assets / functionality preserved, only requested changes added.'
+  ],
+  'game-developer': [
+    'ONE self-contained HTML file (inline CSS/JS, zero network dependencies, no hotlinked assets).',
+    'Game loop on requestAnimationFrame with delta-time; pause on visibilitychange.',
+    'Responsive canvas (resize + devicePixelRatio); keyboard AND touch controls.',
+    'Explicit states: start screen, playing, paused, game over with score + restart (button and key); no autoplay before user input.',
+    'Complete mechanics: collision, scoring, difficulty ramp — no TODOs, no dead buttons.',
+    'Valid JS (double quotes for apostrophes); French UI copy when the user writes French.'
+  ],
+  'canvas-design': [
+    'Crisp rendering (devicePixelRatio + resize); rAF loop pausing on visibilitychange; static fallback for prefers-reduced-motion.',
+    'Self-contained; no external assets unless requested; valid JS.'
+  ],
+  'web-artifacts-builder': [
+    'ONE self-contained interactive HTML file, zero network dependencies.',
+    'Every control works (no dead buttons/placeholders); loading/empty/error states handled.',
+    'Valid, responsive code; French UI copy when the user writes French.'
   ]
 }
 
@@ -132,6 +149,15 @@ const VALIDATION_BY_DOMAIN: Record<string, string[]> = {
   quality: [
     'Output passes the skill’s own quality checks.',
     'No critical defects remain.'
+  ],
+  game: [
+    'Playable from the first load: start screen, game loop, game over + restart.',
+    'Keyboard and touch controls both work.',
+    'No external assets; valid JS with no syntax errors.'
+  ],
+  canvas: [
+    'Renders crisply at any size (devicePixelRatio + resize).',
+    'Animation pauses when hidden; static fallback for reduced motion.'
   ],
   security: [
     'No obvious injection / auth / secret vulnerabilities.',

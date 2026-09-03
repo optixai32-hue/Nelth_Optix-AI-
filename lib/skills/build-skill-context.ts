@@ -132,8 +132,7 @@ export const EXECUTION_REQUIREMENTS_BY_SLUG: Record<string, string[]> = {
     'Avoid generic / basic visual treatment.',
     'Use gradients, depth and coherent stroke / fill where relevant.'
   ],
-  'frontend-design': [
-    'CODE MODIFICATION CONTINUITY: when the user asks to modify, improve, fix, animate, optimize, restyle, extend or adjust an EXISTING generated interface, DO NOT rebuild from scratch, DO NOT replace the HTML structure, existing components or icons unnecessarily, and DO NOT introduce emoji as UI icons. Preserve existing functionality, interactions and content. Change ONLY what the request requires (e.g. "improve the animation" → animations only; "make it dark" → theme tokens only; "fix the mobile menu" → menu behavior only).',
+  'frontend-design': [    'CODE MODIFICATION CONTINUITY: when the user asks to modify, improve, fix, animate, optimize, restyle, extend or adjust an EXISTING generated interface, DO NOT rebuild from scratch, DO NOT replace the HTML structure, existing components or icons unnecessarily, and DO NOT introduce emoji as UI icons. Preserve existing functionality, interactions and content. Change ONLY what the request requires (e.g. "improve the animation" → animations only; "make it dark" → theme tokens only; "fix the mobile menu" → menu behavior only).',
     'CODE-FIRST MODIFICATION RULE: if the conversation already contains a generated code artifact, treat it as the source of truth. When the user asks for an improvement / modification / fix / animation / responsive / feature change, ALWAYS edit that existing artifact and return the modified version — never generate an unrelated replacement from scratch. Preserve every unrelated UI component, interaction, content, asset and icon; change only the requested scope.',
     'DETECTED ≠ LOADED ≠ APPLIED: the skill counts as applied ONLY when its principles demonstrably shape the final code. Loading the SKILL.md is never enough on its own — the output must show a real art direction, intentional typography, a visual signature, and intentional, accessible motion.',
     'FINAL QUALITY GATE (frontend-design = PASS only if ALL hold): skill loaded + design principles genuinely applied + code valid/functional + NO emoji used as UI icons + responsive (viewport <meta> + fluid units / grid / flex + breakpoints down to mobile) + distinctive (NOT the generic hero → 3 cards → testimonial → CTA → footer default). If any fails, refine before returning.',
@@ -145,6 +144,30 @@ export const EXECUTION_REQUIREMENTS_BY_SLUG: Record<string, string[]> = {
     'Apply the frontend-design workflow: plan → critique → build → critique again.',
     'Meet the quality floor: responsive, accessible (semantics, contrast, focus order), with hover / focus / active states.',
     'MODIFICATION SCOPE: if existing code is present, detect modification vs generation; in modification mode edit in place and preserve structure, design, content, components, assets and functionality; change ONLY the requested scope (e.g. dark mode → tokens/toggle only) and never regenerate the whole artifact unless explicitly asked or it is broken.'
+  ],
+  'game-developer': [
+    'Deliver ONE self-contained HTML file (inline <style> + <script>): zero network dependencies, no CDN libraries, no hotlinked images/audio — it must run offline in the preview iframe.',
+    'Run the game on requestAnimationFrame with delta-time updates; never block the main thread; pause on visibilitychange.',
+    'Make the canvas responsive (resize handler + devicePixelRatio scaling) so it renders crisply on mobile and desktop.',
+    'Support BOTH keyboard (arrows/WASD/space) AND touch controls (on-screen buttons or swipe) — mobile-first.',
+    'Implement explicit states: start screen, playing, paused, game over with score + RESTART via button AND key. Never autoplay gameplay or audio before first user input.',
+    'Synthesize game audio with WebAudio (oscillator bleeps) unlocked on first user gesture; never hotlink audio files.',
+    'Ship complete mechanics: entities, collision, scoring and difficulty ramp fully working — no TODO placeholders, no dead buttons.',
+    'French UI copy when the user writes French; valid JS only (double quotes for apostrophes like "l\'utilisateur").'
+  ],
+  'canvas-design': [
+    'Render crisp canvas art: handle devicePixelRatio and resize; animation on requestAnimationFrame with pause on visibilitychange; static-frame fallback for prefers-reduced-motion.',
+    'Self-contained single file; no external assets unless explicitly requested.',
+    'Valid JS only (double quotes for apostrophes); no dead code paths.'
+  ],
+  'web-artifacts-builder': [
+    'Deliver ONE self-contained interactive HTML file (inline CSS/JS) runnable in the preview iframe with zero network dependencies.',
+    'Every control must work: no dead buttons, no placeholder handlers; handle loading/empty/error states.',
+    'Valid HTML/CSS/JS only; responsive down to mobile; French UI copy when the user writes French.'
+  ],
+  'algorithmic-art': [
+    'Self-contained generative piece (canvas/SVG); animated pieces respect prefers-reduced-motion with a static fallback.',
+    'Valid JS only; no external libraries unless explicitly requested.'
   ]
 }
 

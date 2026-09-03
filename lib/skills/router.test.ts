@@ -54,4 +54,25 @@ describe('Skill Router (progressive disclosure)', () => {
     const slugs = selected.map(s => s.slug)
     expect(slugs).toContain('visual-craft')
   })
+
+  it('routes a French game request to game-developer', async () => {
+    const registry = await getSkillRegistry()
+    const selected = routeSkills('Crée un jeu snake en HTML', registry)
+    const slugs = selected.map(s => s.slug)
+    expect(slugs).toContain('game-developer')
+  })
+
+  it('routes an English game request to game-developer', async () => {
+    const registry = await getSkillRegistry()
+    const selected = routeSkills('Build a playable tetris game', registry)
+    const slugs = selected.map(s => s.slug)
+    expect(slugs).toContain('game-developer')
+  })
+
+  it('routes a French website request to frontend-design', async () => {
+    const registry = await getSkillRegistry()
+    const selected = routeSkills('Crée un site vitrine pour une boulangerie', registry)
+    const slugs = selected.map(s => s.slug)
+    expect(slugs).toContain('frontend-design')
+  })
 })
