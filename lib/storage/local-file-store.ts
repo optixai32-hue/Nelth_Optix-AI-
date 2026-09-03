@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 /**
@@ -13,6 +14,33 @@ import path from 'node:path'
  */
 
 export const LOCAL_UPLOAD_DIR = path.join(process.cwd(), '.local-uploads')
+
+function candidateDirs(): string[] {
+  return [
+    LOCAL_UPLOAD_DIR,
+    // Serverless (Vercel, …): the project directory is READ-ONLY, only the
+    // OS temp directory is writable. Without this fallback every local file
+    // write (e.g. generated-image persistence) fails with EROFS.
+    path.join(os.tmpdir(), '.local-uploads')
+  ]
+}
+
+function canWriteDir(dir: string): boolean {
+  try {
+    fs.mkdirSync(dir, { recursive: true })
+    fs.accessSync(dir, fs.constants.W_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function getBaseDir(): string {
+  for (const dir of candidateDirs()) {
+    if (canWriteDir(dir)) return dir
+  }
+  throw new Error('No writable local file directory')
+}
 
 const LOCAL_FILE_BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, '') ?? ''
@@ -30,8 +58,8 @@ export function getLocalFileUrl(key: string): string {
 function safeResolve(key: string): string | null {
   const normalized = key.replace(/^\/+/, '').trim()
   if (!normalized || normalized.includes('\0')) return null
-  const resolved = path.resolve(LOCAL_UPLOAD_DIR, normalized)
-  const base = path.resolve(LOCAL_UPLOAD_DIR)
+  const base = path.resolve(getBaseDir())
+  const resolved = path.resolve(base, normalized)
   if (resolved !== base && !resolved.startsWith(base + path.sep)) return null
   return resolved
 }

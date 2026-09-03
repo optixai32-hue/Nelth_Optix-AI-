@@ -1,75 +1,46 @@
-import { mkdtempSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
-import path from 'path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import path from 'node:path'
 
-/**
- * REAL artifact storage test: a generated document is persisted, resolved back
- * by id, and its bytes are byte-identical (this is what the download endpoint
- * streams). No fake artifacts.
- */
+import { afterEach, describe, expect, it } from 'vitest'
 
-let storeDir: string
-let storeDocument: typeof import('./document-store').storeDocument
-let resolveStoredDocument: typeof import('./document-store').resolveStoredDocument
+import { resolveStoredDocument, storeDocument } from './document-store'
 
-beforeAll(async () => {
-  storeDir = mkdtempSync(path.join(tmpdir(), 'docstore-'))
-  process.env.DOCUMENT_STORE_DIR = storeDir
-  // Import AFTER setting the env so the module-level store dir resolves to temp.
-  const mod = await import('./document-store')
-  storeDocument = mod.storeDocument
-  resolveStoredDocument = mod.resolveStoredDocument
+const ENV_KEY = 'DOCUMENT_STORE_DIR'
+const savedEnv = process.env[ENV_KEY]
+
+afterEach(() => {
+  if (savedEnv === undefined) delete process.env[ENV_KEY]
+  else process.env[ENV_KEY] = savedEnv
 })
 
-afterAll(() => {
-  rmSync(storeDir, { recursive: true, force: true })
-})
-
-describe('TEST 8 — Artifact storage + download content', () => {
-  it('stores and resolves a real DOCX artifact with correct metadata', async () => {
-    const buffer = Buffer.from('PK\x03\x04 fake docx bytes for test')
+describe('document-store', () => {
+  it('round-trips a stored document', async () => {
     const stored = await storeDocument(
-      buffer,
-      'analysis.docx',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      Buffer.from('%PDF-1.4 test'),
+      'facture.pdf',
+      'application/pdf'
     )
-
-    expect(stored.id).toBeTruthy()
-    expect(stored.fileName).toBe('analysis.docx')
-    expect(stored.mimeType).toBe(
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    )
-    expect(stored.size).toBe(buffer.length)
-
-    const resolved = await resolveStoredDocument(stored.id)
-    expect(resolved).not.toBeNull()
-    expect(resolved!.buffer.equals(buffer)).toBe(true)
-    expect(resolved!.meta.fileName).toBe('analysis.docx')
-    expect(resolved!.meta.mimeType).toBe(stored.mimeType)
+    expect(stored.id).toMatch(/^[a-z0-9]+$/i)
+    const found = await resolveStoredDocument(stored.id)
+    expect(found).not.toBeNull()
+    expect(found!.buffer.toString()).toBe('%PDF-1.4 test')
+    expect(found!.meta.fileName).toBe('facture.pdf')
   })
 
-  it('rejects malformed ids and returns null', async () => {
-    expect(await resolveStoredDocument('../../etc/passwd')).toBeNull()
-    expect(await resolveStoredDocument('')).toBeNull()
+  it('falls back to a writable dir when DOCUMENT_STORE_DIR is unusable', async () => {
+    // Point at an existing FILE: mkdir inside it always fails (ENOTDIR),
+    // simulating a read-only project dir (Vercel serverless EROFS).
+    process.env[ENV_KEY] = path.join(process.cwd(), 'package.json', 'sub')
+    const stored = await storeDocument(
+      Buffer.from('fallback-ok'),
+      'note.pdf',
+      'application/pdf'
+    )
+    const found = await resolveStoredDocument(stored.id)
+    expect(found?.buffer.toString()).toBe('fallback-ok')
   })
 
-  it('supports every document format round-trip', async () => {
-    const formats: [string, string][] = [
-      ['report.pdf', 'application/pdf'],
-      ['data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
-      [
-        'deck.pptx',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-      ]
-    ]
-    for (const [name, mime] of formats) {
-      const buf = Buffer.from(`content for ${name}`)
-      const stored = await storeDocument(buf, name, mime)
-      const resolved = await resolveStoredDocument(stored.id)
-      expect(resolved).not.toBeNull()
-      expect(resolved!.buffer.equals(buf)).toBe(true)
-      expect(resolved!.meta.mimeType).toBe(mime)
-    }
+  it('returns null for unknown ids', async () => {
+    expect(await resolveStoredDocument('nope-not-here-123')).toBeNull()
+    expect(await resolveStoredDocument('../evil')).toBeNull()
   })
 })

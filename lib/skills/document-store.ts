@@ -8,20 +8,40 @@
  */
 
 import { promises as fs } from 'fs'
+import os from 'os'
 import path from 'path'
 
 const STORE_SUBDIR = '.document-store'
 
-function getStoreDir(): string {
+function candidateDirs(): string[] {
+  const dirs: string[] = []
   const fromEnv = process.env.DOCUMENT_STORE_DIR?.trim()
-  if (fromEnv) return fromEnv
-  return path.join(import.meta.dirname ?? process.cwd(), STORE_SUBDIR)
+  if (fromEnv) dirs.push(fromEnv)
+  dirs.push(path.join(import.meta.dirname ?? process.cwd(), STORE_SUBDIR))
+  // Serverless (Vercel, …): the project directory is READ-ONLY, only the OS
+  // temp directory is writable. Without this fallback every generated
+  // document fails with EROFS.
+  dirs.push(path.join(os.tmpdir(), STORE_SUBDIR))
+  return dirs
+}
+
+async function canWriteDir(dir: string): Promise<boolean> {
+  try {
+    await fs.mkdir(dir, { recursive: true })
+    await fs.access(dir, fs.constants.W_OK)
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function ensureDir(): Promise<string> {
-  const dir = getStoreDir()
-  await fs.mkdir(dir, { recursive: true })
-  return dir
+  for (const dir of candidateDirs()) {
+    if (await canWriteDir(dir)) return dir
+  }
+  throw new Error(
+    'No writable document store directory (tried DOCUMENT_STORE_DIR, project dir and os.tmpdir())'
+  )
 }
 
 function randomId(): string {
