@@ -322,7 +322,14 @@ export async function createEphemeralChatStreamResponse(
               agentStream as unknown as ReadableStream<unknown>
             ).getReader()
             let searchChunksEmitted = false
-            const textSanitizer = new StreamTextSanitizer()
+            // Mid-conversation: strip any leading greeting-reset intro fluff
+            // the weak model prepends to every answer. No prior assistant
+            // message = keep greetings.
+            const textSanitizer = new StreamTextSanitizer({
+              stripLeadingIntroReset: modelMessages.some(
+                m => m.role === 'assistant'
+              )
+            })
 
             while (true) {
               const { done, value } = await reader.read()

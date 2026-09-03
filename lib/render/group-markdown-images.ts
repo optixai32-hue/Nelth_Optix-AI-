@@ -6,7 +6,9 @@
  *   streamed image line stays Markdown until its URL is complete).
  * - Lines inside fenced code blocks are never touched.
  * - Single isolated images are left as Markdown.
- * - Runs are chunked so a gallery holds at most MAX_IMAGES_PER_GALLERY images.
+ * - Runs are DEDUPED (consecutive repeats of the same URL are dropped — the
+ *   weak model often emits each image twice) and CAPPED to MAX_IMAGES_PER_GALLERY
+ *   (extras are dropped, order of the survivors preserved).
  * - Order is preserved: gallery children follow the Markdown order.
  */
 
@@ -72,18 +74,16 @@ export function groupMarkdownImages(
       pendingBlanks = []
       return
     }
-    if (run.length === 1) {
-      out.push(`![${run[0].alt}](${run[0].url})`)
+    // Dedupe consecutive repeats of the same URL, then enforce the cap.
+    const deduped = run.filter(
+      (img, i) => i === 0 || img.url !== run[i - 1].url
+    )
+    const kept = deduped.slice(0, maxPerGallery)
+    if (kept.length === 1) {
+      out.push(`![${kept[0].alt}](${kept[0].url})`)
     } else {
-      for (let i = 0; i < run.length; i += maxPerGallery) {
-        galleryCount += 1
-        out.push(
-          ...toGallerySpec(
-            run.slice(i, i + maxPerGallery),
-            `gallery${galleryCount}`
-          )
-        )
-      }
+      galleryCount += 1
+      out.push(...toGallerySpec(kept, `gallery${galleryCount}`))
     }
     run = []
     // Blank lines collected after the run go back after it (order preserved).

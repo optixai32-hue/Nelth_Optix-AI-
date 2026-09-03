@@ -252,18 +252,96 @@ export function stripFakeToolCallXmlFromMessage(message: {
 }
 
 /**
+ * Tests the very START of a response: could this open with a greeting reset?
+ * (Word boundaries matter: "hi" must not match "histoire".)
+ */
+const INTRO_START_RE =
+  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|je suis nelth|ravi|content|enchanté)/i
+
+/**
+ * Detects a "greeting reset" intro paragraph: the weak model re-greets and/or
+ * re-introduces itself at the start of EVERY answer ("Salut ! 👋 Ravi de vous
+ * revoir. Je suis Nelth-IA, ...") even mid-conversation, despite prompt rules.
+ * Returns true when the whole paragraph is intro fluff (greeting-led or
+ * self-intro-led) rather than real answer content.
+ */
+const INTRO_PARAGRAPH_RE =
+  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|je suis nelth-ia|je suis nelth\b|ravi(?:e)? de vous|content(?:e)? de vous|enchanté(?:e)?)/i
+
+/**
+ * Strips leading intro-fluff paragraphs (greeting reset + self-introduction)
+ * from the START of an assistant answer, mid-conversation only. Paragraphs are
+ * dropped one by one while MORE content follows — the response itself is never
+ * nuked: if the whole text is just a greeting, it is kept as-is.
+ */
+export function stripLeadingIntroReset(text: string): string {
+  let out = text
+  for (let i = 0; i < 3; i++) {
+    const m = out.match(/^\s*([^\n]+(?:\n(?!\n)[^\n]*)*)/)
+    if (!m) break
+    const para = m[1]
+    const rest = out.slice(m[0].length)
+    // Never remove the entire response — only a leading reset before real content.
+    if (rest.trim().length === 0) break
+    if (para.length > 600) break
+    if (!INTRO_PARAGRAPH_RE.test(para)) break
+    out = rest.replace(/^\s+/, '')
+  }
+  return out
+}
+
+/**
  * Real-time streaming sanitizer to strip fake tool-call pseudo-XML tokens
  * as text chunks arrive from the model during SSE streaming.
  */
 export class StreamTextSanitizer {
   private buffer = ''
+  private stripIntro: boolean
+  private introChecked = false
+  private head = ''
+
+  constructor(opts?: { stripLeadingIntroReset?: boolean }) {
+    this.stripIntro = !!opts?.stripLeadingIntroReset
+  }
 
   /**
    * Processes an incoming text delta. Returns the sanitized text delta
    * safe to immediately stream to the client.
    */
   process(delta: string): string {
-    this.buffer += delta
+    // Greeting-reset enforcement: hold the very start of the stream until we
+    // can decide whether it opens with intro fluff.
+    if (this.stripIntro && !this.introChecked) {
+      this.head += delta
+      // Fast path: enough text and clearly not an intro reset → stream now.
+      if (this.head.length >= 30 && !INTRO_START_RE.test(this.head)) {
+        const incoming = this.head
+        this.head = ''
+        this.introChecked = true
+        this.buffer += incoming
+      } else {
+        const decisive =
+          this.head.includes('\n\n') || this.head.length >= 1200
+        if (!decisive) return ''
+        const stripped = stripLeadingIntroReset(this.head)
+        if (
+          stripped === this.head &&
+          INTRO_START_RE.test(this.head) &&
+          this.head.length < 1200
+        ) {
+          // Opening is intro fluff but real content hasn't arrived yet —
+          // keep holding so the greeting never flashes on screen. flush()
+          // will release it if nothing else ever comes.
+          return ''
+        }
+        this.head = ''
+        this.introChecked = true
+        if (!stripped) return ''
+        this.buffer += stripped
+      }
+    } else {
+      this.buffer += delta
+    }
 
     // 1. If buffer has any complete fake tool call blocks or closed tags
     const hasClosedFakeTag =
@@ -340,8 +418,14 @@ export class StreamTextSanitizer {
    * Flushes any remaining clean text at stream end.
    */
   flush(): string {
-    const remaining = stripFakeToolCallXml(this.buffer)
+    let tail = this.buffer
     this.buffer = ''
+    if (this.stripIntro && !this.introChecked) {
+      tail = stripLeadingIntroReset(this.head + tail)
+      this.head = ''
+      this.introChecked = true
+    }
+    const remaining = stripFakeToolCallXml(tail)
     return remaining
   }
 }

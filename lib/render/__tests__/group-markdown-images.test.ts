@@ -52,6 +52,34 @@ describe('groupMarkdownImages', () => {
     expect(out).toBe(text)
   })
 
+  it('dedupes consecutive repeats of the same image', () => {
+    const text = [
+      '![Same](https://a.test/1.jpg)',
+      '![Same](https://a.test/1.jpg)',
+      '![Other](https://a.test/2.jpg)'
+    ].join('\n')
+    const out = groupMarkdownImages(text)
+    expect(out).toContain('```spec')
+    // URL 1 appears once as a src (plus once in the children id list check below).
+    const srcCount = (out.match(/"src":"https:\/\/a\.test\/1\.jpg"/g) || []).length
+    expect(srcCount).toBe(1)
+    expect(out).toContain('"columns":2')
+  })
+
+  it('caps a run at 3 images, keeping the first ones in order', () => {
+    const text = [
+      '![One](https://a.test/1.jpg)',
+      '![Two](https://a.test/2.jpg)',
+      '![Three](https://a.test/3.jpg)',
+      '![Four](https://a.test/4.jpg)',
+      '![Five](https://a.test/5.jpg)'
+    ].join('\n')
+    const out = groupMarkdownImages(text)
+    expect(out).toContain('"columns":3')
+    expect(out).not.toContain('a.test/4.jpg')
+    expect(out).not.toContain('a.test/5.jpg')
+  })
+
   it('generated gallery evaluates to a ready Grid spec', () => {
     const text = [
       '![First](https://a.test/1.jpg)',
