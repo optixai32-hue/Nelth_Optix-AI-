@@ -328,7 +328,8 @@ export async function createEphemeralChatStreamResponse(
             const textSanitizer = new StreamTextSanitizer({
               stripLeadingIntroReset: modelMessages.some(
                 m => m.role === 'assistant'
-              )
+              ),
+              userQuery
             })
 
             while (true) {

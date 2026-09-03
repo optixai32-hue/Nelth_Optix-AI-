@@ -456,7 +456,8 @@ export async function createChatStreamResponse(
             const textSanitizer = new StreamTextSanitizer({
               stripLeadingIntroReset: modelMessages.some(
                 m => m.role === 'assistant'
-              )
+              ),
+              userQuery
             })
 
             while (true) {

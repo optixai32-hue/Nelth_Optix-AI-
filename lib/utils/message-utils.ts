@@ -256,27 +256,50 @@ export function stripFakeToolCallXmlFromMessage(message: {
  * (Word boundaries matter: "hi" must not match "histoire".)
  */
 const INTRO_START_RE =
-  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|je suis nelth|ravi|content|enchanté)/i
+  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|je suis nelth|qui suis-je|ravi|content|enchanté)/i
 
 /**
- * Detects a "greeting reset" intro paragraph: the weak model re-greets and/or
- * re-introduces itself at the start of EVERY answer ("Salut ! 👋 Ravi de vous
- * revoir. Je suis Nelth-IA, ...") even mid-conversation, despite prompt rules.
- * Returns true when the whole paragraph is intro fluff (greeting-led or
- * self-intro-led) rather than real answer content.
+ * Greeting/hook-led intro paragraph ("Salut ! 👋 Ravi de vous revoir.") —
+ * always droppable mid-conversation while real content follows.
  */
-const INTRO_PARAGRAPH_RE =
-  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|je suis nelth-ia|je suis nelth\b|ravi(?:e)? de vous|content(?:e)? de vous|enchanté(?:e)?)/i
+const GREETING_HOOK_PARAGRAPH_RE =
+  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|ravi(?:e)? de vous|content(?:e)? de vous|enchanté(?:e)?)/i
 
 /**
- * Strips leading intro-fluff paragraphs (greeting reset + self-introduction)
+ * Self-intro-led paragraph ("Qui suis-je ? 🤖", "Je suis Nelth-IA, ...") — the
+ * weak model replays the previous identity answer before the new one. Droppable
+ * mid-conversation ONLY when the current question is NOT about identity
+ * (see keepSelfIntro — a legit "qui es-tu ?" answer must survive).
+ */
+const SELF_INTRO_PARAGRAPH_RE =
+  /^\s*(?:#{1,4}\s*)?(qui suis-je|je suis nelth)/i
+
+/**
+ * True when the user's message asks about the assistant's identity
+ * ("qui es-tu ?", "who are you", "présente-toi"...). Kept narrow on purpose:
+ * "c'est qui X ?" (about someone else) must NOT count as identity.
+ */
+export function isIdentityQuery(query: string): boolean {
+  return /\b(qui\s+(es|êtes)[- ]?tu|who\s+are\s+you|t['’]es\s+qui|présente[- ]?toi|ton\s+nom|your\s+name|dis[- ]?moi\s+qui\s+tu\s+es|parle[- ]?moi\s+de\s+toi)\b/i.test(
+    query || ''
+  )
+}
+
+/**
+ * Strips leading intro-fluff paragraphs (greeting reset + replayed self-intro)
  * from the START of an assistant answer, mid-conversation only. Paragraphs are
  * dropped one by one while MORE content follows — the response itself is never
  * nuked: if the whole text is just a greeting, it is kept as-is.
+ * Self-intro paragraphs survive when keepSelfIntro is set (the user actually
+ * asked "qui es-tu ?" — the intro IS the answer).
  */
-export function stripLeadingIntroReset(text: string): string {
+export function stripLeadingIntroReset(
+  text: string,
+  opts?: { keepSelfIntro?: boolean }
+): string {
+  const keepSelfIntro = !!opts?.keepSelfIntro
   let out = text
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const m = out.match(/^\s*([^\n]+(?:\n(?!\n)[^\n]*)*)/)
     if (!m) break
     const para = m[1]
@@ -284,8 +307,15 @@ export function stripLeadingIntroReset(text: string): string {
     // Never remove the entire response — only a leading reset before real content.
     if (rest.trim().length === 0) break
     if (para.length > 600) break
-    if (!INTRO_PARAGRAPH_RE.test(para)) break
-    out = rest.replace(/^\s+/, '')
+    if (GREETING_HOOK_PARAGRAPH_RE.test(para)) {
+      out = rest.replace(/^\s+/, '')
+      continue
+    }
+    if (!keepSelfIntro && SELF_INTRO_PARAGRAPH_RE.test(para)) {
+      out = rest.replace(/^\s+/, '')
+      continue
+    }
+    break
   }
   return out
 }
@@ -297,11 +327,17 @@ export function stripLeadingIntroReset(text: string): string {
 export class StreamTextSanitizer {
   private buffer = ''
   private stripIntro: boolean
+  private keepSelfIntro: boolean
   private introChecked = false
   private head = ''
 
-  constructor(opts?: { stripLeadingIntroReset?: boolean }) {
+  constructor(opts?: {
+    stripLeadingIntroReset?: boolean
+    /** Raw user query: a legit identity question protects the self-intro. */
+    userQuery?: string
+  }) {
     this.stripIntro = !!opts?.stripLeadingIntroReset
+    this.keepSelfIntro = isIdentityQuery(opts?.userQuery ?? '')
   }
 
   /**
@@ -323,7 +359,9 @@ export class StreamTextSanitizer {
         const decisive =
           this.head.includes('\n\n') || this.head.length >= 1200
         if (!decisive) return ''
-        const stripped = stripLeadingIntroReset(this.head)
+        const stripped = stripLeadingIntroReset(this.head, {
+          keepSelfIntro: this.keepSelfIntro
+        })
         if (
           stripped === this.head &&
           INTRO_START_RE.test(this.head) &&
@@ -421,7 +459,9 @@ export class StreamTextSanitizer {
     let tail = this.buffer
     this.buffer = ''
     if (this.stripIntro && !this.introChecked) {
-      tail = stripLeadingIntroReset(this.head + tail)
+      tail = stripLeadingIntroReset(this.head + tail, {
+        keepSelfIntro: this.keepSelfIntro
+      })
       this.head = ''
       this.introChecked = true
     }
