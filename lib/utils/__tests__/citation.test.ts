@@ -286,8 +286,48 @@ describe('processCitations', () => {
     })
   })
 
-  describe('isCitationLabel', () => {
-    it('accepts numeric, simple domain, and dotted domain labels', () => {
+  describe('fenced code blocks', () => {
+    const maps = {
+      'preloaded-search': {
+        1: {
+          title: 'Example',
+          url: 'https://example.com/a',
+          content: 'c'
+        }
+      } as Record<number, SearchResultItem>
+    }
+
+    it('leaves array indices inside code fences untouched', () => {
+      const content = [
+        'Here is the code:',
+        '',
+        '```js',
+        'const first = items[0];',
+        'const matrix = grid[1][2];',
+        '```',
+        '',
+        'Done [1].'
+      ].join('\n')
+      const result = processCitations(content, maps)
+      expect(result).toContain('const first = items[0];')
+      expect(result).toContain('const matrix = grid[1][2];')
+      // Prose citations outside fences still resolve.
+      expect(result).toContain('[example](https://example.com/a)')
+    })
+
+    it('leaves array literals inside code fences untouched', () => {
+      const content = ['```js', 'const arr = [1, 2, 3];', '```'].join('\n')
+      expect(processCitations(content, maps)).toBe(content)
+    })
+
+    it('still processes citations when no code block is present', () => {
+      expect(processCitations('See [1].', maps)).toBe(
+        'See [example](https://example.com/a).'
+      )
+    })
+  })
+
+  describe('isCitationLabel', () => {    it('accepts numeric, simple domain, and dotted domain labels', () => {
       expect(isCitationLabel('1')).toBe(true)
       expect(isCitationLabel('youtube')).toBe(true)
       expect(isCitationLabel('global.example')).toBe(true)

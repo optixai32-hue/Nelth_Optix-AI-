@@ -150,50 +150,94 @@ export function processCitations(
     return content || ''
   }
 
-  // Rewrite weak-model bare [n] citations into resolvable [n](#toolCallId) form
-  // before matching the full citation syntax below.
-  const normalized = normalizeBareCitations(content, citationMaps)
+  // Citation rewriting must NEVER touch fenced code blocks: generated code
+  // legitimately contains digit-bracket patterns (items[0], [1, 2]) that the
+  // bare-citation regex would otherwise eat or replace with links — silently
+  // corrupting code and breaking the preview with SyntaxErrors.
+  return mapOutsideCodeBlocks(content, segment => {
+    // Rewrite weak-model bare [n] citations into resolvable [n](#toolCallId) form
+    // before matching the full citation syntax below.
+    const normalized = normalizeBareCitations(segment, citationMaps)
 
-  // Replace [number](#toolCallId) with [domain](actual-url)
-  // Also handle cases with spaces: [ number ]
-  return normalized.replace(
-    /\[\s*(\d+)\s*\]\(#([^)]+)\)/g,
-    (_match, num, toolCallId) => {
-      const citationNum = parseInt(num, 10)
+    // Replace [number](#toolCallId) with [domain](actual-url)
+    // Also handle cases with spaces: [ number ]
+    return normalized.replace(
+      /\[\s*(\d+)\s*\]\(#([^)]+)\)/g,
+      (_match, num, toolCallId) => {
+        const citationNum = parseInt(num, 10)
 
-      // Validate citation number bounds
-      if (isNaN(citationNum) || citationNum < 1 || citationNum > 100) {
-        return '' // Return empty string for invalid citation numbers
+        // Validate citation number bounds
+        if (isNaN(citationNum) || citationNum < 1 || citationNum > 100) {
+          return '' // Return empty string for invalid citation numbers
+        }
+
+        // Get the citation map for this toolCallId. Prefer an exact match to
+        // avoid side effects, then fall back to prefix-normalized matching so
+        // ids the model prepended a prefix to (e.g. `toolu_<id>`) still resolve.
+        let citationMap = citationMaps[toolCallId]
+        if (!citationMap) {
+          const normalizedId = stripToolCallPrefix(toolCallId)
+          citationMap =
+            citationMaps[normalizedId] ??
+            citationMaps[
+              Object.keys(citationMaps).find(
+                key => stripToolCallPrefix(key) === normalizedId
+              ) ?? ''
+            ]
+        }
+        if (!citationMap) {
+          return '' // Return empty string if no citation map found
+        }
+
+        const citation = citationMap[citationNum]
+        if (!citation || !isValidUrl(citation.url)) {
+          return '' // Return empty string for invalid citations
+        }
+
+        // Extract domain name from URL (removes TLD and subdomain)
+        const domainName = displayUrlName(citation.url)
+
+        // Encode URI to prevent injection attacks
+        return `[${domainName}](${encodeURI(citation.url)})`
       }
+    )
+  })
+}
 
-      // Get the citation map for this toolCallId. Prefer an exact match to
-      // avoid side effects, then fall back to prefix-normalized matching so
-      // ids the model prepended a prefix to (e.g. `toolu_<id>`) still resolve.
-      let citationMap = citationMaps[toolCallId]
-      if (!citationMap) {
-        const normalizedId = stripToolCallPrefix(toolCallId)
-        citationMap =
-          citationMaps[normalizedId] ??
-          citationMaps[
-            Object.keys(citationMaps).find(
-              key => stripToolCallPrefix(key) === normalizedId
-            ) ?? ''
-          ]
-      }
-      if (!citationMap) {
-        return '' // Return empty string if no citation map found
-      }
+/**
+ * Applies fn to the parts of a Markdown document that live OUTSIDE fenced
+ * code blocks (``` ... ```), leaving code content byte-identical.
+ */
+function mapOutsideCodeBlocks(
+  content: string,
+  fn: (segment: string) => string
+): string {
+  const lines = content.split('\n')
+  const out: string[] = []
+  let buffer: string[] = []
+  let inFence = false
 
-      const citation = citationMap[citationNum]
-      if (!citation || !isValidUrl(citation.url)) {
-        return '' // Return empty string for invalid citations
-      }
-
-      // Extract domain name from URL (removes TLD and subdomain)
-      const domainName = displayUrlName(citation.url)
-
-      // Encode URI to prevent injection attacks
-      return `[${domainName}](${encodeURI(citation.url)})`
+  const flush = () => {
+    if (buffer.length > 0) {
+      out.push(fn(buffer.join('\n')))
+      buffer = []
     }
-  )
+  }
+
+  for (const line of lines) {
+    if (/^\s*```/.test(line)) {
+      flush()
+      inFence = !inFence
+      out.push(line)
+      continue
+    }
+    if (inFence) {
+      out.push(line)
+      continue
+    }
+    buffer.push(line)
+  }
+  flush()
+
+  return out.join('\n')
 }
