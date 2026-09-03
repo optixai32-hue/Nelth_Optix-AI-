@@ -177,7 +177,7 @@ export async function createEphemeralChatStreamResponse(
         )
         const searchResult = await runWebSearch(
           effectiveSearchQuery,
-          isNonThinkingModel ? 7 : 10,
+          caps.webImageSearch ? 20 : isNonThinkingModel ? 7 : 10,
           'basic',
           [],
           [],
@@ -207,7 +207,7 @@ export async function createEphemeralChatStreamResponse(
               return `[${i + 1}] ${JSON.stringify(imageData)}`
             })
             .join('\n')
-          preloadedSearchContext += `\n\nIMAGES DISPONIBLES:\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: utilise ces images dans un bloc \`\`\`spec de type Grid avec des éléments Image, conformément à INLINE IMAGE EMBEDDING. Ne produis jamais de syntaxe Markdown ![alt](url), ne liste pas les URLs en texte et ne dis pas que les images sont indisponibles.`
+          preloadedSearchContext += `\n\nIMAGES DISPONIBLES:\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: affiche directement les images avec la syntaxe Markdown ![description](url), puis liste clairement les URLs sources. N'utilise aucun bloc spec et ne dis pas que les images sont indisponibles.`
         }
         searchResultsForCitation = searchResult
       }
