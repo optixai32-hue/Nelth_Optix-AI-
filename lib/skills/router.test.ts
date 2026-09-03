@@ -75,4 +75,29 @@ describe('Skill Router (progressive disclosure)', () => {
     const slugs = selected.map(s => s.slug)
     expect(slugs).toContain('frontend-design')
   })
+
+  it('routes game requests in Spanish, Malagasy, Arabic and Chinese', async () => {
+    const registry = await getSkillRegistry()
+    for (const q of [
+      'Crea un juego de snake',
+      'Mamorona lalao snake',
+      'أنشئ لعبة ثعبان',
+      '创建一个蛇游戏'
+    ]) {
+      const slugs = routeSkills(q, registry).map(s => s.slug)
+      expect(slugs, `query: ${q}`).toContain('game-developer')
+    }
+  })
+
+  it('routes document requests in Spanish, German and Arabic', async () => {
+    const registry = await getSkillRegistry()
+    const es = routeSkills('Crea una factura en PDF', registry).map(s => s.slug)
+    expect(es).toContain('pdf')
+    const de = routeSkills('Erstelle eine Rechnung als PDF', registry).map(
+      s => s.slug
+    )
+    expect(de).toContain('pdf')
+    const ar = routeSkills('أنشئ فاتورة PDF', registry).map(s => s.slug)
+    expect(ar).toContain('pdf')
+  })
 })

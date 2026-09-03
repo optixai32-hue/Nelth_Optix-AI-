@@ -1,6 +1,7 @@
 import { type JSONValue, tool, UIToolInvocation } from 'ai'
 
 import { getSearchSchemaForModel } from '@/lib/schema/search'
+import { foldText, intentRe } from '@/lib/skills/text-fold'
 import { SearchResults } from '@/lib/types'
 import { getSearchToolDescription } from '@/lib/utils/search-config'
 import { logToolPayload } from '@/lib/utils/usage-logging'
@@ -47,16 +48,18 @@ export function createSearchTool(fullModel: string) {
       let searchResult: SearchResults
 
       // Detect image intent in the query so image search is performed even
-      // when the model does not explicitly set content_types. The configured
-      // DuckDuckGo provider supports image results. Covers English and French.
-      const IMAGE_INTENT_RE =
-        /\b(images?|pictures?|photos?|photograph|illustration|wallpaper|gifs?|meme|drawing|show me|visuel(?:le)?|dessin|aperçu|montre[ -]?moi)\b/i
+      // when the model does not explicitly set content_types. Folded and
+      // multilingual: ES/DE/IT/PT/MG/AR/ZH/RU image nouns match like EN/FR.
+      const IMAGE_INTENT_RE = intentRe(
+        'images?|pictures?|photos?|photograph|illustration|wallpaper|gifs?|meme|drawing|show\\s+me|visuel(?:le)?|dessin|apercu|montre[\\s-]?moi' +
+          '|imagen|imagenes|foto|fotos|bild|bilder|immagine|immagini|imagem|imagens|sary|صورة|صور|图片|照片|图像|изображение|фото|картинка'
+      )
       const requestedContentTypes = Array.isArray(content_types)
         ? [...content_types]
         : ['web']
       if (
         !requestedContentTypes.includes('image') &&
-        IMAGE_INTENT_RE.test(filledQuery)
+        IMAGE_INTENT_RE.test(foldText(filledQuery))
       ) {
         requestedContentTypes.push('image')
         if (!requestedContentTypes.includes('web')) {

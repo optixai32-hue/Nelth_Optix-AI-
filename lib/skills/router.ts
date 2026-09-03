@@ -1,3 +1,4 @@
+import { foldText } from './text-fold'
 import type { SkillMeta, SkillSelection } from './types'
 
 /** Hard caps to protect the model context (progressive disclosure). */
@@ -21,9 +22,9 @@ const STOPWORDS = new Set([
   'modern', 'premium', 'professional', 'complete', 'simple', 'small', 'good'
 ])
 
-/** Lowercase, alphanumeric tokenization (keeps `+`, `#`, digits). */
+/** Lowercase + accent-folded + Unicode-aware tokenization (keeps `+`, `#`, digits). */
 export function tokenize(value: string): string[] {
-  return value.toLowerCase().match(/[a-z0-9+#]+/g) ?? []
+  return foldText(value).match(/[\p{L}\p{N}#+]+/gu) ?? []
 }
 
 /** Tokenize and drop stopwords / very short tokens. */
@@ -96,10 +97,10 @@ const VISUAL_KEYWORDS = [
 /** True when the query is a visual / frontend / UI task (for skill fallback). */
 export function isVisualQuery(query: string): boolean {
   const tokens = keywordTokens(query)
-  const normalized = query.toLowerCase()
+  const normalized = foldText(query)
   return VISUAL_KEYWORDS.some(k => {
     if (k.includes(' ') || k.includes('-')) {
-      return normalized.includes(k)
+      return normalized.includes(foldText(k))
     }
     return tokens.has(k)
   })
@@ -116,29 +117,56 @@ const CODE_KEYWORDS = [
   'code',
   'fonction',
   'function',
+  'funcion',
+  'funktion',
+  'funzione',
+  'funcao',
+  'função',
+  'функция',
+  '函数',
+  'دالة',
   'script',
   'class',
+  'clase',
+  'klasse',
+  'classe',
   'program',
   'programme',
+  'programa',
+  'programm',
+  'programma',
   'algorithm',
+  'algorithme',
+  'algoritmo',
+  'algorithmus',
   'debug',
   'bug',
+  'error',
+  'erreur',
+  'fehler',
   'refactor',
   'implement',
   'syntax',
   'compile',
   'compiler',
+  'compilar',
+  'kompilieren',
   'crée une fonction',
   'créer une fonction',
   'du code',
-  'relis'
+  'relis',
+  'crea una funcion',
+  'escribe codigo',
+  'schreibe code',
+  'scrivi codice',
+  'crie uma funcao'
 ]
 export function isCodeQuery(query: string): boolean {
   const tokens = keywordTokens(query)
-  const normalized = query.toLowerCase()
+  const normalized = foldText(query)
   return CODE_KEYWORDS.some(k => {
     if (k.includes(' ') || k.includes('-')) {
-      return normalized.includes(k)
+      return normalized.includes(foldText(k))
     }
     return tokens.has(k)
   })
@@ -370,11 +398,16 @@ function scoreSkill(
   queryTokens: Set<string>
 ): number {
   let score = 0
+  // Folded once: trigger phrases compare folded-to-folded so accents and
+  // scripts match in any language.
+  const normalized = foldText(query)
 
   // Trigger phrases (from real SKILL.md frontmatter) are the primary signal.
   for (const trigger of skill.triggers) {
-    // Full multi-word phrase present as a substring.
-    if (trigger.includes(' ') && query.includes(trigger)) {
+    // Full multi-word phrase present as a substring (both sides folded so
+    // accents and scripts match in any language).
+    const foldedTrigger = foldText(trigger)
+    if (trigger.includes(' ') && normalized.includes(foldedTrigger)) {
       score += 3
       continue
     }
@@ -394,10 +427,18 @@ function scoreSkill(
         continue
       }
     }
-    // Single-token trigger matched exactly.
+    // Single-token trigger matched exactly (folded). Non-Latin single tokens
+    // (Arabic/Chinese/Cyrillic words, which never align to token boundaries
+    // in spaceless text or with attached prefixes) match as substrings.
     if (!trigger.includes(' ')) {
-      const single = trigger.replace(/[^a-z0-9+#]/g, '')
-      if (single && queryTokens.has(single)) score += 2
+      const folded = foldText(trigger).match(/[\p{L}\p{N}#+]+/gu) ?? []
+      if (folded.length === 1) {
+        if (/[^\u0000-\u007F]/.test(folded[0])) {
+          if (normalized.includes(folded[0])) score += 2
+        } else if (queryTokens.has(folded[0])) {
+          score += 2
+        }
+      }
     }
   }
 
@@ -461,7 +502,7 @@ export function routeSkills(
   attachmentFormats?: string[],
   previousActiveSlugs?: string[]
 ): SkillSelection[] {
-  const normalized = query.toLowerCase()
+  const normalized = foldText(query)
   const queryTokens = keywordTokens(query)
 
   const scored = registry

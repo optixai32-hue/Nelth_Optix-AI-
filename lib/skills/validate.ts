@@ -12,6 +12,7 @@
  * loading and injection are separate concerns handled elsewhere.
  */
 
+import { foldText, intentRe } from './text-fold'
 import { validateUiIcons, validateUiIconsCss } from './ui-icon-validator'
 
 export type ViolationSeverity = 'error' | 'warning'
@@ -333,8 +334,11 @@ export function validateJs(js: string): Violation[] {
 // Web-game validation (game-developer / canvas skills)
 // ---------------------------------------------------------------------------
 
-const GAME_INTENT_RE =
-  /\b(game|video game|jeu|jeux|snake|tetris|pong|pac-?man|platformer|jouable|mini-?jeu)\b/i
+// Unicode edges (\b never matches inside non-Latin text); tested folded.
+const GAME_INTENT_RE = intentRe(
+  'game|video\\s+game|jeu|jeux|snake|tetris|pong|pac-?man|platformer|jouable|mini-?jeu' +
+    '|juego|juegos|jugar|spiel|spiele|spielen|gioco|giochi|jogo|jogos|jogar|lalao|milalao|لعبة|ألعاب|游戏|игра|игры|играть'
+)
 
 /**
  * Validate a single-file web game (HTML + JS): loop, canvas, inputs,
@@ -592,7 +596,7 @@ export function validateGeneratedOutput(
   // self-containment warning — a static rendering needs no game loop.
   const wantsGame =
     opts.slugs?.includes('game-developer') ||
-    (opts.query ? GAME_INTENT_RE.test(opts.query) : false)
+    (opts.query ? GAME_INTENT_RE.test(foldText(opts.query)) : false)
   if (wantsGame && (hasHtml || hasJs)) {
     const jsContent = blocks
       .filter(b => ['js', 'javascript', 'ts', 'typescript'].includes(b.lang))

@@ -20,6 +20,11 @@ import {
   type QuickPromptFlags
 } from './prompts/search-mode-prompts'
 import { classifyVisualIntent } from './visual-intent'
+import {
+  DOCUMENT_INTENT_RE,
+  IMAGE_INTENT_RE
+} from '../skills/capability-detection'
+import { foldText, intentRe } from '../skills/text-fold'
 
 /**
  * Injected HIGH in the system instructions so the model never leaks the
@@ -325,28 +330,33 @@ export function wrapSearchToolForQuickMode<
 // or document request. A request of either kind must NEVER be treated as a code
 // request, otherwise the runtime drops the generateImage / document tool and the
 // model falls back to generating code/HTML ("code.html" bug).
-const IMAGE_INTENT_RE =
-  /\b(image|photo|picture|draw|dessine|dessiner|illustr|g[eé]n[eé]r(e|é|er)\s+(une\s+)?image|create\s+an?\s+image|generate\s+an?\s+image|restyle|turn\s+my\s+photo|make\s+this\s+a|cartoon|anime|edit\s+(this|my)\s+(photo|image)|transform\s+(this|my)\s+(photo|image))\b/i
-const DOCUMENT_INTENT_RE =
-  /\b(pdf|docx|xlsx|pptx|document|documents|transcribe|facture|invoice|rapport|report|contrat|contract|cv|lettre|pr[eé]sentation|presentation|diapos|slides)\b/i
 
 // Web IMAGE SEARCH vs IMAGE GENERATION. A request that wants to FIND existing
 // images on the web (a search/find/show verb + an image noun, and no generation
 // verb) must use the search tool — never generateImage. Otherwise "cherche des
 // images de musique" wrongly triggers image generation.
-const WEB_SEARCH_VERB_RE =
-  /\b(cherche|recherche|search|trouve|find|montre|show|voir|see|donne|give|regarde|look)\b/i
-const IMAGE_NOUN_RE =
-  /\b(image|photo|picture|illustration|photos|images|pictures)\b/i
-const GEN_IMAGE_VERB_RE =
-  /\b(génère|genere|crée|cree|create|draw|dessine|dessiner|generate|restyle|transforme|edit|make an? image|une image de|an image of)\b/i
+// (Folded, all languages — same vocabulary as capability-detection.)
+const WEB_SEARCH_VERB_RE = intentRe(
+  'cherche|recherche|search|trouve|find|montre|show|voir|see|donne|give|regarde|look' +
+    '|buscar|busca|suchen|sucht|cercare|cerca|procurar|procura|mitady|jereo|ابحث|اعرض|搜索|查找|искать|найти|покажи'
+)
+const IMAGE_NOUN_RE = intentRe(
+  'image|photo|picture|illustration|photos|images|pictures' +
+    '|imagen|imagenes|foto|fotos|bild|bilder|immagine|immagini|imagem|imagens|sary|صورة|صور|图片|照片|图像|изображение|фото|картинка'
+)
+const GEN_IMAGE_VERB_RE = intentRe(
+  'genere|cree|create|draw|dessine|dessiner|generate|restyle|transforme|edit|make\\s+an?\\s+image|une\\s+image\\s+de|an\\s+image\\s+of' +
+    '|crear\\s+imagen|crea\\s+una\\s+imagen|generar\\s+imagen|dibujar|bild\\s+erstellen|crea\\s+immagine|criar\\s+imagem|cria\\s+uma\\s+imagem|gerar\\s+imagem|mamorona\\s+sary' +
+    '|انشاء\\s+صورة|ارسم|生成图片|创建图片|生成.{0,6}图片|创建.{0,6}图片|создать\\s+изображение'
+)
 
 function isWebImageSearch(q: string): boolean {
   if (!q) return false
+  const qf = foldText(q)
   return (
-    WEB_SEARCH_VERB_RE.test(q) &&
-    IMAGE_NOUN_RE.test(q) &&
-    !GEN_IMAGE_VERB_RE.test(q)
+    WEB_SEARCH_VERB_RE.test(qf) &&
+    IMAGE_NOUN_RE.test(qf) &&
+    !GEN_IMAGE_VERB_RE.test(qf)
   )
 }
 
@@ -359,9 +369,15 @@ function detectArtifactIntent(text: string): {
     return { isCode: false, needsExternal: false, wantsDownload: false }
 
   const codeRe =
-    /\b(cr[eé]e(r|z)?|create|build|make|generate|g[eé]n[eé]rer|write|r[eé]diger|code|clone|cloner|html|landing|page web|website|site web|web ?page|ui|component|svg|illustration|app|dashboard|snippet|script)\b/i
+    /\b(cr[eé]e(r|z)?|create|build|make|generate|g[eé]n[eé]rer|write|r[eé]diger|code|clone|cloner|html|landing|page web|website|site web|web ?page|ui|component|svg|illustration|app|dashboard|snippet|script|crear|erstellen|erstelle|creare|criar|sitio web|webseite|sito web|juego|jeu)\b/i
+  // Non-Latin / diacritic code-creation verbs, tested on folded text (\b
+  // cannot match inside Arabic/Chinese/Cyrillic).
+  const ML_CODE_RE = intentRe(
+    'mamorona|tranonkala|انشئ|اصنع|موقع|创建|生成|制作|网站|создай|создать|сайт'
+  )
   const downloadRe =
-    /\b(download|t[eé]l[eé]charg|save|sauvegard|fichier|file|export)\b/i
+    /\b(download|t[eé]l[eé]charg|save|sauvegard|fichier|file|export|descargar|herunterladen|scaricare|baixar)\b/i
+  const ML_DOWNLOAD_RE = intentRe('تحميل|下载|скачать')
   const informationalRe =
     /\b(search|cherche|recherch|actualit[eé]|news|price|prix|weather|m[eé]t[eé]o|recent|latest|last)\b/i
   const externalRe =
@@ -383,16 +399,22 @@ function detectArtifactIntent(text: string): {
   // matches codeRe, so we must recognize image intent explicitly and make sure
   // it is NEVER treated as a code request (otherwise the runtime drops the
   // generateImage tool and the model falls back to generating code/HTML).
-  const isImageRequest = IMAGE_INTENT_RE.test(text)
+  // Folded once: shared + local intent regexes below are written folded.
+  const qf = foldText(text)
+  const isImageRequest = IMAGE_INTENT_RE.test(qf)
   // A document-creation request (pdf/docx/xlsx/pptx, invoice, report, …).
   // "Crée" matches codeRe, so a "Crée-moi un PDF" request would otherwise be
   // flagged isCode and the runtime would drop the document tool — leaving the
   // model unable to actually produce the file.
-  const isDocumentRequest = DOCUMENT_INTENT_RE.test(text)
+  const isDocumentRequest = DOCUMENT_INTENT_RE.test(qf)
 
   const urlPresent = /\bhttps?:\/\//.test(text)
 
-  const wantsCode = codeRe.test(text)
+  const wantsCode =
+    (codeRe.test(text) || ML_CODE_RE.test(qf)) &&
+    !isImageRequest &&
+    !isDocumentRequest
+  const wantsDownload = downloadRe.test(text) || ML_DOWNLOAD_RE.test(qf)
   // VISUAL INTENT CLASSIFIER — the deterministic gate that stops the assistant
   // from emitting a visualization/diagram on every response. The broad codeRe
   // above matches "code", "html", "ui", "app", "page", "generate", "write"…,
@@ -421,7 +443,6 @@ function detectArtifactIntent(text: string): {
       needsExternal = true
     }
   }
-  const wantsDownload = downloadRe.test(text)
   return { isCode, needsExternal, wantsDownload }
 }
 
