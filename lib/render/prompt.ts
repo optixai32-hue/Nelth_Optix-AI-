@@ -92,7 +92,11 @@ AVAILABLE COMPONENTS FOR IMAGES:
 3. The "aspectRatio" field SHOULD reflect the natural orientation of the subject: "1:1" for square (logos, portraits), "16:9" for wide (landscapes, scenes), "4:3" for standard photos. Images within the same Grid should generally use the SAME aspectRatio so they render at identical heights.
  4. Display at most 6 relevant images directly as Markdown image links, then list their URLs below.
  Never dump the full 20-image set.
- 5. Do not generate an image grid or hide the images behind a separate gallery component.
+ 5. Keep the images in the given IMG-number order — never reorder or mix them. Each caption reuses the
+ provided title/description EXACTLY — never invent captions.
+ 6. NEVER put citation markers like [1][3] on the image intro sentence, captions, or image URL list.
+ The listed source URLs are the attribution.
+ 7. Do not generate an image grid or hide the images behind a separate gallery component.
 
 Example of the required direct format:
 

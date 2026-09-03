@@ -150,7 +150,7 @@ export function getSearchDetailsPrompt(): string {
 Search tool usage:
 - In the single search call, set type="optimized", search_depth="basic", and max_results=10
 - Rely on the search results' content snippets for your answers
-${hasGeneralProvider ? '- When the user asks for images/pictures/photos, set content_types: ["image"] (or ["web","image"] for both). Images are returned by the search tool and shown in a gallery.' : '- Note: Video/image search requires a dedicated general search provider (not available)'}
+${hasGeneralProvider ? '- When the user asks for images/pictures/photos, set content_types: ["image"] (or ["web","image"] for both). Then embed at most 6 images DIRECTLY in your answer as Markdown ![exact title](exact url) in the returned order, followed by the source URL list. NEVER put [n] citation markers on image lines/captions/intro, never reorder or mix captions, never write "Image not available".' : '- Note: Video/image search requires a dedicated general search provider (not available)'}
 
 ${getContentTypesGuidance()}
 

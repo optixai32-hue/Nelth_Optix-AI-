@@ -257,6 +257,8 @@ export async function createChatStreamResponse(
           )
           .join('\n\n')
         if (searchResult.images && searchResult.images.length > 0) {
+          // Images are numbered (IMG-i) in their OWN space so the model never
+          // confuses them with the [n] web-result citations.
           const imageLines = searchResult.images
             .map((image, i) => {
               const imageUrl = typeof image === 'string' ? image : image.url
@@ -271,10 +273,10 @@ export async function createChatStreamResponse(
                         description: image.description
                       })
                     }
-              return `[${i + 1}] ${JSON.stringify(imageData)}`
+              return `(IMG-${i + 1}) ${JSON.stringify(imageData)}`
             })
             .join('\n')
-          preloadedSearchContext += `\n\nIMAGES DISPONIBLES:\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: affiche au maximum 6 images pertinentes directement avec la syntaxe Markdown ![description](url), puis liste clairement leurs URLs sources. Copie chaque URL EXACTEMENT depuis IMAGES DISPONIBLES sans la modifier. Ne montre JAMAIS les 20 images, n'utilise aucun bloc spec ni grille. N'écris JAMAIS "Image not available" ni aucun texte de remplacement : si une image ne convient pas, ignore-la silencieusement. Ne dis pas que les images sont indisponibles.`
+          preloadedSearchContext += `\n\nIMAGES DISPONIBLES (numérotées IMG-1, IMG-2, ... — espace SÉPARÉ des citations [n]):\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: affiche au maximum 6 images pertinentes directement avec la syntaxe Markdown ![légende](url), puis liste clairement leurs URLs sources. RÈGLES STRICTES: (1) Présente les images choisies DANS L'ORDRE CROISSANT des numéros IMG, sans réordonner ni mélanger. (2) Chaque légende reprend EXACTEMENT le titre/description fourni — n'invente aucune légende. (3) Copie chaque URL EXACTEMENT sans la modifier. (4) N'ajoute AUCUN marqueur de citation [n] dans la phrase d'intro, les légendes ou la liste d'URLs des images — les URLs listées suffisent. (5) Ne montre JAMAIS les 20 images, n'utilise aucun bloc spec ni grille. (6) N'écris JAMAIS "Image not available" ni aucun texte de remplacement : si une image ne convient pas, ignore-la silencieusement. Ne dis pas que les images sont indisponibles.`
         }
         searchResultsForCitation = searchResult
       }
