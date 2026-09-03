@@ -455,6 +455,34 @@ function getHiDreamClient(forceReconnect = false) {
   return hidreamClientPromise
 }
 
+/**
+ * Extract the image URL + Space status text from a HiDream
+ * `/generate_with_status` result payload: [image, seedUsed, status, details].
+ * Exported for unit testing.
+ */
+export function extractHiDreamImageUrl(data: unknown): {
+  url?: string
+  status?: string
+} {
+  const arr = Array.isArray(data) ? data : []
+  const imageRaw = arr[0] as
+    | { url?: unknown; path?: unknown }
+    | string
+    | null
+    | undefined
+  let url: string | undefined
+  if (typeof imageRaw === 'string') {
+    url = imageRaw
+  } else if (imageRaw && typeof imageRaw === 'object') {
+    if (typeof imageRaw.url === 'string') url = imageRaw.url
+    else if (typeof imageRaw.path === 'string') url = imageRaw.path
+  }
+  const status = typeof arr[2] === 'string' ? arr[2] : undefined
+  // A bare local path (/tmp/...) is not downloadable — treat as missing.
+  if (url && !/^(https?:|data:)/i.test(url)) return { status }
+  return url ? { url, status } : { status }
+}
+
 async function generateViaHiDream(
   prompt: string,
   size: string,
@@ -469,15 +497,16 @@ async function generateViaHiDream(
   }
 
   // The Space gateway can be transiently flaky (queue full / network errors),
-  // so retry a few times with backoff. Deterministic content rejections are
-  // rethrown immediately for the caller to handle.
+  // AND its first call after idle sometimes returns an empty image with a
+  // status message instead of throwing ("Error: No image name in successful
+  // response") — while the very next call succeeds. So we retry both thrown
+  // errors and empty-image results, with backoff, before giving up.
   let result: any
   let lastErr: unknown
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       result = await client.predict('/generate_with_status', args)
       lastErr = undefined
-      break
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       if (/content (policy|moderation)|blocked|rejected|not compliant/i.test(msg)) {
@@ -490,6 +519,18 @@ async function generateViaHiDream(
       if (attempt < 4) {
         await new Promise(r => setTimeout(r, 1500 * 2 ** attempt))
       }
+      continue
+    }
+    const found = extractHiDreamImageUrl(
+      Array.isArray((result as any)?.data) ? (result as any).data : []
+    )
+    if (found.url) break
+    lastErr = new Error(
+      `HiDream returned no image${found.status ? ` (Space status: ${found.status})` : ''}`
+    )
+    result = undefined
+    if (attempt < 4) {
+      await new Promise(r => setTimeout(r, 5000 * (attempt + 1)))
     }
   }
   if (lastErr) throw lastErr
@@ -497,14 +538,7 @@ async function generateViaHiDream(
   const data: unknown[] = Array.isArray((result as any)?.data)
     ? (result as any).data
     : []
-  const imageRaw = data[0]
-
-  let rawImageUrl: string | undefined
-  if (typeof imageRaw === 'string') {
-    rawImageUrl = imageRaw
-  } else if (imageRaw && typeof imageRaw === 'object') {
-    rawImageUrl = (imageRaw as any).url || (imageRaw as any).path
-  }
+  const { url: rawImageUrl } = extractHiDreamImageUrl(data)
 
   if (!rawImageUrl) {
     throw new Error('HiDream generation returned no image')
