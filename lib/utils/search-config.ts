@@ -34,14 +34,14 @@ export function getSearchTypeDescription(): string {
 }
 
 export function getSearchToolDescription(): string {
-  return `Search the web (and images) using 4get. When the user wants images, set content_types:["image"] (or ["web","image"] for both). Otherwise use ["web"].`
+  return `Search the web (and images) using 4get. When the user wants images, set content_types:["image"] (or ["web","image"] for both). Otherwise use ["web"]. ONE search per question — answer from its results; repeat searches replay the first results, so never search twice.`
 }
 
 export function getContentTypesGuidance(): string {
   return `- **Images / pictures / photos:**
   - When the user asks for images (e.g. "show me images of cats", "recherche image de..."), set content_types: ["image"].
   - To get both web results AND images, set content_types: ["web","image"].
-  - Images are returned by 4get and displayed in a gallery above the response.
+  - Images are returned by 4get — embed at most 3 directly as Markdown ![title](url) + numbered Sources links, never a gallery reference.
 - **Normal web search:** use content_types: ["web"] (default).
 - Both type="general" and type="optimized" support images.`
 }
@@ -50,8 +50,8 @@ export function getSearchStrategyGuidance(): string {
   return `Search strategy:
 - Use type="optimized" for most research queries (provides content snippets)
 - Use type="general" with content_types:['image'] for image searches
-- Fetch tool can be used optionally for deeper content analysis
-- For comprehensive research: multiple searches + selective fetching`
+- ONE search per question, then answer — never fire repeat/reformulated searches
+- Fetch tool can be used optionally for deeper content analysis`
 }
 
 /**
