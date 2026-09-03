@@ -1,5 +1,4 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3'
-import { Client } from '@gradio/client'
 import { tool, type UIToolInvocation } from 'ai'
 import axios from 'axios'
 import ImageKit from 'imagekit'
@@ -17,9 +16,15 @@ import {
   R2_PUBLIC_URL
 } from '@/lib/storage/r2-client'
 
-const HF_SPACE = 'baidu/ERNIE-Image-Turbo'
 const NVIDIA_ENHANCE_MODEL = 'nvidia/nemotron-3-super-120b-a12b'
 const NVIDIA_INVOKE_URL = 'https://integrate.api.nvidia.com/v1/chat/completions'
+
+// Text-to-image backend: PixelFlash WebAPI (free, unlimited). Override the
+// base with PIXELFLASH_API_BASE if needed.
+const PIXELFLASH_BASE = (
+  process.env.PIXELFLASH_API_BASE?.replace(/\/+$/, '') ||
+  'https://r19fa7skrz00-d.space-z.ai'
+)
 
 // Image-to-image (img2img) backend. When the user supplies a reference photo
 // (e.g. an uploaded selfie to restyle), we route to nelth.space-z.ai instead of
@@ -94,21 +99,35 @@ const IMAGE_CAPTION_SYSTEM = `你是一个智能图像描述助手。你的任�
 * 不要在输出里复述输入 JSON。
 * 重要！！一定要确认你的描述中，包含了这张图片中所有的需要的文字内容，不能遗漏省略任何。`
 
-// Sizes supported by the ERNIE-Image-Turbo Space (must match its dropdown).
+// Sizes supported by the PixelFlash WebAPI (must match its format dropdown).
 const ALLOWED_SIZES = [
   '1024x1024',
-  '848x1264',
-  '1264x848',
-  '1376x768',
-  '1200x896',
-  '896x1200',
-  '768x1376'
+  '864x1152',
+  '768x1344',
+  '1152x864',
+  '1344x768',
+  '1440x720',
+  '720x1440'
 ] as const
 
-function normalizeSize(size: string | undefined): string {
-  return size && (ALLOWED_SIZES as readonly string[]).includes(size)
-    ? size
-    : '1024x1024'
+export function normalizeSize(size: string | undefined): string {
+  if (size && (ALLOWED_SIZES as readonly string[]).includes(size)) return size
+  // Unknown/legacy size (e.g. old ERNIE values): pick the closest aspect
+  // ratio instead of silently forcing square.
+  const { width, height } = parseSize(size ?? '')
+  if (!width || !height) return '1024x1024'
+  const target = width / height
+  let best = '1024x1024'
+  let bestDiff = Number.POSITIVE_INFINITY
+  for (const candidate of ALLOWED_SIZES) {
+    const [w, h] = candidate.split('x').map(Number)
+    const diff = Math.abs(w / h - target)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      best = candidate
+    }
+  }
+  return best
 }
 
 // Ensure the prompt sent to the model starts with a capital letter and ends
@@ -122,24 +141,6 @@ function normalizePrompt(input: string): string {
     p += '.'
   }
   return p
-}
-
-// The seed is sent to the ERNIE Space. `-1` is its "Random" sentinel: when the
-// AI passes -1 we keep it as-is so the Space picks a random seed (this is the
-// default and yields a unique image each call). A specific 10-digit integer
-// (1000000000–9999999999) is honored for reproducibility. Any other value is
-// replaced by a random 10-digit number server-side.
-function normalizeSeed(seed: unknown): number {
-  if (seed === -1) return -1
-  if (
-    typeof seed === 'number' &&
-    Number.isFinite(seed) &&
-    seed >= 1000000000 &&
-    seed <= 9999999999
-  ) {
-    return Math.floor(seed)
-  }
-  return Math.floor(1000000000 + Math.random() * 9000000000)
 }
 
 function parseSize(size: string): { width: number; height: number } {
@@ -309,24 +310,6 @@ async function persistGeneratedImage(
   return getLocalFileUrl(key)
 }
 
-let clientPromise: Promise<any> | null = null
-function getBaiduDateHeaders(): Record<string, string> {
-  const now = new Date().toISOString()
-  return { date: now, 'x-bce-date': now }
-}
-
-function getGradioClient(forceReconnect = false) {
-  if (forceReconnect) {
-    clientPromise = null
-  }
-  if (!clientPromise) {
-    clientPromise = Client.connect(HF_SPACE, {
-      headers: getBaiduDateHeaders()
-    })
-  }
-  return clientPromise
-}
-
 /**
  * Normalize a user-supplied image reference into a base64 data URL that the
  * nelth edit-image endpoint can consume. Accepts:
@@ -439,85 +422,107 @@ async function editViaNelth(
   return { imageUrl, revisedPrompt }
 }
 
-async function generateViaGradio(
-  prompt: string,
-  size: string,
-  seed: number
+/**
+ * Text-to-image via the PixelFlash WebAPI.
+ *
+ * Flow: POST /api/generate { prompt, size, fresh } → either an immediate
+ * `{ status: "done", imageId }` or a `{ jobId }` to poll via
+ * GET /api/generate?jobId= until `{ status: "done", imageId }`.
+ * The finished PNG is downloaded from /api/images/:id and persisted to
+ * durable storage (same as other backends) so the URL survives refreshes.
+ */
+const PIXELFLASH_POLL_MS = 2000
+const PIXELFLASH_TIMEOUT_MS = 150000
+
+function pixelFlashError(err: unknown): Error {
+  const resp = (err as { response?: { data?: unknown; status?: number } })
+    ?.response
+  const data = resp?.data as { error?: unknown } | undefined
+  const detail =
+    data && typeof data.error === 'string'
+      ? data.error
+      : `PixelFlash request failed${resp?.status ? ` (${resp.status})` : ''}`
+  return new Error(detail)
+}
+
+async function fetchPixelFlashImage(
+  imageId: string,
+  sentPrompt: string,
+  echoedPrompt?: unknown
 ): Promise<{ imageUrl: string; revisedPrompt: string }> {
-  let client = await getGradioClient()
-  const args = {
-    // `seed` is provided by the model (the AI generates a random value each
-    // call so every image differs). -1 is the Space's "Random" sentinel.
-    // `use_pe: false` skips Baidu's own prompt-enhancement step (faster).
-    // Our tool already enhances the prompt via NVIDIA, so this is redundant.
-    prompt: normalizePrompt(prompt),
-    size,
-    seed,
-    use_pe: false
+  const resp = await axios.get(
+    `${PIXELFLASH_BASE}/api/images/${encodeURIComponent(imageId)}`,
+    { responseType: 'arraybuffer', timeout: 60000 }
+  )
+  const buffer = Buffer.from(resp.data)
+  const mime =
+    (resp.headers?.['content-type'] as string | undefined) || 'image/png'
+  const imageUrl = await persistGeneratedImage(buffer, mime)
+  return {
+    imageUrl,
+    revisedPrompt:
+      typeof echoedPrompt === 'string' && echoedPrompt.trim()
+        ? echoedPrompt.trim()
+        : sentPrompt
   }
+}
 
-  // The Baidu gateway behind this Space is intermittently flaky (it sometimes
-  // returns "MissingDateHeader" / 404 / network errors). These are transient,
-  // so we retry a few times. We deliberately do NOT retry deterministic
-  // content-moderation rejections (errorCode 40000 / "内容不合规").
-  let result: any
-  let lastErr: unknown
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      result = await client.predict('/generate_image', args)
-      lastErr = undefined
-      break
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (/内容不合规|40000|not compliant/i.test(msg)) throw err
-      lastErr = err
-      if (/MissingDateHeader|x-bce-date|date header/i.test(msg)) {
-        client = await getGradioClient(true)
-      }
-      if (attempt < 4) {
-        await new Promise(r => setTimeout(r, 800 * 2 ** attempt))
-      }
-    }
-  }
-  if (lastErr) throw lastErr
-
-  const data: unknown[] = Array.isArray((result as any)?.data)
-    ? (result as any).data
-    : []
-  const imageRaw = data[0]
-  const revisedPrompt: string | undefined =
-    typeof data[1] === 'string' ? data[1] : undefined
-
-  let rawImageUrl: string | undefined
-  if (typeof imageRaw === 'string') {
-    rawImageUrl = imageRaw
-  } else if (imageRaw && typeof imageRaw === 'object') {
-    rawImageUrl = (imageRaw as any).url || (imageRaw as any).path
-  }
-
-  if (!rawImageUrl) {
-    throw new Error('Image generation returned no image')
-  }
-
-  // Re-fetch the Space-served file and persist it to durable storage, then
-  // return a short, stable URL. This keeps the image available after a page
-  // refresh (a data URL would blow past Firestore's 1 MB document limit).
+async function generateViaPixelFlash(
+  prompt: string,
+  size: string
+): Promise<{ imageUrl: string; revisedPrompt: string }> {
+  let initial: any
   try {
-    const resp = await fetch(rawImageUrl)
-    if (resp.ok) {
-      const buffer = Buffer.from(await resp.arrayBuffer())
-      const mime = resp.headers.get('content-type') || 'image/png'
-      const imageUrl = await persistGeneratedImage(buffer, mime)
-      return {
-        imageUrl,
-        revisedPrompt: revisedPrompt || prompt
+    const res = await axios.post(
+      `${PIXELFLASH_BASE}/api/generate`,
+      { prompt, size, fresh: true },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 30000
       }
-    }
-  } catch (error) {
-    console.warn('Failed to persist generated image; using raw URL:', error)
+    )
+    initial = res.data
+  } catch (err) {
+    throw pixelFlashError(err)
   }
 
-  return { imageUrl: rawImageUrl, revisedPrompt: revisedPrompt || prompt }
+  if (initial?.status === 'done' && initial?.imageId) {
+    return fetchPixelFlashImage(initial.imageId, prompt, initial.prompt)
+  }
+
+  const jobId = initial?.jobId
+  if (!jobId) {
+    throw new Error('PixelFlash generate returned neither image nor job')
+  }
+
+  const deadline = Date.now() + PIXELFLASH_TIMEOUT_MS
+  for (;;) {
+    await new Promise(r => setTimeout(r, PIXELFLASH_POLL_MS))
+    let status: any
+    try {
+      const res = await axios.get(`${PIXELFLASH_BASE}/api/generate`, {
+        params: { jobId },
+        timeout: 15000
+      })
+      status = res.data
+    } catch (err) {
+      throw pixelFlashError(err)
+    }
+    if (status?.status === 'done' && status?.imageId) {
+      return fetchPixelFlashImage(status.imageId, prompt, status.prompt)
+    }
+    if (status?.status === 'error' || typeof status?.error === 'string') {
+      throw new Error(
+        typeof status?.error === 'string'
+          ? status.error
+          : 'PixelFlash generation failed'
+      )
+    }
+    if (Date.now() >= deadline) {
+      throw new Error('PixelFlash generation timed out')
+    }
+    // status === 'pending' → keep polling.
+  }
 }
 
 export function createImageGenerationTool(opts?: { runtimeImage?: string }) {
@@ -528,7 +533,7 @@ export function createImageGenerationTool(opts?: { runtimeImage?: string }) {
   const runtimeImage = opts?.runtimeImage
   return tool({
        description:
-        "Generate or transform an image. Use this whenever the user asks to create, draw, illustrate, or generate an image, OR to restyle/edit/transform a photo they provide (e.g. 'make this a Looney Tunes cartoon', 'turn my photo into anime'). Pass a detailed `prompt` describing the desired result. If the user supplies or references an image (an uploaded photo, a URL, or a base64 data URL) and wants it transformed while preserving the subject's likeness, pass that image as `image` — the request is then routed to the image-to-image backend (nelth edit-image) instead of text-to-image. For image-to-image, the prompt is first enhanced via nelth's enhance-prompt endpoint and then applied with the reference photo while preserving the subject (set `protectFace` to keep facial likeness). When `image` is omitted, the image is generated from scratch by the ERNIE Image Turbo model via NVIDIA prompt enhancement. Returns the generated image along with the (possibly enhanced) prompt. IMPORTANT: call this tool DIRECTLY, without any preamble, narration, or explanation of your intent beforehand. After calling it, do NOT reason further, do NOT analyze the result, and do NOT call any other tool. If you write any text, keep it to a single short, elegant sentence in the user's language (optionally prefixed with a relevant emoji title) that briefly presents the image, then stop.",
+        "Generate or transform an image. Use this whenever the user asks to create, draw, illustrate, or generate an image, OR to restyle/edit/transform a photo they provide (e.g. 'make this a Looney Tunes cartoon', 'turn my photo into anime'). Pass a detailed `prompt` describing the desired result. If the user supplies or references an image (an uploaded photo, a URL, or a base64 data URL) and wants it transformed while preserving the subject's likeness, pass that image as `image` — the request is then routed to the image-to-image backend (nelth edit-image) instead of text-to-image. For image-to-image, the prompt is first enhanced via nelth's enhance-prompt endpoint and then applied with the reference photo while preserving the subject (set `protectFace` to keep facial likeness). When `image` is omitted, the image is generated from scratch by the PixelFlash WebAPI after NVIDIA prompt enhancement. Returns the generated image along with the (possibly enhanced) prompt. IMPORTANT: call this tool DIRECTLY, without any preamble, narration, or explanation of your intent beforehand. After calling it, do NOT reason further, do NOT analyze the result, and do NOT call any other tool. If you write any text, keep it to a single short, elegant sentence in the user's language (optionally prefixed with a relevant emoji title) that briefly presents the image, then stop.",
     inputSchema: z.object({
       prompt: z
         .string()
@@ -551,24 +556,25 @@ export function createImageGenerationTool(opts?: { runtimeImage?: string }) {
         .optional()
         .default('1024x1024')
         .describe(
-          "Image size. Allowed values: '1024x1024', '848x1264', '1264x848', '1376x768', '1200x896', '896x1200', '768x1376'. Defaults to '1024x1024'."
+          "Image size. Allowed values: '1024x1024', '864x1152', '768x1344', '1152x864', '1344x768', '1440x720', '720x1440'. Defaults to '1024x1024'."
         ),
       seed: z
         .number()
         .optional()
         .default(-1)
         .describe(
-          'Seed for image generation. Pass -1 (default) to let the model pick a random seed each time — this gives a unique image per request and is recommended. You may pass a specific integer of EXACTLY 10 digits (between 1000000000 and 9999999999) to reproduce a previous image.'
+          'Seed for image generation. Accepted for compatibility but the PixelFlash backend generates a fresh image on every call — pass -1 (default) for a unique image each time.'
         )
     }),
     async *execute(
       { prompt, size = '1024x1024', seed = -1, image, protectFace = true },
       { toolCallId }
     ) {
-      // Normalize the size to one the Space accepts. The seed defaults to -1
-      // (the Space's "Random" sentinel) and is always normalized server-side.
+      // Normalize the size to one the PixelFlash WebAPI accepts. `seed` is
+      // accepted for schema compatibility but the backend generates a fresh
+      // image on every call (fresh:true), so each request is already unique.
       const normalizedSize = normalizeSize(size)
-      const finalSeed = normalizeSeed(seed)
+      void seed
 
       // Yield an initial "generating" state so the UI can show a loader.
       yield {
@@ -618,26 +624,29 @@ export function createImageGenerationTool(opts?: { runtimeImage?: string }) {
           return
         }
 
+        // Text-to-image path: first enhance the user prompt with our existing
+        // NVIDIA enhancer, then generate via the PixelFlash WebAPI.
         const enhancedPrompt = await enhancePrompt(prompt, normalizedSize)
 
-        // Generate with the (enhanced) prompt. If Baidu rejects it for
-        // non-compliant content ("内容不合规" / errorCode 40000), retry once
-        // with the original user prompt, which is usually shorter and less
-        // likely to trip Baidu's content-moderation filter.
+        // Generate with the (enhanced) prompt. If the backend rejects it for
+        // content reasons, retry once with the original user prompt, which is
+        // usually shorter and less likely to trip moderation filters.
         let imageResult: { imageUrl: string; revisedPrompt: string }
         try {
-          imageResult = await generateViaGradio(
+          imageResult = await generateViaPixelFlash(
             enhancedPrompt,
-            normalizedSize,
-            finalSeed
+            normalizedSize
           )
         } catch (genErr) {
           const msg = genErr instanceof Error ? genErr.message : String(genErr)
-          if (/内容不合规|40000|not compliant/i.test(msg)) {
-            imageResult = await generateViaGradio(
+          if (
+            /moderat|rejected|inappropriate|unsafe|blocked|not compliant|40000|不合规/i.test(
+              msg
+            )
+          ) {
+            imageResult = await generateViaPixelFlash(
               normalizePrompt(prompt),
-              normalizedSize,
-              finalSeed
+              normalizedSize
             )
           } else {
             throw genErr

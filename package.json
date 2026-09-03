@@ -28,7 +28,6 @@
     "@assistant-ui/react": "^0.15.14",
     "@aws-sdk/client-s3": "3.859.0",
     "@aws-sdk/s3-request-presigner": "3.859.0",
-    "@gradio/client": "^2.5.0",
     "@hugeicons/core-free-icons": "^4.2.3",
     "@hugeicons/react": "^1.1.9",
     "@json-render/core": "^0.16.0",
