@@ -306,6 +306,26 @@ describe('Follow-up INTENT classification (spec §2)', () => {
     expect(isFollowUpVariation('Add pricing')).toBe(true)
     expect(isFollowUpVariation('Write a python script')).toBe(false)
   })
+
+  it('classifies Malagasy follow-ups (amboary, tohizo, averneo)', () => {
+    expect(classifyFollowUpIntent('Amboary io')).toBe('MODIFY_EXISTING')
+    expect(classifyFollowUpIntent('Ovay ny loko')).toBe('MODIFY_EXISTING')
+    expect(classifyFollowUpIntent('Tohizo')).toBe('MODIFY_EXISTING')
+    expect(classifyFollowUpIntent('Averneo')).toBe('REBUILD_REQUEST')
+    expect(classifyFollowUpIntent('Ampio fizarana iray')).toBe(
+      'ADD_TO_EXISTING'
+    )
+  })
+
+  it('treats bare continuations as thread-preserving', () => {
+    expect(classifyFollowUpIntent('Continue')).toBe('MODIFY_EXISTING')
+    expect(classifyFollowUpIntent('Encore')).toBe('MODIFY_EXISTING')
+  })
+
+  it('keeps Malagasy questions as fresh inquiries (no forced continuity)', () => {
+    expect(classifyFollowUpIntent('Inona no dikan izany?')).toBeNull()
+    expect(classifyFollowUpIntent('Iza no namorona an ity?')).toBeNull()
+  })
 })
 
 describe('TEST 2 (corrected) — "Make it dark" MODIFIES, never rebuilds', () => {

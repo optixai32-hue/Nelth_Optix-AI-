@@ -23,6 +23,7 @@ import {
   type AttachmentLike,
   extractAttachmentFormats} from '@/lib/skills/document-runtime'
 import { stripEmojiFromCodeInMessage } from '@/lib/skills/enforce-stream'
+import { resolveConversationLanguage } from '@/lib/skills/language-memory'
 import { search as runWebSearch } from '@/lib/tools/search'
 import {
   getImageAttachmentUrl,
@@ -257,6 +258,13 @@ export async function createEphemeralChatStreamResponse(
           ? `${skillCtx.context}\n\n${skillCtx.operationalPrompt}`
           : skillCtx?.context ?? ''
 
+      // Active conversation language (persisted preference from history or
+      // current request) — same rule as the main chat path.
+      const conversationLanguage = resolveConversationLanguage(
+        historyMessages,
+        userQuery
+      )
+
       // Get the researcher agent with search mode. `imageAttachment` / `needsImageEff`
       // are already resolved above, before the `trivial` gate.
       const researchAgent = researcher({
@@ -266,6 +274,7 @@ export async function createEphemeralChatStreamResponse(
         skillContext,
         preloadedSearchContext,
         preloadedSearchQuery,
+        conversationLanguage,
         imageAttachment,
         userQuery,
         capabilities: {

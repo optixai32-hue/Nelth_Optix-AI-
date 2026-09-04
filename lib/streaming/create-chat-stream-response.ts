@@ -25,6 +25,7 @@ import {
   enforceSkillOutput,
   stripEmojiFromCodeInMessage
 } from '@/lib/skills/enforce-stream'
+import { resolveConversationLanguage } from '@/lib/skills/language-memory'
 import { isTracingEnabled } from '@/lib/utils/telemetry'
 
 import { loadChat } from '../actions/chat'
@@ -330,6 +331,14 @@ export async function createChatStreamResponse(
           ? `${skillCtx.context}\n\n${skillCtx.operationalPrompt}`
           : skillCtx?.context ?? ''
 
+      // Active conversation language (persisted preference from history or
+      // current request): injected near the top of the system instructions
+      // so it holds for BOTH models every turn.
+      const conversationLanguage = resolveConversationLanguage(
+        messagesToModel,
+        userQuery
+      )
+
       // Get the researcher agent with search mode. `imageAttachment` / `needsImageEff`
       // are already resolved above, before the `trivial` gate.
       const researchAgent = researcher({
@@ -339,6 +348,7 @@ export async function createChatStreamResponse(
         skillContext,
         preloadedSearchContext,
         preloadedSearchQuery,
+        conversationLanguage,
         imageAttachment,
         userQuery,
         capabilities: {

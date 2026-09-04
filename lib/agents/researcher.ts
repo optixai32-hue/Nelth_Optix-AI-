@@ -24,6 +24,10 @@ import {
   DOCUMENT_INTENT_RE,
   IMAGE_INTENT_RE
 } from '../skills/capability-detection'
+import {
+  buildLanguageLayer,
+  type ResolvedLanguage
+} from '../skills/language-memory'
 import { foldText, intentRe } from '../skills/text-fold'
 
 /**
@@ -544,6 +548,7 @@ export function createResearcher({
   preloadedSearchQuery,
   imageAttachment,
   userQuery,
+  conversationLanguage,
   capabilities
 }: {
   model: string
@@ -560,6 +565,12 @@ export function createResearcher({
   /** Latest user message text, used to detect code/artifact creation so we can
    *  drop search/fetch/document from the active tools for that turn. */
   userQuery?: string
+  /**
+   * Active conversation language resolved from history + current query
+   * (see resolveConversationLanguage). When set, a CONVERSATION LANGUAGE
+   * layer is prepended near the top so the preference persists every turn.
+   */
+  conversationLanguage?: ResolvedLanguage | null
   /** Capability gate from the orchestrator. When `trivial` is set the request
    *  needs no skill and no external tool, so we arm NO tools — the model answers
    *  immediately without the search/fetch/image/document agent. */
@@ -820,7 +831,7 @@ export function createResearcher({
 - Do NOT emit any <tool_call>, <tool_calls>, <function>, <invoke>, or XML markup.
 - Output your conversational answer directly.`
         : TOOL_CALL_PROTOCOL
-    let instructions = `${CORE_DIRECTIVE}\n\n${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
+    let instructions = `${CORE_DIRECTIVE}\n\n${buildLanguageLayer(conversationLanguage ?? null)}${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
 
     // Trailing override for code/artifact requests. The QUICK/ADAPTIVE prompts
     // contain a generic "OUTPUT FORMAT (MANDATORY)" + "Emoji usage" section that

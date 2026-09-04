@@ -256,7 +256,10 @@ const REBUILD_KEYWORDS = [
   'redo from scratch',
   'rebuild from scratch',
   'entirely new',
-  'whole thing'
+  'whole thing',
+  'averneo',
+  'averina',
+  'amboary tanteraka'
 ]
 
 // ADD_TO_EXISTING signals: append a feature/section without touching the rest.
@@ -272,7 +275,9 @@ const ADD_KEYWORDS = [
   'include',
   'append',
   'insert',
-  'incorporate'
+  'incorporate',
+  'ampio',
+  'ampiana'
 ]
 const ADD_PATTERN = /\b(new|extra|another|more)\s+(section|page|part|block|module|area|row)\b/i
 
@@ -329,7 +334,12 @@ const MODIFY_KEYWORDS = [
   'navigation',
   'hero',
   'animation',
-  'layout'
+  'layout',
+  'amboary',
+  'amboaro',
+  'ovay',
+  'ovao',
+  'ahitsio'
 ]
 const MODIFY_PATTERN = /\b(make|change|fix|adjust|update|improve|modify|turn|set)\b/i
 
@@ -363,13 +373,22 @@ export type FollowUpIntent =
   | 'NEW_PROJECT'
 
 const INFORMATIONAL_INQUIRY_PATTERN =
-  /^(qui|quoi|pourquoi|comment|quand|o[uù]|combien|est[- ]ce\s+que|c'est\s+quoi|qu'est[- ]ce|raconte|explique|traduis|donne[- ]moi|dis[- ]moi|who|what|why|how|when|where|is\s+there|tell\s+me|explain|translate)\b/i
+  /^(qui|quoi|pourquoi|comment|quand|o[uù]|combien|est[- ]ce\s+que|c'est\s+quoi|qu'est[- ]ce|raconte|explique|traduis|donne[- ]moi|dis[- ]moi|who|what|why|how|when|where|is\s+there|tell\s+me|explain|translate|inona|iza|ahoana|nahoana|oviana|taiza|ohatrinona|fa maninona)\b/i
+
+// Bare continuations ("continue", "tohizo", "encore") keep the previous
+// turn's skills alive instead of resetting: same thread, same task.
+const CONTINUATION_PATTERN =
+  /^(continue|continues?|tohizo|tohizana|encore|mbola|plus|poursuis|vas-y|allez-y)\b/i
 
 export function classifyFollowUpIntent(query: string): FollowUpIntent | null {
   const q = query.toLowerCase().trim()
   if (!q) return null
   if (SWITCH_AWAY_PATTERN.test(q)) return null
   if (INFORMATIONAL_INQUIRY_PATTERN.test(q)) return null
+
+  // Bare continuation ("continue", "tohizo", "encore", "plus") = same thread,
+  // same task: keep previous skills, edit/extend in place.
+  if (CONTINUATION_PATTERN.test(q)) return 'MODIFY_EXISTING'
 
   if (ADD_KEYWORDS.some(k => q.includes(k)) || ADD_PATTERN.test(q)) {
     return 'ADD_TO_EXISTING'

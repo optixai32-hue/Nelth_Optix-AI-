@@ -21,6 +21,7 @@ import { getTextFromParts } from '@/lib/utils/message-utils'
 
 import { EXECUTION_REQUIREMENTS_BY_SLUG } from './build-skill-context'
 import { SkillEnforcementEngine } from './enforce'
+import { resolveConversationLanguage } from './language-memory'
 import type { SkillContextResult } from './types'
 import { stripEmojisFromCodeBlocks } from './ui-icon-validator'
 import { validateGeneratedOutput } from './validate'
@@ -198,7 +199,13 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
     const skillContext = skillCtx.operationalPrompt
       ? `${skillCtx.context}\n\n${skillCtx.operationalPrompt}`
       : skillCtx.context
-    const agent = researcher({ model, modelConfig, searchMode, skillContext })
+    const agent = researcher({
+      model,
+      modelConfig,
+      searchMode,
+      skillContext,
+      conversationLanguage: resolveConversationLanguage(modelMessages, userQuery)
+    })
 
     const generate = async (prompt: string): Promise<string> => {
       const res = await agent.generate({

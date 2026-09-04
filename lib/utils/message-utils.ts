@@ -269,14 +269,14 @@ export function stripFakeToolCallXmlFromMessage(message: {
  * (Word boundaries matter: "hi" must not match "histoire".)
  */
 const INTRO_START_RE =
-  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|je suis nelth|qui suis-je|ravi\s+de|content\s+de|enchanté)/i
+  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|je suis nelth|qui suis-je|salama|manao ahoana|ravi\s+de|content\s+de|enchanté)/i
 
 /**
  * Greeting/hook-led intro paragraph ("Salut ! 👋 Ravi de vous revoir.") —
  * always droppable mid-conversation while real content follows.
  */
 const GREETING_HOOK_PARAGRAPH_RE =
-  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|ravi(?:e)? de vous|content(?:e)? de vous|enchanté(?:e)?)/i
+  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|salama|manao ahoana|ravi(?:e)? de vous|content(?:e)? de vous|enchanté(?:e)?)/i
 
 /**
  * Leading greeting sentences inside an intro paragraph ("Salut ! 👋 Ravi de
@@ -293,7 +293,7 @@ const LEADING_GREETING_SENTENCES_RE =
  * (see keepSelfIntro — a legit "qui es-tu ?" answer must survive).
  */
 const SELF_INTRO_PARAGRAPH_RE =
-  /^\s*(?:#{1,4}\s*)?(qui suis-je|je suis nelth)/i
+  /^\s*(?:#{1,4}\s*)?(qui suis-je|je suis nelth|izaho dia nelth)/i
 
 /**
  * True when the user's message asks about the assistant's identity
@@ -301,7 +301,7 @@ const SELF_INTRO_PARAGRAPH_RE =
  * "c'est qui X ?" (about someone else) must NOT count as identity.
  */
 export function isIdentityQuery(query: string): boolean {
-  return /\b(qui\s+(es|êtes)[- ]?tu|who\s+are\s+you|t['’]es\s+qui|présente[- ]?toi|ton\s+nom|your\s+name|dis[- ]?moi\s+qui\s+tu\s+es|parle[- ]?moi\s+de\s+toi)\b/i.test(
+  return /\b(qui\s+(es|êtes)[- ]?tu|who\s+are\s+you|t['’]es\s+qui|présente[- ]?toi|ton\s+nom|your\s+name|dis[- ]?moi\s+qui\s+tu\s+es|parle[- ]?moi\s+de\s+toi|iza\s+ianao|ianao\s+iza|ahoana\s+ny\s+anaranao)\b/i.test(
     query || ''
   )
 }
@@ -505,7 +505,7 @@ export class StreamTextSanitizer {
 // strict intent regexes) should still get preloaded search for the weak
 // model so it doesn't hallucinate [n] citations.
 const PURE_GREETING_RE =
-  /^\s*(bonjour|hello|hi|hey|salut|coucou|yo|ça\s+va|ca\s+va|comment\s+(ça|ca)\s+va|what'?s\s+up|how\s+are\s+you|comment\s+allez[- ]vous|merci|thanks|thx|ok|okay|oui|yes|no|non|d'?accord|noted|super|cool|great|bien|bienvenue|welcome|bye|au\s+revoir|bonne\s+(journée|nuit)|good\s+(morning|evening|night|afternoon))\s*[!?.?\s]*$/i
+  /^\s*(bonjour|hello|hi|hey|salut|coucou|yo|salama|manao ahoana|ça\s+va|ca\s+va|comment\s+(ça|ca)\s+va|what'?s\s+up|how\s+are\s+you|comment\s+allez[- ]vous|merci|thanks|thx|ok|okay|oui|yes|no|non|d'?accord|noted|super|cool|great|bien|bienvenue|welcome|bye|au\s+revoir|bonne\s+(journée|nuit)|good\s+(morning|evening|night|afternoon))\s*[!?.?\s]*$/i
 
 export function isPureGreeting(query: string): boolean {
   if (!query) return false
@@ -527,7 +527,7 @@ export function resolveContextualSearchQuery(
   if (!q) return ''
 
   const hasPronounOrFollowUp =
-    /\b(leur|leurs|son|sa|ses|ça|ce|cet|cette|ces|eux|elle|elles|il|ils|lui|it|its|they|their|them|this|that|these|those|images?|photos?|pictures?|prix|combien|caract[eé]ristiques?)\b/i.test(
+    /\b(leur|leurs|son|sa|ses|ça|ce|cet|cette|ces|eux|elle|elles|il|ils|lui|it|its|they|their|them|this|that|these|those|images?|photos?|pictures?|prix|combien|caract[eé]ristiques?|izy|azy|io|izay|ity|ireo|inona|iza|ahoana|nahoana|ataovy|amboary|hazavao|tohizo|avereno|eny)\b/i.test(
       q
     )
 
@@ -546,7 +546,7 @@ export function resolveContextualSearchQuery(
         }
         const cleanPrev = prevText
           .replace(
-            /\b(cherche|recherche|trouve|search|find|show|montre|donne|donne-moi|give|qu'est[- ]ce|what\s+is|what\s+did|tell\s+me|about)\b/gi,
+            /\b(cherche|recherche|trouve|search|find|show|montre|donne|donne-moi|give|mitady|trouve|qu'est[- ]ce|what\s+is|what\s+did|tell\s+me|about)\b/gi,
             ''
           )
           .replace(/[?!.]+$/, '')
@@ -633,12 +633,26 @@ function hasOwnImageSubject(query: string): boolean {
     'mes',
     'ton',
     'ta',
-    'tes'
+    'tes',
+    'ny',
+    'sy',
+    'dia',
+    'fa',
+    'ary',
+    've',
+    'ho',
+    'ka',
+    'izy',
+    'azy',
+    'io',
+    'izay',
+    'ity',
+    'ireo'
   ])
   const cleaned = query
     .toLowerCase()
     .replace(
-      /\b(cherche|recherche|chercher|trouve|trouver|montre(?:-moi)?|montrez|affiche|affichez|donne(?:-moi)?|donnez|veux|voir|search|find|show|give|get)\b/gi,
+      /\b(cherche|recherche|chercher|trouve|trouver|montre(?:-moi)?|montrez|affiche|affichez|donne(?:-moi)?|donnez|veux|voir|search|find|show|give|get|mitady|tadiavo|tadiavina)\b/gi,
       ' '
     )
     .replace(/\b(images?|photos?|pictures?|illustrations?|visuels?|dessins?)\b/gi, ' ')
