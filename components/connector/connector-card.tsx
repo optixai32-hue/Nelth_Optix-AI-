@@ -196,7 +196,7 @@ export function ConnectorCard({ className, timings, connectImpl }: ConnectorCard
         role="region"
         aria-label={t('connector.title')}
         className={cn(
-          'relative w-full max-w-[530px] rounded-2xl border border-neutral-200 bg-white px-4 py-[14px] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.25)]',
+          'nelth-connector-card relative w-full max-w-[530px] rounded-2xl border border-neutral-200 bg-white px-4 py-[14px] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.25)]',
           phase === 'entering' && 'nelth-connector-enter',
           phase === 'leaving' && 'nelth-connector-leave',
           className
@@ -263,7 +263,7 @@ export function ConnectorCard({ className, timings, connectImpl }: ConnectorCard
                 <p className="truncate text-[16px] font-semibold leading-6 text-neutral-900">
                   {t('connector.title')}
                 </p>
-                <p className="mt-0.5 line-clamp-3 text-[13px] leading-[18px] text-neutral-500">
+                <p className="nelth-connector-desc mt-0.5 line-clamp-3 text-[13px] leading-[18px] text-neutral-500">
                   {t('connector.description')}
                 </p>
               </div>

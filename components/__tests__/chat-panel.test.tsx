@@ -130,6 +130,8 @@ describe('ChatPanel', () => {
     expect(slot?.className).not.toContain('min-h-')
     const anchored = slot?.querySelector('.absolute')
     expect(anchored).not.toBeNull()
+    // Tight gap: the card sits just under the quick actions.
+    expect(anchored?.className).toContain('mt-1')
   })
 
   test('short viewports compact the empty state so the card stays visible', () => {

@@ -710,3 +710,17 @@
     animation: none;
   }
 }
+
+/* Short viewports: compact the card so it stays fully visible without
+   touching the layout above (overlay positioning is unchanged). */
+@media (max-height: 720px) {
+  .nelth-connector-card {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .nelth-connector-desc {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}

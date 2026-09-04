@@ -1034,7 +1034,7 @@ export function ChatPanel({
             It follows the chips row naturally (e.g. when the composer grows). */}
         {messages.length === 0 && (
           <div data-testid="connector-slot" className="relative">
-            <div className="absolute inset-x-0 top-full z-10 mt-3 flex justify-center px-2 [@media(max-height:720px)]:mt-2 md:px-0">
+            <div className="absolute inset-x-0 top-full z-10 mt-1 flex justify-center px-2 md:px-0">
               <ConnectorCard className="w-full max-w-[530px]" />
             </div>
           </div>
