@@ -583,3 +583,130 @@
     scale: 0.95;
   }
 }
+
+/* Nelth Connector Card motion system (chatbot-native easing). */
+@keyframes nelth-connector-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nelth-connector-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes nelth-connector-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes nelth-connector-panel-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+
+@keyframes nelth-connector-pulse {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.012);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes nelth-connector-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  55% {
+    transform: translateX(3px);
+  }
+  80% {
+    transform: translateX(-1px);
+  }
+}
+
+@keyframes nelth-check-draw {
+  from {
+    stroke-dasharray: 20;
+    stroke-dashoffset: 20;
+  }
+  to {
+    stroke-dasharray: 20;
+    stroke-dashoffset: 0;
+  }
+}
+
+.nelth-connector-enter {
+  animation: nelth-connector-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.nelth-connector-leave {
+  animation: nelth-connector-leave 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.nelth-connector-panel-enter {
+  animation: nelth-connector-panel-enter 220ms cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+.nelth-connector-panel-leave {
+  animation: nelth-connector-panel-leave 200ms cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+.nelth-connector-pulse {
+  animation: nelth-connector-pulse 600ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+}
+
+.nelth-connector-shake {
+  animation: nelth-connector-shake 300ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+}
+
+.nelth-check-draw {
+  stroke-dasharray: 20;
+  animation: nelth-check-draw 350ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nelth-connector-enter,
+  .nelth-connector-leave,
+  .nelth-connector-panel-enter,
+  .nelth-connector-panel-leave,
+  .nelth-connector-pulse,
+  .nelth-connector-shake,
+  .nelth-check-draw {
+    animation: none;
+  }
+}

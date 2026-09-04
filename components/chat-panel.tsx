@@ -58,6 +58,7 @@ import {
   TooltipTrigger
 } from './ui/tooltip'
 import { ActionButtons } from './action-buttons'
+import { ConnectorCard } from './connector/connector-card'
 import { useI18n } from './i18n-provider'
 import { MessageNavigationDots } from './message-navigation-dots'
 import { SearchModeSelector } from './search-mode-selector'
@@ -1022,6 +1023,12 @@ export function ChatPanel({
             inputRef={inputRef}
             className="mt-2 hidden md:block"
           />
+        )}
+        {/* Connector Card: native empty-state upsell, below quick actions */}
+        {messages.length === 0 && (
+          <div className="mt-4 flex w-full justify-center px-2 md:px-0">
+            <ConnectorCard className="w-full max-w-[530px]" />
+          </div>
         )}
       </form>
       <LibraryPickerDialog

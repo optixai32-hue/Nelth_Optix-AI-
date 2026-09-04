@@ -42,6 +42,20 @@ const en: Dict = {
   'chat.reply': 'Reply...',
   'chat.greetingTip': 'Ask me anything to get started.',
 
+  'connector.title': 'Connect your apps to Nelth-AI',
+  'connector.description':
+    'Connecting apps like your calendar and email lets you get more done directly with Nelth-AI.',
+  'connector.connect': 'Connect',
+  'connector.connecting': 'Connecting…',
+  'connector.connected': 'Connected',
+  'connector.retry': 'Retry',
+  'connector.manage': 'Manage',
+  'connector.dismiss': 'Dismiss connector suggestions',
+  'connector.panelTitle': 'Connect an app',
+  'connector.panelSubtitle':
+    'Give Nelth-IA access so it can work with your files, mail and calendar.',
+  'connector.close': 'Close',
+
   'feedback.title': 'Feedback',
   'feedback.help':
     'Your feedback helps us improve Nelth-IA. Let us know what you think!',
@@ -113,6 +127,20 @@ const fr: Dict = {
   'chat.placeholder': 'Posez n’importe quelle question...',
   'chat.reply': 'Répondre...',
   'chat.greetingTip': 'Posez-moi une question pour commencer.',
+
+  'connector.title': 'Connectez vos applications à Nelth-IA',
+  'connector.description':
+    'La connexion d’applications comme Google Drive, Gmail, GitHub ou Notion vous permet d’accomplir plus de tâches directement avec Nelth-IA.',
+  'connector.connect': 'Connecter',
+  'connector.connecting': 'Connexion…',
+  'connector.connected': 'Connecté',
+  'connector.retry': 'Réessayer',
+  'connector.manage': 'Gérer',
+  'connector.dismiss': 'Masquer les suggestions de connexion',
+  'connector.panelTitle': 'Connecter une application',
+  'connector.panelSubtitle':
+    'Donnez à Nelth-IA l’accès à vos fichiers, e-mails et calendriers pour travailler directement avec.',
+  'connector.close': 'Fermer',
 
   'feedback.title': 'Commentaires',
   'feedback.help':
