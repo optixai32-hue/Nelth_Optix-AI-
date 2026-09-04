@@ -38,7 +38,6 @@ import {
 import {
   getImageAttachmentUrl,
   getTextFromParts,
-  isPureGreeting,
   resolveContextualSearchQuery,
   StreamTextSanitizer,
   stripFakeToolCallXmlFromMessage
@@ -598,12 +597,16 @@ export async function createChatStreamResponse(
         },
         onFinish: ({ responseMessage, isAborted }) => {
           // Also persist the synthetic tool-search part so the Sources panel and
-          // inline citation map survive a reload.
+          // inline citation map survive a reload. Same condition as the live
+          // emit above: results, images OR videos (image-only searches must
+          // survive too).
           if (
             !isAborted &&
             responseMessage &&
             searchResultsForCitation &&
-            searchResultsForCitation.results.length > 0
+            (searchResultsForCitation.results.length > 0 ||
+              searchResultsForCitation.images.length > 0 ||
+              (searchResultsForCitation.videos?.length ?? 0) > 0)
           ) {
             const hasSearch = responseMessage.parts?.some(
               (p: any) => p.type === 'tool-search'

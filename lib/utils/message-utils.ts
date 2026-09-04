@@ -215,11 +215,20 @@ export function hasToolCalls(message: UIMessage | null): boolean {
 const FAKE_TOOL_PATTERNS = [
   /<tool_calls?\b[^>]*>[\s\S]*?(?:<\/tool_calls?\b[^>]*>|<\/invoke\b[^>]*>|(?=<tool_calls?\b)|$)/gi,
   /<tool_call\b[^>]*>[\s\S]*?(?:<\/tool_call\b[^>]*>|<\/invoke\b[^>]*>|(?=<tool_calls?\b)|$)/gi,
-  /<invoke\b[^>]*>[\s\S]*?(?:<\/invoke\b[^>]*>|$)/gi,
-  /<function\b[^>]*>[\s\S]*?(?:<\/function>|$)/gi,
+  // <invoke> / <function> only strip CLOSED blocks or attribute-carrying calls
+  // (<invoke name="search">…). A bare unclosed tag is often legitimate prose
+  // ("the <function> keyword") — deleting to end-of-answer would nuke a
+  // correct response, which is worse than leaking a tag.
+  /<invoke\b[^>]*>[\s\S]*?<\/invoke\s*>/gi,
+  /<invoke\b[^>]*\b(?:name|id|tool|query|args?|params?)\b[^>]*>[\s\S]*?(?:<\/invoke\s*>|$)/gi,
+  /<function\b[^>]*>[\s\S]*?<\/function\s*>/gi,
+  /<function\b[^>]*\b(?:name|id|tool|query|args?|params?)\b[^>]*>[\s\S]*?(?:<\/function\s*>|$)/gi,
   /<tool-search\b[^>]*>[\s\S]*?(?:<\/tool-search>|$)/gi,
-  /<\/?(?:tool_calls?|tool_call|invoke|function|tool-search)\b[^>]*\/?>/gi,
-  /<\/?tool_call(?:s|:[a-zA-Z0-9_-]+)?[^>]*>/gi
+  // Lone tags: only unambiguous fake-tool syntax. Bare <invoke>/<function>
+  // are legitimate prose far more often than tool calls, so they are left
+  // alone here (closed/attribute-carrying blocks are handled above).
+  /<\/?(?:tool_calls?|tool-search)\b[^>]*\/?>/gi,
+  /<\/?tool_calls?(?::[a-zA-Z0-9_-]+)?[^>]*>/gi
 ]
 
 export function stripFakeToolCallXml(text: string): string {
@@ -231,7 +240,11 @@ export function stripFakeToolCallXml(text: string): string {
   return result
     .replace(/^[ \t]*search">.*$/gim, '')
     .replace(/\n{3,}/g, '\n\n')
-    .trim()
+    // Strip blank LINES at the edges only — never .trim(): streaming deltas
+    // carry meaningful leading/trailing spaces (" world") and trimming them
+    // glues words together ("Helloworld").
+    .replace(/^\n+/, '')
+    .replace(/\n+$/, '')
 }
 
 export function stripFakeToolCallXmlFromMessage(message: {
@@ -256,7 +269,7 @@ export function stripFakeToolCallXmlFromMessage(message: {
  * (Word boundaries matter: "hi" must not match "histoire".)
  */
 const INTRO_START_RE =
-  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|je suis nelth|qui suis-je|ravi|content|enchanté)/i
+  /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|je suis nelth|qui suis-je|ravi\s+de|content\s+de|enchanté)/i
 
 /**
  * Greeting/hook-led intro paragraph ("Salut ! 👋 Ravi de vous revoir.") —
@@ -264,6 +277,14 @@ const INTRO_START_RE =
  */
 const GREETING_HOOK_PARAGRAPH_RE =
   /^\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b|👋|ravi(?:e)? de vous|content(?:e)? de vous|enchanté(?:e)?)/i
+
+/**
+ * Leading greeting sentences inside an intro paragraph ("Salut ! 👋 Ravi de
+ * vous revoir. Voici ..."). Stripped sentence by sentence (up to 2) so a
+ * paragraph that continues with real content keeps that content.
+ */
+const LEADING_GREETING_SENTENCES_RE =
+  /^(?:\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b[^.!?…\n]*[.!?…]?|👋+\s*|(?:ravi(?:e)? de vous|content(?:e)? de vous|enchanté(?:e)?)[^.!?…\n]*[.!?…]+)\s*){1,2}/i
 
 /**
  * Self-intro-led paragraph ("Qui suis-je ? 🤖", "Je suis Nelth-IA, ...") — the
@@ -308,7 +329,15 @@ export function stripLeadingIntroReset(
     if (rest.trim().length === 0) break
     if (para.length > 600) break
     if (GREETING_HOOK_PARAGRAPH_RE.test(para)) {
-      out = rest.replace(/^\s+/, '')
+      // Greeting-led paragraph: strip only the leading greeting sentences so
+      // real content continuing in the same paragraph survives. If nothing
+      // substantial remains, drop the paragraph as before.
+      const remainder = para.replace(LEADING_GREETING_SENTENCES_RE, '').trim()
+      if (remainder.length > 40) {
+        out = `${remainder}\n\n${rest.replace(/^\s+/, '')}`
+      } else {
+        out = rest.replace(/^\s+/, '')
+      }
       continue
     }
     if (!keepSelfIntro && SELF_INTRO_PARAGRAPH_RE.test(para)) {

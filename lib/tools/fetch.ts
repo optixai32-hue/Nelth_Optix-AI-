@@ -123,7 +123,7 @@ async function fetchJinaReaderData(url: string): Promise<SearchResultsType> {
 
 export const fetchTool = tool({
   description:
-    'Fetch content from any URL. By default uses "regular" type which performs fast, direct HTML fetching without external APIs - ideal for most websites. IMPORTANT: "regular" type does NOT support PDFs and will fail on PDF URLs. Use "api" type when you need: 1) PDF content extraction (required for .pdf URLs), 2) Complex JavaScript-rendered pages, 3) Better markdown formatting, 4) Table extraction. The "api" type requires Jina or Tavily API keys and uses Jina Reader if available, otherwise falls back to Tavily Extract.',
+    'Fetch content from any URL. By default uses "regular" type which performs fast, direct HTML fetching without external APIs - ideal for most websites. IMPORTANT: "regular" type does NOT support PDFs and will fail on PDF URLs. Use "api" type when you need: 1) PDF content extraction (required for .pdf URLs), 2) Complex JavaScript-rendered pages, 3) Better markdown formatting, 4) Table extraction. The "api" type requires a Jina API key and uses Jina Reader when available, otherwise falls back to a direct regular fetch (which fails on PDFs).',
   inputSchema: fetchSchema,
   async *execute({ url, type = 'regular' }) {
     // Yield initial fetching state

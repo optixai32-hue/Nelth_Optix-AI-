@@ -36,6 +36,23 @@ describe('stripLeadingIntroReset', () => {
     expect(stripLeadingIntroReset(text)).toBe(text)
   })
 
+  it('keeps real content continuing in the same paragraph as the greeting', () => {
+    const text = [
+      'Salut ! Voici les trois points essentiels à retenir sur ce sujet important que vous m’avez demandé d’expliquer en détail.',
+      '',
+      'La suite de la réponse.'
+    ].join('\n')
+    const result = stripLeadingIntroReset(text)
+    expect(result).toContain('Voici les trois points essentiels')
+    expect(result).toContain('La suite de la réponse.')
+    expect(result).not.toContain('Salut !')
+  })
+
+  it('drops a greeting-only paragraph even with a longer rest following', () => {
+    const text = ['Bonjour ! 👋', '', 'Voici la réponse complète.'].join('\n')
+    expect(stripLeadingIntroReset(text)).toBe('Voici la réponse complète.')
+  })
+
   it('never nukes a greeting-only response', () => {
     const text = 'Bonjour ! Que puis-je faire pour vous ?'
     expect(stripLeadingIntroReset(text)).toBe(text)

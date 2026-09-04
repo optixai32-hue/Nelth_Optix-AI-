@@ -97,18 +97,26 @@ export function extractCitationMapsFromMessages(
  */
 /**
  * Expand grouped citations like `[1, 2, 5]` or `[1,2]` into separate `[1] [2] [5]`.
+ * Math spans ($...$, paired dollars only) are left untouched so vectors and
+ * matrices like `$[1, 2]$` are never mangled.
  */
 function expandGroupedCitations(content: string): string {
-  return content.replace(
-    /\[\s*(\d{1,2}(?:\s*,\s*\d{1,2})+)\s*\](?!\()/g,
-    (_m, group) => {
-      const numbers = group
-        .split(',')
-        .map((n: string) => n.trim())
-        .filter(Boolean)
-      return numbers.map((n: string) => `[${n}]`).join(' ')
-    }
-  )
+  const segments = content.split(/(\$[^$\n]+\$)/g)
+  for (let i = 0; i < segments.length; i += 2) {
+    // Lookbehind: a digit-bracket glued to a word char (arr[1,2], x[0,1])
+    // is code, not a citation group.
+    segments[i] = segments[i].replace(
+      /(?<![A-Za-z0-9_])\[\s*(\d{1,2}(?:\s*,\s*\d{1,2})+)\s*\](?!\()/g,
+      (_m, group) => {
+        const numbers = group
+          .split(',')
+          .map((n: string) => n.trim())
+          .filter(Boolean)
+        return numbers.map((n: string) => `[${n}]`).join(' ')
+      }
+    )
+  }
+  return segments.join('')
 }
 
 /**
@@ -127,18 +135,22 @@ function normalizeBareCitations(
 
   const expanded = expandGroupedCitations(content)
 
-  return expanded.replace(/\[\s*(\d{1,2})\s*\](?!\()/g, (_m, numStr) => {
+  return expanded.replace(
+    /(?<![A-Za-z0-9_])\[\s*(\d{1,2})\s*\](?!\()/g,
+    (_m, numStr) => {
     const num = parseInt(numStr, 10)
-    // Find which tool call has citation `num`
-    let targetId = 'preloaded-search'
+    // Only rewrite bare tokens that actually resolve to a search result.
+    // Anything else (array indices like arr[1], "section [12]", footnotes)
+    // is legitimate prose and must be left untouched — never deleted.
     if (citationMaps['preloaded-search']?.[num]) {
-      targetId = 'preloaded-search'
-    } else {
-      // Find any toolCallId that has this citation number
-      const foundId = toolCallIds.find(id => citationMaps[id]?.[num])
-      targetId = foundId || toolCallIds[toolCallIds.length - 1]
+      return `[${num}](#preloaded-search)`
     }
-    return `[${num}](#${targetId})`
+    // Find any toolCallId that has this citation number
+    const foundId = toolCallIds.find(id => citationMaps[id]?.[num])
+    if (foundId) {
+      return `[${num}](#${foundId})`
+    }
+    return _m
   })
 }
 

@@ -27,7 +27,6 @@ import { search as runWebSearch } from '@/lib/tools/search'
 import {
   getImageAttachmentUrl,
   getTextFromParts,
-  isPureGreeting,
   resolveContextualSearchQuery,
   StreamTextSanitizer,
   stripFakeToolCallXmlFromMessage

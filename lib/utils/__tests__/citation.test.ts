@@ -205,6 +205,26 @@ describe('processCitations', () => {
     expect(result).toBe('Edge cases:   [-1](#toolCall1)')
   })
 
+  it('leaves prose digit-brackets untouched when they resolve to nothing', () => {
+    const content = 'Use arr[1] and see section [12] for details [99].'
+    expect(processCitations(content, mockCitationMaps)).toBe(content)
+  })
+
+  it('still resolves bare citations that match a real result', () => {
+    expect(processCitations('See [1] and [2].', mockCitationMaps)).toBe(
+      'See [google](https://www.google.com) and [github](https://docs.github.com).'
+    )
+  })
+
+  it('does not expand grouped numbers inside $...$ math spans', () => {
+    const content = 'The vector $[1, 2]$ is fine, but see [1, 2].'
+    const result = processCitations(content, mockCitationMaps)
+    expect(result).toContain('$[1, 2]$')
+    expect(result).toContain(
+      '[google](https://www.google.com) [github](https://docs.github.com)'
+    )
+  })
+
   describe('extractCitationMaps', () => {
     const results = [
       { title: 'Google', url: 'https://www.google.com', content: 'a' },

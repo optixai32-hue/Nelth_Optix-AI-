@@ -7,8 +7,12 @@
  * It only wraps content that looks like a real spec block: consecutive lines
  * that each start with `{"op":` and contain a `path` field, covering the
  * `{"op":"add","path":...}` shape used by related-question and image specs.
+ *
+ * Content inside fenced code blocks (``` ... ```) is NEVER touched: code
+ * tutorials legitimately contain `{"op":...}` JSON that must stay prose.
+ * Each bare run is wrapped independently — runs are never merged or moved.
  */
-const SPEC_LINE_RE = /^\s*\{\s*"op"\s*:/
+const SPEC_LINE_RE = /^\s*\{\s*"op"\s*:[^}]*"path"\s*:/
 
 function looksLikeSpecLine(line: string): boolean {
   return SPEC_LINE_RE.test(line)
@@ -18,25 +22,12 @@ export function wrapBareSpecBlocks(text: string): string {
   if (!text.includes('{"op":')) return text
 
   const lines = text.split('\n')
-
-  // Some models emit a ```spec fence whose closing delimiter is malformed:
-  // a bare `spec` line (no backticks) instead of ```. Normalize those into a
-  // proper closing fence so the block doesn't leak as raw text.
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() === 'spec') {
-      lines[i] = '```'
-    }
-  }
-
   const out: string[] = []
   let buffer: string[] = []
-  let fenceOpen = false
+  let inFence = false
 
   const flush = (fenced: boolean) => {
-    if (buffer.length === 0) {
-      fenceOpen = false
-      return
-    }
+    if (buffer.length === 0) return
     if (fenced) {
       out.push('```spec')
       out.push(...buffer)
@@ -45,35 +36,49 @@ export function wrapBareSpecBlocks(text: string): string {
       out.push(...buffer)
     }
     buffer = []
-    fenceOpen = false
   }
 
   for (const line of lines) {
     const trimmed = line.trim()
-    if (trimmed === '```') {
-      // Proper closing fence: flush whatever we collected as a spec block.
-      flush(fenceOpen)
+    if (/^\s*```/.test(line)) {
+      // A fence boundary ends any pending bare run; the fence itself and
+      // everything inside fenced regions passes through untouched.
+      flush(true)
+      inFence = !inFence
       out.push(line)
       continue
     }
-    const isSpec = looksLikeSpecLine(line)
-    if (isSpec) {
-      if (fenceOpen) {
-        // Already inside a spec fence — pass through unchanged.
+    // Some models emit a ```spec fence whose closing delimiter is malformed:
+    // a bare `spec` line (no backticks) instead of ```. Repair it inside
+    // fences; outside fences only a run in progress justifies touching it —
+    // a lone prose "spec" word must never become a fence.
+    // NOTE: this check must come BEFORE the in-fence passthrough below,
+    // otherwise a malformed closer inside a fence would leak through.
+    if (trimmed === 'spec') {
+      if (inFence) {
+        inFence = false
+        out.push('```')
+      } else if (buffer.length > 0) {
+        flush(true)
+      } else {
         out.push(line)
-        continue
       }
+      continue
+    }
+    if (inFence) {
+      out.push(line)
+      continue
+    }
+    if (looksLikeSpecLine(line)) {
       buffer.push(line)
     } else {
-      if (fenceOpen) {
-        // Fence was opened but this line breaks the spec run: close it
-        // implicitly and emit the buffered spec as a fenced block.
-        flush(true)
-      }
+      // A non-spec line ends the run: wrap what we collected in place so
+      // separate runs never merge and surrounding prose keeps its order.
+      flush(true)
       out.push(line)
     }
   }
-  // Close a spec fence that was left open at the end of the message.
+  // A run left open at the end of the message still gets wrapped.
   flush(true)
 
   return out.join('\n')

@@ -58,7 +58,7 @@ export const strictSearchSchema = z.object({
   content_types: z
     .array(z.enum(['web', 'video', 'image', 'news']))
     .describe(
-      'Types of content to include in search results. Only applicable when type is "general" and a dedicated general search provider is configured. Ignored otherwise.'
+      'Types of content to include in search results (web and image are both supported on either search type).'
     ),
   max_results: z.number().describe('The maximum number of results to return.'),
   search_depth: z
