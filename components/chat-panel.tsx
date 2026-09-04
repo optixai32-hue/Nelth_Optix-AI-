@@ -1024,16 +1024,16 @@ export function ChatPanel({
             className="mt-2 hidden md:block"
           />
         )}
-        {/* Connector Card: native empty-state upsell, below quick actions.
-            The slot keeps a reserved min-height at all times (even when the
-            card is dismissed) so the logo, composer and chips above NEVER
-            shift position when the card appears or disappears. */}
+        {/* Connector Card: anchored OVERLAY below the quick actions.
+            Absolutely positioned so it NEVER affects the layout: the logo,
+            greeting, composer and chips keep their exact original positions,
+            and the card appears, animates and dismisses with zero shift.
+            It follows the chips row naturally (e.g. when the composer grows). */}
         {messages.length === 0 && (
-          <div
-            data-testid="connector-slot"
-            className="mt-3 flex min-h-[164px] w-full justify-center px-2 sm:min-h-[112px] md:px-0"
-          >
-            <ConnectorCard className="w-full max-w-[530px]" />
+          <div data-testid="connector-slot" className="relative">
+            <div className="absolute inset-x-0 top-full z-10 mt-3 flex justify-center px-2 md:px-0">
+              <ConnectorCard className="w-full max-w-[530px]" />
+            </div>
           </div>
         )}
       </form>

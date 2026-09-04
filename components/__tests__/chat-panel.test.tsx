@@ -122,11 +122,13 @@ describe('ChatPanel', () => {
 
     const slot = container.querySelector('[data-testid="connector-slot"]')
     expect(slot).not.toBeNull()
-    // Reserved heights prevent siblings from shifting when the card
-    // appears, animates or is dismissed.
-    expect(slot?.className).toContain('min-h-[164px]')
-    expect(slot?.className).toContain('sm:min-h-[112px]')
-    // Tight gap: the card sits just under the quick actions.
-    expect(slot?.className).toContain('mt-3')
+    // Overlay anchoring: the slot is zero-height (relative wrapper) and the
+    // card is absolutely positioned below the chips, so the logo, composer
+    // and chips keep their exact original positions — no reserved space
+    // pushes them up, and mount/dismiss never shifts them.
+    expect(slot?.className).toContain('relative')
+    expect(slot?.className).not.toContain('min-h-')
+    const anchored = slot?.querySelector('.absolute')
+    expect(anchored).not.toBeNull()
   })
 })
