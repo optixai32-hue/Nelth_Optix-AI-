@@ -1024,9 +1024,15 @@ export function ChatPanel({
             className="mt-2 hidden md:block"
           />
         )}
-        {/* Connector Card: native empty-state upsell, below quick actions */}
+        {/* Connector Card: native empty-state upsell, below quick actions.
+            The slot keeps a reserved min-height at all times (even when the
+            card is dismissed) so the logo, composer and chips above NEVER
+            shift position when the card appears or disappears. */}
         {messages.length === 0 && (
-          <div className="mt-4 flex w-full justify-center px-2 md:px-0">
+          <div
+            data-testid="connector-slot"
+            className="mt-3 flex min-h-[164px] w-full justify-center px-2 sm:min-h-[112px] md:px-0"
+          >
             <ConnectorCard className="w-full max-w-[530px]" />
           </div>
         )}

@@ -92,4 +92,41 @@ describe('ChatPanel', () => {
     })
     expect(onAdaptiveModeAuthRequired).not.toHaveBeenCalled()
   })
+
+  test('reserves a stable slot for the connector card below quick actions', async () => {
+    const { container } = render(
+      <ChatPanel
+        chatId="chat-1"
+        input=""
+        handleInputChange={vi.fn()}
+        handleSubmit={vi.fn()}
+        status="ready"
+        messages={[]}
+        setMessages={vi.fn()}
+        query=""
+        stop={vi.fn()}
+        append={vi.fn()}
+        showScrollToBottomButton={false}
+        scrollContainerRef={React.createRef<HTMLDivElement>()}
+        uploadedFiles={[]}
+        setUploadedFiles={vi.fn()}
+        quotedContexts={[]}
+        setQuotedContexts={vi.fn()}
+        noteContexts={[]}
+        setNoteContexts={vi.fn()}
+        isGuest
+        isCloudDeployment
+        onAdaptiveModeAuthRequired={vi.fn()}
+      />
+    )
+
+    const slot = container.querySelector('[data-testid="connector-slot"]')
+    expect(slot).not.toBeNull()
+    // Reserved heights prevent siblings from shifting when the card
+    // appears, animates or is dismissed.
+    expect(slot?.className).toContain('min-h-[164px]')
+    expect(slot?.className).toContain('sm:min-h-[112px]')
+    // Tight gap: the card sits just under the quick actions.
+    expect(slot?.className).toContain('mt-3')
+  })
 })
