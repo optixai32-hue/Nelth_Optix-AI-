@@ -174,6 +174,44 @@ Entries correspond to cited sources in order. Their URLs remain in the preceding
 }
 
 /**
+ * When an assistant turn has no text at all (tool-only turn, e.g. an image
+ * generation with no prose), dropping it entirely would erase the fact that
+ * an artifact was produced — follow-ups like "make it bigger" could no longer
+ * resolve "it". Keep a one-line factual marker instead (URLs only, no prose).
+ */
+function artifactMarkerText(message: UIMessage): string | null {
+  const markers: string[] = []
+  for (const part of message.parts) {
+    const output = (part as { output?: unknown }).output
+    if (!output || typeof output !== 'object') continue
+    const out = output as {
+      imageUrl?: unknown
+      artifact?: { downloadUrl?: unknown; fileName?: unknown }
+    }
+    if (typeof out.imageUrl === 'string' && out.imageUrl) {
+      markers.push(`[previous assistant turn generated an image: ${out.imageUrl}]`)
+    } else if (
+      out.artifact &&
+      typeof out.artifact === 'object' &&
+      typeof (out.artifact as { downloadUrl?: unknown }).downloadUrl ===
+        'string'
+    ) {
+      const artifact = out.artifact as {
+        downloadUrl: string
+        fileName?: unknown
+      }
+      const name =
+        typeof artifact.fileName === 'string' ? ` (${artifact.fileName})` : ''
+      markers.push(
+        `[previous assistant turn generated a downloadable document${name}: ${artifact.downloadUrl}]`
+      )
+    }
+  }
+  if (markers.length === 0) return null
+  return [...new Set(markers)].join('\n')
+}
+
+/**
  * Converts completed assistant history into a provider-neutral transcript.
  *
  * Historical reasoning, tool calls, tool results, step markers, and provider
@@ -219,6 +257,13 @@ export function compactHistoricalMessages(messages: UIMessage[]): UIMessage[] {
     })
 
     if (textParts.length === 0) {
+      // Tool-only turn (no prose): preserve a compact artifact marker so
+      // follow-ups ("make it bigger", "modify it") still resolve. Pure
+      // execution traces with no artifact are dropped as before.
+      const marker = artifactMarkerText(message)
+      if (marker) {
+        return [{ ...message, parts: [{ type: 'text', text: marker }] }]
+      }
       return []
     }
 

@@ -519,12 +519,29 @@ function detectQuickIntent(
 
 // Enhanced researcher function with improved type safety using ToolLoopAgent
 // Note: abortSignal should be passed to agent.stream() or agent.generate() calls, not to the agent constructor
+/**
+ * Builds the injected server-provided search layer. The executed search query
+ * is labeled so the model can tell which question the results answer — without
+ * it, merged follow-up queries make the model restate previous-topic facts.
+ * Exported for unit testing.
+ */
+export function buildPreloadedSearchLayer(
+  preloadedSearchContext: string | undefined,
+  preloadedSearchQuery?: string
+): string {
+  if (!preloadedSearchContext) return ''
+  const queryLine = preloadedSearchQuery?.trim()
+    ? `Search query used: "${preloadedSearchQuery.trim()}"\n`
+    : ''
+  return `\n\nSERVER-PROVIDED WEB RESULTS (each numbered 1..N):\n${queryLine}${preloadedSearchContext}\nUse these results to answer now. Do NOT emit any <tool_call>, <tool_calls>, or function-call syntax.\n\nCITATIONS (MANDATORY): Every factual claim that comes from a source MUST be followed immediately by that source's number inside SQUARE BRACKETS, e.g. [1] or [3]. Place the [n] right after the sentence it supports. Example: "iOS 27 rolled out across devices[1]." Each citation is a SEPARATE [n] token placed next to its own fact.\nSTRICT RULES:\n- Write each citation as [n] where n is the source's 1-based number from the numbered list above.\n- NEVER concatenate numbers into one string (NEVER write "1314" or "13141920"). Write [1][3][14] as separate tokens instead.\n- NEVER write a bare number with no brackets, and NEVER write a raw URL.\nThese [n] markers are automatically turned into clickable links to the real source, so just use [n] next to its own fact.\nNEVER invent citation numbers: use [n] ONLY for a numbered web result actually provided above — with no web results, no [n] at all.\nEXCEPTION — IMAGE DISPLAY: Markdown image lines, their captions, the image intro sentence and the image Sources section must NEVER carry [n] markers and NEVER show raw URLs — sources are numbered clickable links. Image captions reuse the given image title verbatim and images stay in IMG-number order.\n`
+}
 export function createResearcher({
   model,
   modelConfig,
   searchMode = 'adaptive',
   skillContext,
   preloadedSearchContext,
+  preloadedSearchQuery,
   imageAttachment,
   userQuery,
   capabilities
@@ -536,6 +553,8 @@ export function createResearcher({
   skillContext?: string
   /** Server-side search results used when the selected model emits fake XML tool calls. */
   preloadedSearchContext?: string
+  /** The exact search query that produced the preloaded results (provenance). */
+  preloadedSearchQuery?: string
   /** URL of an uploaded image attachment to force the img2img route. */
   imageAttachment?: string
   /** Latest user message text, used to detect code/artifact creation so we can
@@ -780,9 +799,10 @@ export function createResearcher({
     // the preview iframe). Leading the prompt with the active skills guarantees
     // the model sees and applies them first.
     const skillLayer = skillContext ? skillContext : ''
-    const preloadedSearchLayer = preloadedSearchContext
-      ? `\n\nSERVER-PROVIDED WEB RESULTS (each numbered 1..N):\n${preloadedSearchContext}\nUse these results to answer now. Do NOT emit any <tool_call>, <tool_calls>, or function-call syntax.\n\nCITATIONS (MANDATORY): Every factual claim that comes from a source MUST be followed immediately by that source's number inside SQUARE BRACKETS, e.g. [1] or [3]. Place the [n] right after the sentence it supports. Example: "iOS 27 rolled out across devices[1]." Each citation is a SEPARATE [n] token placed next to its own fact.\nSTRICT RULES:\n- Write each citation as [n] where n is the source's 1-based number from the numbered list above.\n- NEVER concatenate numbers into one string (NEVER write "1314" or "13141920"). Write [1][3][14] as separate tokens instead.\n- NEVER write a bare number with no brackets, and NEVER write a raw URL.\nThese [n] markers are automatically turned into clickable links to the real source, so just use [n] next to each fact.\nNEVER invent citation numbers: use [n] ONLY for a numbered web result actually provided above — with no web results, no [n] at all.\nEXCEPTION — IMAGE DISPLAY: Markdown image lines, their captions, the image intro sentence and the image Sources section must NEVER carry [n] markers and NEVER show raw URLs — sources are numbered clickable links. Image captions reuse the given image title verbatim and images stay in IMG-number order.\n`
-      : ''
+    const preloadedSearchLayer = buildPreloadedSearchLayer(
+      preloadedSearchContext,
+      preloadedSearchQuery
+    )
     // In preloaded (server-side search) mode the search tool is NOT available to
     // the model — results are injected as text. Replacing the generic
     // TOOL_CALL_PROTOCOL (which says "invoke the search tool immediately") with a

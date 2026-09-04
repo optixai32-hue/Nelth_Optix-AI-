@@ -45,6 +45,7 @@ import {
   convertDataPart,
   mapFilePartsToDataParts
 } from './helpers/convert-data-part'
+import { normalizeConversationHistory } from './helpers/normalize-conversation'
 import { stripSpecFromMessages } from './helpers/strip-spec-from-messages'
 import { BaseStreamConfig } from './types'
 
@@ -83,7 +84,11 @@ export async function createEphemeralChatStreamResponse(
     }
 
     try {
-      const messagesWithoutSpec = stripSpecFromMessages(messages)
+      // Authoritative history normalization FIRST: exactly-once messages,
+      // chronological order preserved. Everything downstream (user query,
+      // skill routing, search, model input) sees this same clean list.
+      const historyMessages = normalizeConversationHistory(messages).messages
+      const messagesWithoutSpec = stripSpecFromMessages(historyMessages)
       const messagesToConvert = compactHistoricalMessages(messagesWithoutSpec)
       const messagesWithoutFileParts = mapFilePartsToDataParts(
         messagesToConvert
@@ -108,7 +113,7 @@ export async function createEphemeralChatStreamResponse(
 
       // Attachment-driven routing: collect document formats across all messages so
       // an uploaded pdf/docx/xlsx/pptx activates its skill even with no trigger.
-      const fileParts = messages
+      const fileParts = historyMessages
         .flatMap(m => m.parts ?? [])
         .filter(p => p?.type === 'file')
       const attachmentFormats = extractAttachmentFormats(
@@ -140,7 +145,7 @@ export async function createEphemeralChatStreamResponse(
       // If resolved only AFTER `trivial`, an image upload is wrongly treated as a
       // trivial request and ALL tools (incl. generateImage) get disarmed — so the
       // model falls back to the web search tool.
-      const lastUserMessage = [...messages]
+      const lastUserMessage = [...historyMessages]
         .reverse()
         .find(m => m.role === 'user')
       const imageAttachment = lastUserMessage?.parts
@@ -168,12 +173,14 @@ export async function createEphemeralChatStreamResponse(
       // is true), we fetch results server-side and provide them directly to the model.
       const shouldPreloadSearch = Boolean(caps.needsSearch)
       let preloadedSearchContext: string | undefined
+      let preloadedSearchQuery: string | undefined
       let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
       if (shouldPreloadSearch) {
         const effectiveSearchQuery = resolveContextualSearchQuery(
           userQuery,
-          messages
+          historyMessages
         )
+        preloadedSearchQuery = effectiveSearchQuery
         const searchResult = await runWebSearch(
           effectiveSearchQuery,
           // Web count only — the provider always fetches 20 images in parallel
@@ -226,7 +233,7 @@ export async function createEphemeralChatStreamResponse(
         // Skill CONTINUITY: carry the previous turn's active skills + design
         // fingerprint so follow-ups ("another version") keep the skill active.
         // Only resolved when a skill is actually in play for this request.
-        prevCtx = await getPreviousDesignContext(messages, lastUser?.id)
+        prevCtx = await getPreviousDesignContext(historyMessages, lastUser?.id)
         // NOTE (parity with the main chat path): do NOT pass `compact` for ANY
         // model. The checklist-only context makes models ignore the skill
         // substance for code (design brief instead of complete code), and it
@@ -258,6 +265,7 @@ export async function createEphemeralChatStreamResponse(
         searchMode,
         skillContext,
         preloadedSearchContext,
+        preloadedSearchQuery,
         imageAttachment,
         userQuery,
         capabilities: {

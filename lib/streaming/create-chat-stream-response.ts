@@ -50,6 +50,7 @@ import {
   convertDataPart,
   mapFilePartsToDataParts
 } from './helpers/convert-data-part'
+import { normalizeConversationHistory } from './helpers/normalize-conversation'
 import { persistStreamResults } from './helpers/persist-stream-results'
 import { prepareMessages } from './helpers/prepare-messages'
 import { stripSpecFromMessages } from './helpers/strip-spec-from-messages'
@@ -158,7 +159,11 @@ export async function createChatStreamResponse(
       perfLog(
         `prepareMessages - Invoked: trigger=${trigger}, isNewChat=${isNewChat}`
       )
-      const messagesToModel = await prepareMessages(context, message)
+      const preparedMessages = await prepareMessages(context, message)
+      // Authoritative history normalization: exactly-once current message,
+      // no duplicates, no contentless turns — chronological order preserved.
+      const { messages: messagesToModel } =
+        normalizeConversationHistory(preparedMessages)
       perfTime('prepareMessages completed (stream)', prepareStart)
 
       // Resolve the latest user query and run the Skill Router so the model
@@ -235,12 +240,14 @@ export async function createChatStreamResponse(
       // UI displays the search process, Sources panel, and inline citations.
       const shouldPreloadSearch = Boolean(caps.needsSearch)
       let preloadedSearchContext: string | undefined
+      let preloadedSearchQuery: string | undefined
       let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
       if (shouldPreloadSearch) {
         const effectiveSearchQuery = resolveContextualSearchQuery(
           userQuery,
           messagesToModel
         )
+        preloadedSearchQuery = effectiveSearchQuery
         const searchResult = await runWebSearch(
           effectiveSearchQuery,
           // Web count only — the provider always fetches 20 images in parallel
@@ -331,6 +338,7 @@ export async function createChatStreamResponse(
         searchMode,
         skillContext,
         preloadedSearchContext,
+        preloadedSearchQuery,
         imageAttachment,
         userQuery,
         capabilities: {
