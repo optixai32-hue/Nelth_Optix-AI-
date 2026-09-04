@@ -131,4 +131,36 @@ describe('ChatPanel', () => {
     const anchored = slot?.querySelector('.absolute')
     expect(anchored).not.toBeNull()
   })
+
+  test('short viewports compact the empty state so the card stays visible', () => {
+    const { container } = render(
+      <ChatPanel
+        chatId="chat-1"
+        input=""
+        handleInputChange={vi.fn()}
+        handleSubmit={vi.fn()}
+        status="ready"
+        messages={[]}
+        setMessages={vi.fn()}
+        query=""
+        stop={vi.fn()}
+        append={vi.fn()}
+        showScrollToBottomButton={false}
+        scrollContainerRef={React.createRef<HTMLDivElement>()}
+        uploadedFiles={[]}
+        setUploadedFiles={vi.fn()}
+        quotedContexts={[]}
+        setQuotedContexts={vi.fn()}
+        noteContexts={[]}
+        setNoteContexts={vi.fn()}
+        isGuest
+        isCloudDeployment
+        onAdaptiveModeAuthRequired={vi.fn()}
+      />
+    )
+
+    // Height-scoped compaction only (tall screens pixel-identical).
+    const hero = container.querySelector('[data-testid="empty-hero"]')
+    expect(hero?.className).toContain('max-height')
+  })
 })

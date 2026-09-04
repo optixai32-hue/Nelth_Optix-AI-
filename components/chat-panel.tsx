@@ -476,9 +476,12 @@ export function ChatPanel({
       )}
     >
       {messages.length === 0 && (
-        <div className="mb-6 md:mb-10 flex flex-col items-center gap-2 md:gap-4">
-          <IconBlinkingLogo className="size-16" />
-          <h1 className="text-xl md:text-2xl font-medium text-foreground">
+        <div
+          data-testid="empty-hero"
+          className="mb-6 flex flex-col items-center gap-2 md:mb-10 md:gap-4 [@media(max-height:720px)]:mb-3 [@media(max-height:720px)]:gap-2"
+        >
+          <IconBlinkingLogo className="size-16 [@media(max-height:720px)]:size-12" />
+          <h1 className="text-xl font-medium text-foreground md:text-2xl [@media(max-height:720px)]:text-lg">
             {greeting}
           </h1>
         </div>
@@ -1031,7 +1034,7 @@ export function ChatPanel({
             It follows the chips row naturally (e.g. when the composer grows). */}
         {messages.length === 0 && (
           <div data-testid="connector-slot" className="relative">
-            <div className="absolute inset-x-0 top-full z-10 mt-3 flex justify-center px-2 md:px-0">
+            <div className="absolute inset-x-0 top-full z-10 mt-3 flex justify-center px-2 [@media(max-height:720px)]:mt-2 md:px-0">
               <ConnectorCard className="w-full max-w-[530px]" />
             </div>
           </div>
