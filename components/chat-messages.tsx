@@ -38,13 +38,22 @@ interface ChatMessagesProps {
   error?: Error | string | null | undefined
   onQuoteContext?: (text: string) => void
   /** The model selection cookie value (e.g. "tencent:tencent/hy3:free").
-   *  When it contains "hy3:free", the Nelth-3.5 loading label is shown. */
+   *  Kept for API compatibility; the loading label now shows for all models. */
   selectedModelKey?: string
 }
 
 const DESKTOP_LATEST_SECTION_OFFSET = 196
 const MOBILE_LATEST_SECTION_OFFSET_FALLBACK = 180
 const MOBILE_FOLLOW_UP_TOP_CLEARANCE_FALLBACK = 56
+
+// Activity messages for connector tools while they reach the user's apps.
+const CONNECTOR_TOOL_ACTIVITY: Record<string, string> = {
+  'tool-gmail': 'Connexion à Gmail…',
+  'tool-drive': 'Lecture de Drive…',
+  'tool-calendar': 'Consultation de l’agenda…',
+  'tool-github': 'Recherche dans GitHub…',
+  'tool-notion': 'Lecture de Notion…'
+}
 
 export function ChatMessages({
   sections,
@@ -58,8 +67,7 @@ export function ChatMessages({
   onUpdateMessage,
   reload,
   error,
-  onQuoteContext,
-  selectedModelKey
+  onQuoteContext
 }: ChatMessagesProps) {
   // Track user-modified states (when user explicitly opens/closes)
   const [userModifiedStates, setUserModifiedStates] = useState<
@@ -70,17 +78,14 @@ export function ChatMessages({
   const isLoading = status === 'submitted' || status === 'streaming'
   const isMobile = useMediaQuery('(max-width: 767px)')
 
-  // Show the shimmer loading label only for the Nelth-3.5 (non-thinking) model.
-  // The label is intentionally DELAYED 500ms and only shown while waiting for the
-  // first real text token in the UI:
+  // Shimmer loading label for ALL models while waiting for the first real
+  // text token in the UI. The label is intentionally DELAYED 500ms:
   //   - Simple questions (bonjour, math)  → response in <300ms  → label never appears
-  //   - Skill-heavy requests (code, design) → 1-3s latency → label shows at 500ms
+  //   - Tool-heavy requests (web search, connectors, skills) → label shows at
+  //     500ms with the CURRENT activity ("Connexion à Gmail…"), then falls
+  //     back to rotating generic phases between tool calls.
   //   - Label hides ONLY when actual text appears in the message (not on status change)
   //     so it doesn't vanish before the user sees any content.
-  const isNonThinkingModel = Boolean(
-    selectedModelKey?.includes('hy3:free') ||
-      selectedModelKey?.includes('minimax-m3:free')
-  )
 
   // True once the latest assistant message contains at least one non-empty text part.
   // Recomputed only when sections change (not on every render tick).
@@ -112,37 +117,72 @@ export function ChatMessages({
     )
   }, [sections])
 
-  const [showNelthLabel, setShowNelthLabel] = useState(false)
+  // Current tool activity for the shimmer label ("Connexion à Gmail…").
+  // Scans the latest assistant message from the end: the most recent tool
+  // part wins while it is still running (input streaming OR an in-progress
+  // output beat like searching/fetching/connecting). A completed tool
+  // returns null so the label falls back to the generic rotating phases
+  // until the first text token arrives.
+  const currentActivity = useMemo(() => {
+    const latestSection = sections[sections.length - 1]
+    const parts = (latestSection?.assistantMessages[
+      latestSection.assistantMessages.length - 1
+    ]?.parts ?? []) as any[]
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i]
+      if (typeof p?.type !== 'string' || !p.type.startsWith('tool-')) continue
+      if (p.state === 'output-available') {
+        const beat = p.output?.state
+        if (beat === 'searching') {
+          const q = typeof p.output?.query === 'string' ? p.output.query.trim().slice(0, 60) : ''
+          return q ? `Recherche : ${q}…` : 'Recherche sur le web…'
+        }
+        if (beat === 'fetching') return 'Lecture de la page…'
+        if (beat === 'connecting')
+          return CONNECTOR_TOOL_ACTIVITY[p.type] ?? 'Connexion…'
+        if (beat === 'generating') return 'Génération de l’image…'
+        return null
+      }
+      if (p.type === 'tool-search') return 'Recherche sur le web…'
+      if (p.type === 'tool-fetch') return 'Lecture de la page…'
+      if (CONNECTOR_TOOL_ACTIVITY[p.type]) return CONNECTOR_TOOL_ACTIVITY[p.type]
+      if (p.type === 'tool-document') return 'Génération du document…'
+      if (p.type === 'tool-generateImage') return 'Génération de l’image…'
+      return null
+    }
+    return null
+  }, [sections])
+
+  // Delayed visibility for the shimmer label: the 500ms timer fires inside a
+  // callback (no synchronous setState in the effect body). Hiding is derived
+  // (`shouldShow && labelFired`) so no state write is needed when the first
+  // token arrives or the stream ends.
+  const [labelFired, setLabelFired] = useState(false)
   const nelthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Guard: prevents the 500ms timer from restarting on every re-render while we are
-  // still in the "should show" window (e.g. while sections stream in but no text yet).
+  // Guard: prevents the 500ms timer from restarting on every re-render while
+  // we are still in the "should show" window (e.g. while sections stream in
+  // but no text yet).
   const labelScheduledRef = useRef(false)
 
-  useEffect(() => {
-    const shouldShow =
-      isNonThinkingModel && isLoading && !hasFirstToken && !isTrivialQuery
+  const shouldShowNelthLabel = isLoading && !hasFirstToken && !isTrivialQuery
 
-    if (shouldShow && !labelScheduledRef.current) {
-      // First time entering the "waiting for skills" window — arm the 500ms timer once.
-      labelScheduledRef.current = true
-      nelthTimerRef.current = setTimeout(() => setShowNelthLabel(true), 500)
-    } else if (!shouldShow) {
-      // First token arrived OR response complete OR not non-thinking → hide & reset.
+  useEffect(() => {
+    if (!shouldShowNelthLabel) return
+    if (labelScheduledRef.current) return
+    // First time entering the waiting window — arm the 500ms timer once.
+    labelScheduledRef.current = true
+    nelthTimerRef.current = setTimeout(() => setLabelFired(true), 500)
+
+    return () => {
       labelScheduledRef.current = false
       if (nelthTimerRef.current) {
         clearTimeout(nelthTimerRef.current)
         nelthTimerRef.current = null
       }
-      setShowNelthLabel(false)
     }
+  }, [shouldShowNelthLabel])
 
-    return () => {
-      if (nelthTimerRef.current) {
-        clearTimeout(nelthTimerRef.current)
-        nelthTimerRef.current = null
-      }
-    }
-  }, [isNonThinkingModel, isLoading, hasFirstToken, isTrivialQuery])
+  const showNelthLabel = shouldShowNelthLabel && labelFired
 
   const [scrollViewportHeight, setScrollViewportHeight] = useState(0)
   const [mobileFollowUpTopClearance, setMobileFollowUpTopClearance] = useState(
@@ -150,7 +190,16 @@ export function ChatMessages({
   )
 
   // Tool types definition - moved outside function for performance
-  const toolTypes = ['tool-search', 'tool-fetch', 'tool-askQuestion']
+  const toolTypes = [
+    'tool-search',
+    'tool-fetch',
+    'tool-askQuestion',
+    'tool-gmail',
+    'tool-drive',
+    'tool-calendar',
+    'tool-github',
+    'tool-notion'
+  ]
 
   useEffect(() => {
     const container = scrollContainerRef.current
@@ -399,7 +448,7 @@ export function ChatMessages({
                   animate={isLoading}
                 />
                 {/* Shimmer label — appears only after 500ms in 'submitted' state
-                    (skill-heavy requests only) and fades out smoothly when
+                    (tool-heavy requests) and fades out smoothly when
                     the first token arrives. opacity + max-height transition
                     gives a collapse effect so it doesn't leave a gap. */}
                 <span
@@ -412,7 +461,7 @@ export function ChatMessages({
                     display: 'block',
                   }}
                 >
-                  {isNonThinkingModel && <NelthLoadingLabel />}
+                  {<NelthLoadingLabel activity={currentActivity} />}
                 </span>
                 {/* Footer tips — only shown when label is not active */}
                 {!showNelthLabel && <ChatFooterMessage isLoading={isLoading} />}

@@ -275,7 +275,12 @@ export function ChatPanel({
     return (
       (lastPart?.type === 'tool-search' ||
         lastPart?.type === 'tool-fetch' ||
-        lastPart?.type === 'tool-askQuestion') &&
+        lastPart?.type === 'tool-askQuestion' ||
+        lastPart?.type === 'tool-gmail' ||
+        lastPart?.type === 'tool-drive' ||
+        lastPart?.type === 'tool-calendar' ||
+        lastPart?.type === 'tool-github' ||
+        lastPart?.type === 'tool-notion') &&
       ((lastPart as any)?.state === 'input-streaming' ||
         (lastPart as any)?.state === 'input-available')
     )

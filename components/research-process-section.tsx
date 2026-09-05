@@ -41,6 +41,7 @@ import {
   StepsTrigger
 } from './prompt-kit/steps'
 import { ShimmerSkeleton } from './ui/shimmer-skeleton'
+import ConnectorSection from './connector-section'
 import { SearchResultsImageSection } from './search-results-image'
 import { ToolSection } from './tool-section'
 
@@ -307,6 +308,26 @@ function ToolStep({
   // the file is produced, then a download link once it is ready.
   if (part.type === 'tool-document') {
     return <DocumentToolContent part={part as ToolPart<'document'>} />
+  }
+
+  // Connectors (Gmail / Drive / Calendar / GitHub / Notion): dedicated
+  // section with its own shimmer activity ("Connexion à Gmail…") and a
+  // compact result summary — same inline look as search/fetch.
+  if (
+    part.type === 'tool-gmail' ||
+    part.type === 'tool-drive' ||
+    part.type === 'tool-calendar' ||
+    part.type === 'tool-github' ||
+    part.type === 'tool-notion'
+  ) {
+    return (
+      <ConnectorSection
+        tool={part}
+        isOpen={isOpen}
+        onOpenChange={onOpenChange}
+        status={status}
+      />
+    )
   }
 
   // Web search: render with the ChainOfThought component, listing result

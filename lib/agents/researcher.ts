@@ -3,6 +3,24 @@ import { hasToolCall, stepCountIs, tool, ToolLoopAgent } from 'ai'
 import type { ResearcherTools } from '@/lib/types/agent'
 import { type Model } from '@/lib/types/models'
 
+import {
+  buildConnectorContext,
+  detectConnectorIntent,
+  runConnectorPreload
+} from '../connectors/context'
+import {
+  DOCUMENT_INTENT_RE,
+  IMAGE_INTENT_RE
+} from '../skills/capability-detection'
+import {
+  buildLanguageLayer,
+  type ResolvedLanguage
+} from '../skills/language-memory'
+import { foldText, intentRe } from '../skills/text-fold'
+import {
+  CONNECTOR_TOOL_NAMES,
+  type ConnectorTools,
+  createConnectorTools} from '../tools/connectors'
 import { documentTool } from '../tools/document'
 import { fetchTool } from '../tools/fetch'
 import { createImageGenerationTool } from '../tools/image-generation'
@@ -20,15 +38,6 @@ import {
   type QuickPromptFlags
 } from './prompts/search-mode-prompts'
 import { classifyVisualIntent } from './visual-intent'
-import {
-  DOCUMENT_INTENT_RE,
-  IMAGE_INTENT_RE
-} from '../skills/capability-detection'
-import {
-  buildLanguageLayer,
-  type ResolvedLanguage
-} from '../skills/language-memory'
-import { foldText, intentRe } from '../skills/text-fold'
 
 /**
  * Injected HIGH in the system instructions so the model never leaks the
@@ -539,7 +548,7 @@ export function buildPreloadedSearchLayer(
     : ''
   return `\n\nSERVER-PROVIDED WEB RESULTS (each numbered 1..N):\n${queryLine}${preloadedSearchContext}\nUse these results to answer now. Do NOT emit any <tool_call>, <tool_calls>, or function-call syntax.\n\nCITATIONS (MANDATORY): Every factual claim that comes from a source MUST be followed immediately by that source's number inside SQUARE BRACKETS, e.g. [1] or [3]. Place the [n] right after the sentence it supports. Example: "iOS 27 rolled out across devices[1]." Each citation is a SEPARATE [n] token placed next to its own fact.\nSTRICT RULES:\n- Write each citation as [n] where n is the source's 1-based number from the numbered list above.\n- NEVER concatenate numbers into one string (NEVER write "1314" or "13141920"). Write [1][3][14] as separate tokens instead.\n- NEVER write a bare number with no brackets, and NEVER write a raw URL.\nThese [n] markers are automatically turned into clickable links to the real source, so just use [n] next to its own fact.\nNEVER invent citation numbers: use [n] ONLY for a numbered web result actually provided above — with no web results, no [n] at all.\nEXCEPTION — IMAGE DISPLAY: Markdown image lines, their captions, the image intro sentence and the image Sources section must NEVER carry [n] markers and NEVER show raw URLs — sources are numbered clickable links. Image captions reuse the given image title verbatim and images stay in IMG-number order.\n`
 }
-export function createResearcher({
+export async function createResearcher({
   model,
   modelConfig,
   searchMode = 'adaptive',
@@ -549,7 +558,8 @@ export function createResearcher({
   imageAttachment,
   userQuery,
   conversationLanguage,
-  capabilities
+  capabilities,
+  userId
 }: {
   model: string
   modelConfig?: Model
@@ -581,6 +591,13 @@ export function createResearcher({
     founderPhoto?: boolean
     webImageSearch?: boolean
   }
+  /**
+   * Authenticated user id. When set (and the turn targets the user's own
+   * connected apps), connector status is injected into the instructions and
+   * — for tool-capable models — the gmail/drive/calendar/github/notion tools
+   * are armed. Guests ('guest'/undefined) never get connectors.
+   */
+  userId?: string
 }) {
   try {
     const currentDate = new Date().toLocaleString()
@@ -744,6 +761,43 @@ export function createResearcher({
         )
       }
 
+      // CONNECTORS (user-owned apps: Gmail, Drive, Calendar, GitHub, Notion).
+      // Armed ONLY when the turn targets the user's own data — never for
+      // greetings, code artifacts, or plain web research — so the 5 tool
+      // definitions don't bloat every prompt. Tool-capable models get native
+      // tools; the weak non-thinking model (tools stripped above) gets a
+      // server-side preload layer with the same data as injected text.
+      let connectorLayer = ''
+      let connectorTools: ConnectorTools | null = null
+      const connectorIntent = detectConnectorIntent(userQuery ?? '')
+      const connectorsAllowed =
+        Boolean(userId && userId !== 'guest') &&
+        connectorIntent &&
+        !preloadedSearchContext &&
+        !capabilities?.trivial &&
+        !(artifactIntent.isCode && !artifactIntent.needsExternal)
+      if (connectorsAllowed && userId) {
+        try {
+          const ctx = await buildConnectorContext(userId)
+          connectorLayer = ctx.text
+          if (ctx.anyConnected) {
+            if (!isNonThinking) {
+              connectorTools = createConnectorTools(userId)
+              activeToolsList.push(...CONNECTOR_TOOL_NAMES)
+            } else {
+              const preload = await runConnectorPreload(
+                userId,
+                userQuery ?? '',
+                ctx.status
+              )
+              if (preload) connectorLayer += preload
+            }
+          }
+        } catch (e) {
+          console.error('[Researcher] Connector context failed:', e)
+        }
+      }
+
     // Build tools object with proper typing
     const tools: ResearcherTools = {
       search: searchTool,
@@ -751,7 +805,8 @@ export function createResearcher({
       askQuestion: askQuestionTool,
       document: documentTool,
       generateImage: createImageGenerationTool({ runtimeImage: imageAttachment }),
-      ...todoTools
+      ...todoTools,
+      ...(connectorTools ?? {})
     } as ResearcherTools
 
     // CORE DIRECTIVE — for the thinking model (Nelth-3.5 Thinking), the full
@@ -831,7 +886,7 @@ export function createResearcher({
 - Do NOT emit any <tool_call>, <tool_calls>, <function>, <invoke>, or XML markup.
 - Output your conversational answer directly.`
         : TOOL_CALL_PROTOCOL
-    let instructions = `${CORE_DIRECTIVE}\n\n${buildLanguageLayer(conversationLanguage ?? null)}${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
+    let instructions = `${CORE_DIRECTIVE}\n\n${buildLanguageLayer(conversationLanguage ?? null)}${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${connectorLayer ? connectorLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
 
     // Trailing override for code/artifact requests. The QUICK/ADAPTIVE prompts
     // contain a generic "OUTPUT FORMAT (MANDATORY)" + "Emoji usage" section that

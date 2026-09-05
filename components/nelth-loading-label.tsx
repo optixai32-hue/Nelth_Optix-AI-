@@ -3,16 +3,19 @@
 import { useEffect, useState } from 'react'
 
 /**
- * Rotating loading label shown next to the AnimatedLogo while Nelth-3.5
- * (non-thinking model) is generating a response.
+ * Rotating loading label shown next to the AnimatedLogo while any model is
+ * generating a response.
  *
- * Cycles through three short messages with a shimmer gradient animation,
- * giving the user feedback that the model is actively working — especially
- * useful when the model takes a second or two before the first token arrives.
+ * Cycles through three short generic messages with a shimmer gradient
+ * animation (ChatGPT/Gemini-style), giving the user feedback that the model
+ * is actively working — especially useful when tools run for a second or two
+ * before the first token arrives.
  *
- * Displayed ONLY for the Nelth-3.5 model (tencent/hy3:free) and ONLY
- * while status === 'submitted' | 'streaming' and before any text has been
- * streamed yet (handled by the parent ChatMessages component).
+ * When `activity` is set (e.g. "Connexion à Gmail…"), it is shown INSTEAD of
+ * the rotating phases so the user sees exactly what is happening right now.
+ *
+ * Displayed ONLY while status === 'submitted' | 'streaming' and before any
+ * text has been streamed yet (handled by the parent ChatMessages component).
  */
 
 const PHASES = [
@@ -21,7 +24,7 @@ const PHASES = [
   'Pr\u00e9paration de la r\u00e9ponse\u2026',
 ] as const
 
-export function NelthLoadingLabel() {
+export function NelthLoadingLabel({ activity }: { activity?: string | null }) {
   const [phaseIdx, setPhaseIdx] = useState(0)
   const [visible, setVisible] = useState(true)
 
@@ -42,7 +45,7 @@ export function NelthLoadingLabel() {
   return (
     <span
       aria-live="polite"
-      aria-label="Nelth-IA réfléchit"
+      aria-label={activity || 'Nelth-IA réfléchit'}
       className="text-sm select-none"
       style={{
         opacity: visible ? 1 : 0,
@@ -58,7 +61,7 @@ export function NelthLoadingLabel() {
         animation: 'shimmer 1.6s linear infinite',
       }}
     >
-      {PHASES[phaseIdx]}
+      {activity || PHASES[phaseIdx]}
     </span>
   )
 }

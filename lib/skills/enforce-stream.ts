@@ -199,7 +199,7 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
     const skillContext = skillCtx.operationalPrompt
       ? `${skillCtx.context}\n\n${skillCtx.operationalPrompt}`
       : skillCtx.context
-    const agent = researcher({
+    const agent = await researcher({
       model,
       modelConfig,
       searchMode,

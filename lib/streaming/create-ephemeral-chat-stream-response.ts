@@ -267,7 +267,7 @@ export async function createEphemeralChatStreamResponse(
 
       // Get the researcher agent with search mode. `imageAttachment` / `needsImageEff`
       // are already resolved above, before the `trivial` gate.
-      const researchAgent = researcher({
+      const researchAgent = await researcher({
         model: `${model.providerId}:${model.id}`,
         modelConfig: model,
         searchMode,

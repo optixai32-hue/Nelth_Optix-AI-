@@ -5,6 +5,7 @@ import { UseChatHelpers } from '@ai-sdk/react'
 import type { ToolPart, UIDataTypes, UIMessage, UITools } from '@/lib/types/ai'
 
 import { DocumentToolContent } from './artifact/document-tool-content'
+import ConnectorSection from './connector-section'
 import FetchSection from './fetch-section'
 import { QuestionConfirmation } from './question-confirmation'
 import { SearchSection } from './search-section'
@@ -112,6 +113,22 @@ export function ToolSection({
       )
     case 'tool-document':
       return <DocumentToolContent part={tool as ToolPart<'document'>} />
+    case 'tool-gmail':
+    case 'tool-drive':
+    case 'tool-calendar':
+    case 'tool-github':
+    case 'tool-notion':
+      return (
+        <ConnectorSection
+          tool={tool}
+          isOpen={isOpen}
+          onOpenChange={onOpenChange}
+          status={status}
+          borderless={borderless}
+          isFirst={isFirst}
+          isLast={isLast}
+        />
+      )
     default:
       return null
   }

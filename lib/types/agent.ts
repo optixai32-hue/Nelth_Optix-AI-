@@ -6,6 +6,7 @@ import type {
   UIToolInvocation
 } from 'ai'
 
+import type { ConnectorTools } from '../tools/connectors'
 import type { documentTool } from '../tools/document'
 import type { fetchTool } from '../tools/fetch'
 import type { createImageGenerationTool } from '../tools/image-generation'
@@ -20,6 +21,11 @@ export type ResearcherTools = {
   askQuestion: ReturnType<typeof createQuestionTool>
   document: typeof documentTool
   generateImage: ReturnType<typeof createImageGenerationTool>
+  gmail: ConnectorTools['gmail']
+  drive: ConnectorTools['drive']
+  calendar: ConnectorTools['calendar']
+  github: ConnectorTools['github']
+  notion: ConnectorTools['notion']
 } & ReturnType<typeof createTodoTools>
 
 // Type alias for the researcher agent using ToolLoopAgent
@@ -48,6 +54,11 @@ export type ResearcherToolInvocation =
   | FetchToolInvocation
   | QuestionToolInvocation
   | TodoWriteToolInvocation
+  | UIToolInvocation<ResearcherTools['gmail']>
+  | UIToolInvocation<ResearcherTools['drive']>
+  | UIToolInvocation<ResearcherTools['calendar']>
+  | UIToolInvocation<ResearcherTools['github']>
+  | UIToolInvocation<ResearcherTools['notion']>
 
 // Helper type to extract tool names
 export type ResearcherToolName = keyof ResearcherTools
