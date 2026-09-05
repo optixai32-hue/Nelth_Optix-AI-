@@ -18,11 +18,13 @@ class MockRecognition {
   onend: (() => void) | null = null
   onstart: (() => void) | null = null
   started = false
+  startCalls = 0
   constructor() {
     MockRecognition.instances.push(this)
   }
   start() {
     this.started = true
+    this.startCalls++
     this.onstart?.()
   }
   stop() {
@@ -169,5 +171,39 @@ describe('useVoiceRecognition', () => {
     })
     expect(result.current.state).toBe('denied')
     expect(cbs.onError).toHaveBeenCalled()
+  })
+
+  it('revives the session when unmuting after it ended muted', async () => {
+    ;(window as any).webkitSpeechRecognition = MockRecognition
+    mockAudio()
+    const cbs = makeCallbacks()
+    const ref = { current: cbs }
+    const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
+
+    await act(async () => {
+      await result.current.start()
+    })
+    const rec = MockRecognition.instances[0]
+    const startsBefore = rec.startCalls
+
+    // Mute (AI speaking), then the session ends underneath.
+    act(() => {
+      result.current.setMuted(true)
+    })
+    act(() => {
+      rec.onend?.()
+    })
+    // No restart while muted — and no new instance.
+    expect(MockRecognition.instances).toHaveLength(1)
+    expect(rec.startCalls).toBe(startsBefore)
+
+    // Unmuting revives the dead session on the SAME instance.
+    act(() => {
+      result.current.setMuted(false)
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
+    expect(rec.startCalls).toBe(startsBefore + 1)
   })
 })

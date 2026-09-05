@@ -40,6 +40,9 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { message, messages, chatId, trigger, messageId, isNewChat } = body
     const analyticsId: unknown = body.analyticsId
+    // Voice-mode turns (flagged per-request by the voice UI) take an
+    // isolated minimal path server-side. Absent = normal chat, untouched.
+    const voiceMode = body.voiceMode === true
 
     // Normalize the message id up front so persistence and analytics agree on it.
     if (message && !message.id) {
@@ -194,7 +197,8 @@ export async function POST(req: Request) {
           messageId,
           abortSignal,
           isNewChat,
-          searchMode
+          searchMode,
+          voiceMode
         })
 
     perfTime('createChatStreamResponse resolved', streamStart)

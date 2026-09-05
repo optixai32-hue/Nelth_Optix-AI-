@@ -91,7 +91,7 @@ interface ChatPanelProps {
   setMessages: (messages: UIMessage[]) => void
   query?: string
   stop: () => void
-  append: (message: any) => void
+  append: (message: any, options?: { body?: Record<string, unknown> }) => void
   /** Whether to show the scroll to bottom button */
   showScrollToBottomButton: boolean
   /** Reference to the scroll container */
@@ -212,20 +212,19 @@ export function ChatPanel({
         isCloudDeployment
       })
 
-  // Voice mode transcripts submit through the exact same path as a typed
-  // message (guards, attachments, analytics all apply).
+  // Voice mode transcripts bypass the composer entirely and go straight
+  // through the message pipeline with a per-request voice flag, so the
+  // server answers from the tiny voice-only path (normal submits untouched).
   const handleVoiceSubmit = useCallback(
     (text: string) => {
-      if (!text.trim()) return
-      handleInputChange({
-        target: { value: text }
-      } as React.ChangeEvent<HTMLTextAreaElement>)
-      setTimeout(() => {
-        inputRef.current?.form?.requestSubmit()
-        setIsInputFocused(false)
-      }, INPUT_UPDATE_DELAY_MS)
+      const trimmed = text.trim()
+      if (!trimmed) return
+      append(
+        { role: 'user', parts: [{ type: 'text', text: trimmed }] },
+        { body: { voiceMode: true } }
+      )
     },
-    [handleInputChange]
+    [append]
   )
 
   const handleCompositionStart = () => setIsComposing(true)

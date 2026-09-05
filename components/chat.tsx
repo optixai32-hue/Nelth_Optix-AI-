@@ -649,8 +649,8 @@ export function Chat({
           setMessages={setMessages}
           stop={stop}
           query={query}
-          append={(message: any) => {
-            safeSendMessage(message)
+          append={(message: any, options?: { body?: Record<string, unknown> }) => {
+            safeSendMessage(message, options)
           }}
           showScrollToBottomButton={!isAtBottom}
           uploadedFiles={uploadedFiles}

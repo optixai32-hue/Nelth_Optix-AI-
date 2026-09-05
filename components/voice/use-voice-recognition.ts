@@ -33,8 +33,8 @@ export function isVoiceRecognitionSupported(): boolean {
   return getRecognitionClass() !== null
 }
 
-const SILENCE_SUBMIT_MS = 1200
-const FINAL_SUBMIT_MS = 400
+const SILENCE_SUBMIT_MS = 1000
+const FINAL_SUBMIT_MS = 350
 const RESTART_DELAY_MS = 150
 const MAX_RESTARTS_PER_WINDOW = 5
 const RESTART_WINDOW_MS = 3000
@@ -63,6 +63,10 @@ export function useVoiceRecognition(
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const listeningRef = useRef(false)
   const mutedRef = useRef(false)
+  // True when the recognition session ended while muted (Chrome ends idle
+  // sessions after ~60s even mid-conversation). The next unmute must restart
+  // it — otherwise the mic looks alive but transcribes nothing.
+  const endedRef = useRef(false)
   const langRef = useRef('fr-FR')
   const restartStampsRef = useRef<number[]>([])
   const stateRef = useRef<VoiceRecState>('idle')
@@ -133,6 +137,34 @@ export function useVoiceRecognition(
     analyserRef.current = null
   }, [stopLevelLoop])
 
+  const restartRecognition = useCallback(() => {
+    if (!listeningRef.current || mutedRef.current) return
+    // Guard against hot restart loops.
+    const now = Date.now()
+    restartStampsRef.current = restartStampsRef.current.filter(
+      t => now - t < RESTART_WINDOW_MS
+    )
+    if (restartStampsRef.current.length >= MAX_RESTARTS_PER_WINDOW) {
+      listeningRef.current = false
+      setRecState('error')
+      callbacksRef.current.onError?.(
+        'Speech recognition keeps stopping. Check your connection, then reopen voice mode.'
+      )
+      return
+    }
+    restartStampsRef.current.push(now)
+    window.setTimeout(() => {
+      if (listeningRef.current && !mutedRef.current) {
+        endedRef.current = false
+        try {
+          recognitionRef.current?.start()
+        } catch {
+          /* already started — ignore */
+        }
+      }
+    }, RESTART_DELAY_MS)
+  }, [callbacksRef, setRecState])
+
   const beginRecognition = useCallback(() => {
     const Cls = getRecognitionClass()
     if (!Cls) return
@@ -142,6 +174,10 @@ export function useVoiceRecognition(
       recognition.interimResults = true
       recognition.maxAlternatives = 1
       recognition.lang = langRef.current
+
+      recognition.onstart = () => {
+        endedRef.current = false
+      }
 
       recognition.onresult = (event: any) => {
         if (mutedRef.current || !listeningRef.current) return
@@ -177,31 +213,13 @@ export function useVoiceRecognition(
       }
 
       recognition.onend = () => {
-        if (!listeningRef.current || mutedRef.current) return
-        // Auto-restart the continuous session (Chrome ends it after ~1 min
-        // or on network blips). Guard against hot restart loops.
-        const now = Date.now()
-        restartStampsRef.current = restartStampsRef.current.filter(
-          t => now - t < RESTART_WINDOW_MS
-        )
-        if (restartStampsRef.current.length >= MAX_RESTARTS_PER_WINDOW) {
-          listeningRef.current = false
-          setRecState('error')
-          callbacksRef.current.onError?.(
-            'Speech recognition keeps stopping. Check your connection, then reopen voice mode.'
-          )
-          return
-        }
-        restartStampsRef.current.push(now)
-        window.setTimeout(() => {
-          if (listeningRef.current && !mutedRef.current) {
-            try {
-              recognitionRef.current?.start()
-            } catch {
-              /* already started — ignore */
-            }
-          }
-        }, RESTART_DELAY_MS)
+        if (!listeningRef.current) return
+        // The session ended (Chrome ends idle sessions after ~1 min or on
+        // network blips). If muted, just record it — the unmute below will
+        // revive the session. Otherwise restart transparently.
+        endedRef.current = true
+        if (mutedRef.current) return
+        restartRecognition()
       }
 
       recognitionRef.current = recognition
@@ -210,7 +228,13 @@ export function useVoiceRecognition(
       listeningRef.current = false
       setRecState('error')
     }
-  }, [callbacksRef, clearSilenceTimer, setRecState, submitFinal])
+  }, [
+    callbacksRef,
+    clearSilenceTimer,
+    restartRecognition,
+    setRecState,
+    submitFinal
+  ])
 
   const start = useCallback(async () => {
     if (listeningRef.current) return true
@@ -219,6 +243,7 @@ export function useVoiceRecognition(
       return false
     }
     mutedRef.current = false
+    endedRef.current = false
     restartStampsRef.current = []
     try {
       streamRef.current = await navigator.mediaDevices.getUserMedia({
@@ -272,6 +297,7 @@ export function useVoiceRecognition(
   const stop = useCallback(() => {
     listeningRef.current = false
     mutedRef.current = false
+    endedRef.current = false
     clearSilenceTimer()
     restartStampsRef.current = []
     if (recognitionRef.current) {
@@ -291,9 +317,16 @@ export function useVoiceRecognition(
   const setMuted = useCallback(
     (muted: boolean) => {
       mutedRef.current = muted
-      if (muted) clearSilenceTimer()
+      if (muted) {
+        clearSilenceTimer()
+      } else if (listeningRef.current && endedRef.current) {
+        // The session died while muted — revive it now, otherwise the mic
+        // looks alive but transcribes nothing.
+        endedRef.current = false
+        restartRecognition()
+      }
     },
-    [clearSilenceTimer]
+    [clearSilenceTimer, restartRecognition]
   )
 
   const setLanguage = useCallback((nextLocale: string) => {

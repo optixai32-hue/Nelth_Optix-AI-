@@ -10,6 +10,10 @@ import {
 
 import { researcher } from '@/lib/agents/researcher'
 import {
+  createVoiceAgent,
+  VOICE_MAX_OUTPUT_TOKENS
+} from '@/lib/agents/voice-agent'
+import {
   type ConnectorPreloadCall,
   detectConnectorIntent,
   isConnectorFollowUp
@@ -53,6 +57,7 @@ import { perfLog, perfTime } from '../utils/perf-logging'
 import { isUsageLogging, logUsage } from '../utils/usage-logging'
 
 import { compactHistoricalMessages } from './helpers/compact-historical-messages'
+import { toVoiceHistory } from './helpers/voice-history'
 import {
   convertDataPart,
   mapFilePartsToDataParts
@@ -111,7 +116,8 @@ export async function createChatStreamResponse(
     messageId,
     abortSignal,
     isNewChat,
-    searchMode
+    searchMode,
+    voiceMode
   } = config
 
   // Verify that chatId is provided
@@ -219,8 +225,13 @@ export async function createChatStreamResponse(
       // it (e.g. an uploaded document). Everything else (greetings, simple chat,
       // translations, plain explanations) skips skill loading and the research
       // agent entirely.
+      // Voice mode bypasses the whole research pipeline (long system
+      // prompt, skill router, tools, web/connector preloads) — the voice
+      // agent answers from its own tiny system prompt. Nothing below this
+      // flag affects normal turns.
       const skillNeeded =
-        caps.candidateSkillSlugs.length > 0 || attachmentFormats.length > 0
+        !voiceMode &&
+        (caps.candidateSkillSlugs.length > 0 || attachmentFormats.length > 0)
 
       // Detect an uploaded image in the current user message BEFORE the `trivial`
       // gate below. The generateImage tool needs it to force the image-to-image
@@ -270,9 +281,9 @@ export async function createChatStreamResponse(
         hasVault &&
         isConnectorFollowUp(userQuery ?? '', initialChat?.messages)
       const connectorIntent = rawConnectorIntent || connectorFollowUp
-      const connectorDataIntent = connectorIntent && hasVault
+      const connectorDataIntent = connectorIntent && hasVault && !voiceMode
       const shouldPreloadSearch =
-        Boolean(caps.needsSearch) && !connectorDataIntent
+        Boolean(caps.needsSearch) && !connectorDataIntent && !voiceMode
       let preloadedSearchContext: string | undefined
       let preloadedSearchQuery: string | undefined
       let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
@@ -377,9 +388,16 @@ export async function createChatStreamResponse(
       // be surfaced as synthetic tool parts below (same UX as native calls).
       const connectorPreloadCalls: ConnectorPreloadCall[] = []
 
-      // Get the researcher agent with search mode. `imageAttachment` / `needsImageEff`
-      // are already resolved above, before the `trivial` gate.
-      const researchAgent = await researcher({
+      // Voice mode: isolated minimal agent (tiny voice-only system prompt,
+      // zero tools, hard token cap). The researcher — long prompt, skills,
+      // tools, preloads — is never constructed for voice turns.
+      const researchAgent = voiceMode
+        ? createVoiceAgent({
+            model: context.modelId,
+            modelConfig: model,
+            conversationLanguage
+          })
+        : await researcher({
         model: context.modelId,
         modelConfig: model,
         searchMode,
@@ -405,7 +423,11 @@ export async function createChatStreamResponse(
       })
 
       const messagesWithoutSpec = stripSpecFromMessages(messagesToModel)
-      const messagesToConvert = compactHistoricalMessages(messagesWithoutSpec)
+      // Voice turns carry text-only recent history: the voice agent owns no
+      // tools, so replaying tool/file/data parts would be dead weight.
+      const messagesToConvert = voiceMode
+        ? toVoiceHistory(messagesWithoutSpec)
+        : compactHistoricalMessages(messagesWithoutSpec)
       const messagesWithoutFileParts = mapFilePartsToDataParts(
         messagesToConvert
       )
@@ -450,6 +472,9 @@ export async function createChatStreamResponse(
       const result = await researchAgent.stream({
         messages: modelMessages,
         abortSignal,
+        // Voice turns get a hard output cap (spoken answers must stay
+        // short). Normal turns are unaffected.
+        ...(voiceMode ? { maxOutputTokens: VOICE_MAX_OUTPUT_TOKENS } : {}),
         experimental_transform: smoothStream({ chunking: 'word' }),
         ...(isUsageLogging() && {
           onStepFinish: step => {
