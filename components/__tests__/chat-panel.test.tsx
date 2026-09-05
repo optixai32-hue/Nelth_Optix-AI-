@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { render, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { deleteCookie, getCookie, setCookie } from '@/lib/utils/cookies'
@@ -31,6 +31,16 @@ vi.mock('../library/library-picker-dialog', () => ({
 
 vi.mock('../message-navigation-dots', () => ({
   MessageNavigationDots: () => null
+}))
+
+vi.mock('../voice/voice-mode', () => ({
+  VoiceMode: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="voice-mode-stub">
+      <button type="button" data-testid="voice-stub-close" onClick={onClose}>
+        close
+      </button>
+    </div>
+  )
 }))
 
 vi.mock('../uploaded-file-list', () => ({
@@ -158,5 +168,54 @@ describe('ChatPanel', () => {
     // Height-scoped compaction only (tall screens pixel-identical).
     const hero = container.querySelector('[data-testid="empty-hero"]')
     expect(hero?.className).toContain('max-height')
+  })
+
+  function renderPanel(input: string) {
+    return render(
+      <ChatPanel
+        chatId="chat-1"
+        input={input}
+        handleInputChange={vi.fn()}
+        handleSubmit={vi.fn()}
+        status="ready"
+        messages={[]}
+        setMessages={vi.fn()}
+        query=""
+        stop={vi.fn()}
+        append={vi.fn()}
+        showScrollToBottomButton={false}
+        scrollContainerRef={React.createRef<HTMLDivElement>()}
+        uploadedFiles={[]}
+        setUploadedFiles={vi.fn()}
+        quotedContexts={[]}
+        setQuotedContexts={vi.fn()}
+        noteContexts={[]}
+        setNoteContexts={vi.fn()}
+        isGuest
+        isCloudDeployment
+        onAdaptiveModeAuthRequired={vi.fn()}
+      />
+    )
+  }
+
+  test('empty input swaps the send button for the voice button', () => {
+    renderPanel('')
+    // Default locale is English.
+    expect(screen.getByLabelText('Voice input')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Send')).not.toBeInTheDocument()
+  })
+
+  test('text input restores the send button', () => {
+    renderPanel('hello')
+    expect(screen.getByLabelText('Send')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Voice input')).not.toBeInTheDocument()
+  })
+
+  test('voice button opens voice mode, stub close exits it', () => {
+    renderPanel('')
+    fireEvent.click(screen.getByLabelText('Voice input'))
+    expect(screen.getByTestId('voice-mode-stub')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('voice-stub-close'))
+    expect(screen.queryByTestId('voice-mode-stub')).not.toBeInTheDocument()
   })
 })

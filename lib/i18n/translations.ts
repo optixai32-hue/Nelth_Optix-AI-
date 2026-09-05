@@ -43,6 +43,20 @@ const en: Dict = {
   'chat.greetingTip': 'Ask me anything to get started.',
   'chat.noModelAvailable': 'No enabled model is available',
 
+  'voice.title': 'Voice mode',
+  'voice.close': 'Exit voice mode',
+  'voice.openLabel': 'Voice input',
+  'voice.listeningHint': 'Listening… speak now',
+  'voice.thinkingHint': 'Thinking…',
+  'voice.speakingHint': 'Speaking…',
+  'voice.startingHint': 'Starting microphone…',
+  'voice.micDenied':
+    'Microphone access was denied. Allow it in the browser settings, then reopen voice mode.',
+  'voice.unsupported':
+    'Voice input is not supported in this browser. Try Chrome, Edge or Safari.',
+  'voice.recognitionError':
+    'Speech recognition keeps stopping. Check your connection, then reopen voice mode.',
+
   'loading.phase1': 'Analyzing…',
   'loading.phase2': 'Reading skills…',
   'loading.phase3': 'Preparing your answer…',
@@ -158,6 +172,20 @@ const fr: Dict = {
   'chat.reply': 'Répondre...',
   'chat.greetingTip': 'Posez-moi une question pour commencer.',
   'chat.noModelAvailable': 'Aucun modèle disponible',
+
+  'voice.title': 'Mode vocal',
+  'voice.close': 'Quitter le mode vocal',
+  'voice.openLabel': 'Saisie vocale',
+  'voice.listeningHint': 'Écoute… parlez maintenant',
+  'voice.thinkingHint': 'Réflexion…',
+  'voice.speakingHint': 'Réponse…',
+  'voice.startingHint': 'Démarrage du microphone…',
+  'voice.micDenied':
+    'Accès au microphone refusé. Autorisez-le dans les paramètres du navigateur, puis rouvrez le mode vocal.',
+  'voice.unsupported':
+    'La saisie vocale n’est pas prise en charge par ce navigateur. Essayez Chrome, Edge ou Safari.',
+  'voice.recognitionError':
+    'La reconnaissance vocale s’interrompt sans cesse. Vérifiez votre connexion, puis rouvrez le mode vocal.',
 
   'loading.phase1': 'Analyse en cours…',
   'loading.phase2': 'Lecture des compétences…',

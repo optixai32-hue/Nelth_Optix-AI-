@@ -23,6 +23,7 @@ import {
   IconSquare as Square,
   IconX as X
 } from '@tabler/icons-react'
+import { AudioLines as AudioLinesIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { captureClient } from '@/lib/analytics/posthog-client'
@@ -57,6 +58,7 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from './ui/tooltip'
+import { VoiceMode } from './voice/voice-mode'
 import { ActionButtons } from './action-buttons'
 import { useI18n } from './i18n-provider'
 import { MessageNavigationDots } from './message-navigation-dots'
@@ -149,7 +151,7 @@ export function ChatPanel({
   const [enterDisabled, setEnterDisabled] = useState(false) // Disable Enter after composition ends
 
   const { user } = useAuthCheck()
-  const { t, greetingPhrases } = useI18n()
+  const { t, greetingPhrases, locale } = useI18n()
   const rawName = user?.name || user?.email?.split('@')[0] || ''
   // Display only the first name (prénom), capitalized.
   const firstName = rawName.split(/\s+/)[0] || ''
@@ -176,6 +178,7 @@ export function ChatPanel({
   const [urlCards, setUrlCards] = useState<string[]>([])
   const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false)
   const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false)
+  const [voiceOpen, setVoiceOpen] = useState(false)
   const { close: closeArtifact } = useArtifact()
   const { upsertCachedFile } = useLibrary()
   const isLoading = status === 'submitted' || status === 'streaming'
@@ -208,6 +211,22 @@ export function ChatPanel({
         isGuest,
         isCloudDeployment
       })
+
+  // Voice mode transcripts submit through the exact same path as a typed
+  // message (guards, attachments, analytics all apply).
+  const handleVoiceSubmit = useCallback(
+    (text: string) => {
+      if (!text.trim()) return
+      handleInputChange({
+        target: { value: text }
+      } as React.ChangeEvent<HTMLTextAreaElement>)
+      setTimeout(() => {
+        inputRef.current?.form?.requestSubmit()
+        setIsInputFocused(false)
+      }, INPUT_UPDATE_DELAY_MS)
+    },
+    [handleInputChange]
+  )
 
   const handleCompositionStart = () => setIsComposing(true)
 
@@ -969,17 +988,27 @@ export function ChatPanel({
                 </Button>
               )}
               <Button
-                type={isLoading ? 'button' : 'submit'}
+                type={isLoading || !hasPendingInput ? 'button' : 'submit'}
                 size={'icon'}
-                aria-label={isLoading ? t('common.stop') : t('common.send')}
+                aria-label={
+                  isLoading
+                    ? t('common.stop')
+                    : hasPendingInput
+                      ? t('common.send')
+                      : t('voice.openLabel')
+                }
                 className={cn(
                   isLoading && 'animate-pulse',
                   'size-8 md:size-10 rounded-full transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:-translate-y-0.5 hover:scale-110 active:scale-95'
                 )}
-                disabled={
-                  (!hasPendingInput && !isLoading) || !hasAvailableModels
+                disabled={!hasAvailableModels}
+                onClick={
+                  isLoading
+                    ? stop
+                    : !hasPendingInput
+                      ? () => setVoiceOpen(true)
+                      : undefined
                 }
-                onClick={isLoading ? stop : undefined}
                 title={
                   hasAvailableModels
                     ? undefined
@@ -988,8 +1017,13 @@ export function ChatPanel({
               >
                 {isLoading ? (
                   <Square className="size-4 md:size-5" />
-                ) : (
+                ) : hasPendingInput ? (
                   <ArrowUp className="size-4 md:size-5" />
+                ) : (
+                  <AudioLinesIcon
+                    className="size-4 md:size-5"
+                    aria-hidden="true"
+                  />
                 )}
               </Button>
             </div>
@@ -1040,6 +1074,15 @@ export function ChatPanel({
         onAttachNote={handleAttachNote}
         onAttachFile={handleAttachLibraryFile}
       />
+      {voiceOpen && (
+        <VoiceMode
+          onClose={() => setVoiceOpen(false)}
+          onSubmitText={handleVoiceSubmit}
+          messages={messages}
+          status={status}
+          locale={locale}
+        />
+      )}
     </div>
   )
 }
