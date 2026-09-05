@@ -60,7 +60,6 @@ export const CONNECTOR_SERVICES: ConnectorService[] = [
 export type ConnectorStatus = 'idle' | 'connecting' | 'connected' | 'error'
 
 const CONNECTED_KEY = 'nelth.connectors.connected'
-const DISMISSED_KEY = 'nelth.connector-card.dismissed'
 
 function readStoredIds(): ConnectorId[] {
   try {
@@ -74,14 +73,6 @@ function readStoredIds(): ConnectorId[] {
     )
   } catch {
     return []
-  }
-}
-
-function readDismissed(): boolean {
-  try {
-    return localStorage.getItem(DISMISSED_KEY) === '1'
-  } catch {
-    return false
   }
 }
 
@@ -105,8 +96,11 @@ const defaultConnectImpl =
   }
 
 /**
- * Connector state: which services are connected, per-service status, and
- * card dismissal. All persisted to localStorage so the state survives reloads.
+ * Connector state: which services are connected (persisted to localStorage
+ * so connections survive reloads) plus per-service status. Card dismissal is
+ * intentionally session-only (plain React state): closing the card hides it
+ * for the current view, but it comes back on refresh — otherwise the user
+ * could never reach the connector panel again.
  */
 export function useConnectors(options: UseConnectorsOptions = {}) {
   const { connectDelayMs = 900, connectImpl } = options
@@ -122,9 +116,7 @@ export function useConnectors(options: UseConnectorsOptions = {}) {
       notion: 'idle'
     })
   )
-  const [dismissed, setDismissed] = useState<boolean>(() =>
-    typeof window === 'undefined' ? false : readDismissed()
-  )
+  const [dismissed, setDismissed] = useState<boolean>(false)
 
   const setStatus = useCallback((id: ConnectorId, status: ConnectorStatus) => {
     setStatuses(prev => (prev[id] === status ? prev : { ...prev, [id]: status }))
@@ -157,11 +149,6 @@ export function useConnectors(options: UseConnectorsOptions = {}) {
 
   const dismiss = useCallback(() => {
     setDismissed(true)
-    try {
-      localStorage.setItem(DISMISSED_KEY, '1')
-    } catch {
-      /* ignore */
-    }
   }, [])
 
   return {

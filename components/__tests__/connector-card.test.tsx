@@ -10,12 +10,10 @@ vi.mock('@/lib/analytics/posthog-client', () => ({
 }))
 
 const CONNECTED_KEY = 'nelth.connectors.connected'
-const DISMISSED_KEY = 'nelth.connector-card.dismissed'
 
 beforeEach(() => {
   vi.clearAllMocks()
   window.localStorage.removeItem(CONNECTED_KEY)
-  window.localStorage.removeItem(DISMISSED_KEY)
 })
 
 describe('ConnectorCard', () => {
@@ -26,7 +24,7 @@ describe('ConnectorCard', () => {
     expect(screen.getByTestId('connector-dismiss')).toBeInTheDocument()
   })
 
-  test('dismiss animates out, unmounts and persists', async () => {
+  test('dismiss animates out and unmounts for this view only', async () => {
     render(<ConnectorCard />)
     fireEvent.click(screen.getByTestId('connector-dismiss'))
     // Exit animation state first.
@@ -37,13 +35,19 @@ describe('ConnectorCard', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('connector-card')).not.toBeInTheDocument()
     })
-    expect(window.localStorage.getItem(DISMISSED_KEY)).toBe('1')
+    // Dismissal is NOT persisted: nothing stored, card returns on remount.
+    expect(window.localStorage.getItem('nelth.connector-card.dismissed')).toBeNull()
   })
 
-  test('stays hidden on remount once dismissed', () => {
-    window.localStorage.setItem(DISMISSED_KEY, '1')
+  test('shows again on remount after dismiss (e.g. page refresh)', async () => {
+    const { unmount } = render(<ConnectorCard />)
+    fireEvent.click(screen.getByTestId('connector-dismiss'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('connector-card')).not.toBeInTheDocument()
+    })
+    unmount()
     render(<ConnectorCard />)
-    expect(screen.queryByTestId('connector-card')).not.toBeInTheDocument()
+    expect(screen.getByTestId('connector-card')).toBeInTheDocument()
   })
 
   test('connect shows loading then opens the OAuth panel', async () => {
