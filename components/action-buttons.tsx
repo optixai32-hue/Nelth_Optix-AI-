@@ -16,8 +16,8 @@ import {
 import { captureClient } from '@/lib/analytics/posthog-client'
 import { cn } from '@/lib/utils'
 
-import { Button } from './ui/button'
 import { ConnectorCard } from './connector/connector-card'
+import { Button } from './ui/button'
 import {
   Stories,
   StoriesContent,

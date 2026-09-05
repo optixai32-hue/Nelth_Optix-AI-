@@ -6,12 +6,13 @@ import { captureClient } from '@/lib/analytics/posthog-client'
 import { cn } from '@/lib/utils'
 
 import { useI18n } from '../i18n-provider'
-import { ConnectorPanel } from './connector-panel'
+
 import {
   GmailIcon,
   GoogleCalendarIcon,
   GoogleDriveIcon
 } from './connector-icons'
+import { ConnectorPanel } from './connector-panel'
 import { useConnectors } from './use-connectors'
 
 type CardPhase =
