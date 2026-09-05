@@ -57,7 +57,6 @@ import { perfLog, perfTime } from '../utils/perf-logging'
 import { isUsageLogging, logUsage } from '../utils/usage-logging'
 
 import { compactHistoricalMessages } from './helpers/compact-historical-messages'
-import { toVoiceHistory } from './helpers/voice-history'
 import {
   convertDataPart,
   mapFilePartsToDataParts
@@ -67,6 +66,7 @@ import { persistStreamResults } from './helpers/persist-stream-results'
 import { prepareMessages } from './helpers/prepare-messages'
 import { stripSpecFromMessages } from './helpers/strip-spec-from-messages'
 import type { StreamContext } from './helpers/types'
+import { toVoiceHistory } from './helpers/voice-history'
 import { BaseStreamConfig } from './types'
 
 import { langfuseSpanProcessor } from '@/instrumentation'
@@ -393,9 +393,7 @@ export async function createChatStreamResponse(
       // tools, preloads — is never constructed for voice turns.
       const researchAgent = voiceMode
         ? createVoiceAgent({
-            conversationLanguage,
-            fallbackModel: context.modelId,
-            fallbackModelConfig: model
+            conversationLanguage
           })
         : await researcher({
         model: context.modelId,

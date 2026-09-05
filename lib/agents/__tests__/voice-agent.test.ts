@@ -42,10 +42,8 @@ describe('voice agent isolation', () => {
     expect(VOICE_MAX_OUTPUT_TOKENS).toBe(1024)
   })
 
-  it('builds a tool-less agent', () => {
-    const agent = createVoiceAgent({
-      fallbackModel: 'kilo-gateway:minimax/minimax-m3:free'
-    })
+  it('builds a tool-less agent (no fallback model exists)', () => {
+    const agent = createVoiceAgent({})
     expect(agent.tools).toEqual({})
   })
 })

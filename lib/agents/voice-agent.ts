@@ -4,8 +4,7 @@ import {
   buildLanguageLayer,
   type ResolvedLanguage
 } from '@/lib/skills/language-memory'
-import type { Model } from '@/lib/types/models'
-import { getModel, isProviderEnabled } from '@/lib/utils/registry'
+import { getModel } from '@/lib/utils/registry'
 import { isTracingEnabled } from '@/lib/utils/telemetry'
 
 /**
@@ -78,32 +77,20 @@ export function voiceModelString(): string {
 export const VOICE_MAX_OUTPUT_TOKENS = 1024
 
 export function createVoiceAgent({
-  conversationLanguage,
-  fallbackModel,
-  fallbackModelConfig
+  conversationLanguage
 }: {
   conversationLanguage?: ResolvedLanguage | null
-  /** Chat's selected model — used ONLY if the Nemotron provider is down. */
-  fallbackModel: string
-  fallbackModelConfig?: Model
 }) {
-  const useNemotron = isProviderEnabled(VOICE_MODEL_PROVIDER_ID)
-  const modelString = useNemotron ? voiceModelString() : fallbackModel
-  if (!useNemotron) {
-    console.log(
-      `[Voice] Nemotron provider disabled — falling back to ${fallbackModel}`
-    )
-  } else {
-    console.log(`[Voice] driving model=${voiceModelString()}`)
-  }
+  // No fallback, by design: voice ALWAYS runs on Nemotron. Requires
+  // OPENAI_COMPATIBLE_API_KEY + OPENAI_COMPATIBLE_API_BASE_URL
+  // (NVIDIA endpoint) in the server environment.
+  const modelString = voiceModelString()
+  console.log(`[Voice] driving model=${modelString}`)
   return new ToolLoopAgent({
     model: getModel(modelString),
     instructions: `${VOICE_SYSTEM_PROMPT}\n\n${buildLanguageLayer(conversationLanguage ?? null)}`,
     tools: {},
     stopWhen: [stepCountIs(1)],
-    ...(!useNemotron && fallbackModelConfig?.providerOptions
-      ? { providerOptions: fallbackModelConfig.providerOptions }
-      : {}),
     experimental_telemetry: {
       isEnabled: isTracingEnabled(),
       functionId: 'voice-agent',
