@@ -58,7 +58,6 @@ import {
   TooltipTrigger
 } from './ui/tooltip'
 import { ActionButtons } from './action-buttons'
-import { ConnectorCard } from './connector/connector-card'
 import { useI18n } from './i18n-provider'
 import { MessageNavigationDots } from './message-navigation-dots'
 import { SearchModeSelector } from './search-mode-selector'
@@ -1024,20 +1023,8 @@ export function ChatPanel({
             }}
             isGuest={isGuest}
             inputRef={inputRef}
-            className="mt-2 hidden md:block"
+            className="mt-2"
           />
-        )}
-        {/* Connector Card (mobile only): ActionButtons is hidden below md,
-            so the card renders in normal flow under the composer. On md+
-            screens the card lives anchored to the chips row inside
-            ActionButtons (zero layout impact everywhere). */}
-        {messages.length === 0 && (
-          <div
-            data-testid="connector-slot-mobile"
-            className="mt-2 flex w-full justify-center px-2 md:hidden"
-          >
-            <ConnectorCard className="w-full max-w-[530px]" />
-          </div>
         )}
       </form>
       <LibraryPickerDialog

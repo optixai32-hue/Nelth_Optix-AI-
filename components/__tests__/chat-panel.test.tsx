@@ -93,7 +93,7 @@ describe('ChatPanel', () => {
     expect(onAdaptiveModeAuthRequired).not.toHaveBeenCalled()
   })
 
-  test('reserves a stable slot for the connector card below quick actions', async () => {
+  test('no separate mobile slot: single anchored card for all viewports', async () => {
     const { container } = render(
       <ChatPanel
         chatId="chat-1"
@@ -120,14 +120,12 @@ describe('ChatPanel', () => {
       />
     )
 
-    const slot = container.querySelector(
-      '[data-testid="connector-slot-mobile"]'
-    )
-    expect(slot).not.toBeNull()
-    // Mobile-only in-flow slot (desktop card lives anchored to the chips
-    // row inside ActionButtons): visible below md, hidden on md+.
-    expect(slot?.className).toContain('md:hidden')
-    expect(slot?.querySelector('[data-testid="connector-card"]')).not.toBeNull()
+    // The mobile-only duplicate is gone: one card, anchored to the chips
+    // row inside ActionButtons (asserted in action-buttons.test.tsx),
+    // so mobile gets the same chips-to-card distance as desktop.
+    expect(
+      container.querySelector('[data-testid="connector-slot-mobile"]')
+    ).toBeNull()
   })
 
   test('short viewports compact the empty state so the card stays visible', () => {
