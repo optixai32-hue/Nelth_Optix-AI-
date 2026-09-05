@@ -11,7 +11,8 @@ import {
 import { researcher } from '@/lib/agents/researcher'
 import {
   type ConnectorPreloadCall,
-  detectConnectorIntent
+  detectConnectorIntent,
+  isConnectorFollowUp
 } from '@/lib/connectors/context'
 import {
   createPublicErrorResponse,
@@ -30,6 +31,7 @@ import {
   stripEmojiFromCodeInMessage
 } from '@/lib/skills/enforce-stream'
 import { resolveConversationLanguage } from '@/lib/skills/language-memory'
+import { isNonThinkingModelId } from '@/lib/utils/registry'
 import { isTracingEnabled } from '@/lib/utils/telemetry'
 
 import { loadChat } from '../actions/chat'
@@ -79,9 +81,18 @@ function deriveQueryFromChat(
   const messages = chat?.messages
   if (!messages || messages.length === 0) return ''
 
-  const target = messageId
-    ? messages.find(m => m.id === messageId)
-    : [...messages].reverse().find(m => m.role === 'user')
+  // Route skills/search on the USER's question only. Matching by id
+  // regardless of role would route on answer text when regenerating an
+  // assistant message.
+  if (messageId) {
+    const byId = messages.find(m => m.id === messageId)
+    if (byId && (byId as { role?: string }).role === 'user') {
+      return getTextFromParts((byId as { parts?: unknown }).parts as never)
+    }
+  }
+  const target = [...messages]
+    .reverse()
+    .find(m => (m as { role?: string }).role === 'user')
 
   if (!target) return ''
   // DB messages store parts as { type, text } which getTextFromParts accepts.
@@ -202,8 +213,7 @@ export async function createChatStreamResponse(
       // the capability detector already flagged needsSearch, in which case we
       // preload too). This prevents the model from hallucinating current info
       // it no longer has in its weights.
-      const isNonThinkingModel =
-        model.id === 'tencent/hy3:free' || model.id === 'minimax/minimax-m3:free'
+      const isNonThinkingModel = isNonThinkingModelId(model.id)
 
       // A skill is needed only when one matched (LEVEL 1) or an attachment forces
       // it (e.g. an uploaded document). Everything else (greetings, simple chat,
@@ -249,10 +259,18 @@ export async function createChatStreamResponse(
       // Skip the server-side web preload so the researcher arms the connector
       // tools (or the connector preload for the weak model) instead. Guests
       // have no vault, so the preload stays for them.
-      const connectorDataIntent =
-        detectConnectorIntent(userQuery ?? '') &&
-        Boolean(userId) &&
-        userId !== 'guest'
+      //
+      // Follow-ups ("et demain ?", "le deuxième") name no service but continue
+      // an established connector thread — inherit the intent from recent
+      // history so they don't fall back to web search either.
+      const hasVault = Boolean(userId) && userId !== 'guest'
+      const rawConnectorIntent = detectConnectorIntent(userQuery ?? '')
+      const connectorFollowUp =
+        !rawConnectorIntent &&
+        hasVault &&
+        isConnectorFollowUp(userQuery ?? '', initialChat?.messages)
+      const connectorIntent = rawConnectorIntent || connectorFollowUp
+      const connectorDataIntent = connectorIntent && hasVault
       const shouldPreloadSearch =
         Boolean(caps.needsSearch) && !connectorDataIntent
       let preloadedSearchContext: string | undefined
@@ -373,8 +391,13 @@ export async function createChatStreamResponse(
         userQuery,
         userId,
         connectorCallsSink: connectorPreloadCalls,
+        // A connector follow-up ("et demain ?") looks trivial to the
+        // capability gate but needs the data path — don't let it disarm.
+        connectorIntentOverride: connectorFollowUp
+          ? true
+          : undefined,
         capabilities: {
-          trivial,
+          trivial: trivial && !connectorFollowUp,
           needsSearch: caps.needsSearch && !preloadedSearchContext,
           needsImage: needsImageEff,
           needsDocument: caps.needsDocument
@@ -664,7 +687,10 @@ export async function createChatStreamResponse(
               '):',
             error
           )
-          if (wroteContent || writtenPartCount > 0) {
+          // Gate suppression on real answer text ONLY. writtenPartCount also
+          // counts the synthetic `start` chunk and preloaded tool chunks, so
+          // a total failure with zero delivered text must still surface.
+          if (wroteContent) {
             console.error(
               '[Stream] error suppressed — content already delivered; not surfacing to user'
             )
@@ -695,10 +721,14 @@ export async function createChatStreamResponse(
                   type: 'tool-search',
                   toolCallId: 'preloaded-search',
                   state: 'output-available',
+                  // Same input as the live synthetic emit above (image
+                  // searches must keep their images after reload).
                   input: {
                     query: userQuery,
                     type: 'optimized',
-                    content_types: ['web'],
+                    content_types: caps.webImageSearch
+                      ? ['image', 'web']
+                      : ['web'],
                     max_results: 10,
                     search_depth: 'basic'
                   },

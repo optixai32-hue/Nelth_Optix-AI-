@@ -4,6 +4,7 @@ import {
   buildConnectorContext,
   detectConnectorIntent,
   extractConnectorKeywords,
+  isConnectorFollowUp,
   isStatusOnlyIntent
 } from './context'
 import { hasConnection } from './vault'
@@ -63,6 +64,43 @@ describe('isStatusOnlyIntent', () => {
   it('flags connection questions without data access', () => {
     expect(isStatusOnlyIntent('quelles apps sont connectées ?')).toBe(true)
     expect(isStatusOnlyIntent('lis mes mails')).toBe(false)
+  })
+})
+
+describe('isConnectorFollowUp', () => {
+  const history = [
+    { parts: [{ type: 'text', text: 'lire mon programme' }] },
+    {
+      parts: [
+        { type: 'text', text: 'Voici votre programme.' },
+        {
+          type: 'tool-calendar',
+          state: 'output-available',
+          output: { state: 'complete', items: [] }
+        }
+      ]
+    }
+  ]
+  it('inherits intent for short anaphoric follow-ups', () => {
+    expect(isConnectorFollowUp('et demain ?', history)).toBe(true)
+    expect(isConnectorFollowUp('le deuxième', history)).toBe(true)
+  })
+  it('refuses without history evidence', () => {
+    expect(isConnectorFollowUp('et demain ?', [])).toBe(false)
+    expect(
+      isConnectorFollowUp('et demain ?', [
+        { parts: [{ type: 'text', text: 'bonjour' }] }
+      ])
+    ).toBe(false)
+  })
+  it('refuses unrelated questions and long queries', () => {
+    expect(isConnectorFollowUp('quel temps fait-il ?', history)).toBe(false)
+    expect(
+      isConnectorFollowUp(
+        'et demain peux-tu me rappeler tout ce que tu sais sur le projet',
+        history
+      )
+    ).toBe(false)
   })
 })
 

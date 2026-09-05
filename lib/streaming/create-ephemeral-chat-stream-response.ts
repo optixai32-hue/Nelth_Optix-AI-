@@ -32,6 +32,7 @@ import {
   StreamTextSanitizer,
   stripFakeToolCallXmlFromMessage
 } from '@/lib/utils/message-utils'
+import { isNonThinkingModelId } from '@/lib/utils/registry'
 import { isTracingEnabled } from '@/lib/utils/telemetry'
 
 import {
@@ -131,8 +132,7 @@ export async function createEphemeralChatStreamResponse(
       // Nelth-3.5 (tencent/hy3:free) is a non-thinking model that cannot emit valid
       // native tool calls — it outputs fake <tool_call> XML blocks. So for this model
       // we ALWAYS preload search results for non-trivial queries.
-      const isNonThinkingModel =
-        model.id === 'tencent/hy3:free' || model.id === 'minimax/minimax-m3:free'
+      const isNonThinkingModel = isNonThinkingModelId(model.id)
 
       // A skill is needed only when one matched (LEVEL 1) or an attachment forces
       // it (e.g. an uploaded document). Everything else (greetings, simple chat,

@@ -1,6 +1,6 @@
 import { foldText, intentRe } from '@/lib/skills/text-fold'
 
-import { ConnectorAuthError } from './api-client'
+import { ConnectorAuthError } from './errors'
 import {
   calendarList,
   driveRecent,
@@ -10,7 +10,7 @@ import {
   gmailSearch,
   notionSearch
 } from './service-clients'
-import { hasConnection } from './vault'
+import { hasConnection, markConnectorAuthFailure } from './vault'
 
 /**
  * Connector awareness for the chat model.
@@ -59,6 +59,54 @@ export function isStatusOnlyIntent(query: string): boolean {
   return STATUS_INTENT_RE.test(folded) && !DATA_INTENT_RE.test(folded)
 }
 
+// Short anaphoric continuers ("et demain ?", "le deuxième", "that one").
+// Folded form. Deliberately excludes bare pronouns like "it" that would hijack
+// unrelated questions ("is it raining?") asked right after a connector turn.
+const CONNECTOR_FOLLOWUP_RE = intentRe(
+  'et|le|la|les|lui|leur|eux|celui|celle|ceux|celles|ca|ceci|cela|deuxieme|troisieme|premier|premiere|autre|encore|aussi|plus|apres|ensuite|demain|semaine|hier|matin|soir|jour|mois' +
+    '|that|this|other|another|more|next|second|first|them|tomorrow|week|day|yesterday|morning|evening'
+)
+
+const CONNECTOR_PART_TYPES = new Set([
+  'tool-gmail',
+  'tool-drive',
+  'tool-calendar',
+  'tool-github',
+  'tool-notion'
+])
+
+/**
+ * True when a short query continues a connector thread without naming a
+ * service ("et demain ?", "le deuxième"). Without this, follow-ups fall back
+ * to web search / generic answers even though the data path is established.
+ * Requires BOTH an anaphoric continuer AND connector evidence in recent
+ * history (tool parts or retained connector context).
+ */
+export function isConnectorFollowUp(
+  query: string,
+  messages?: Array<{ parts?: unknown }>
+): boolean {
+  const folded = foldText(query ?? '').trim()
+  if (!folded) return false
+  if (folded.split(/\s+/).length > 8) return false
+  if (detectConnectorIntent(query)) return false
+  if (!CONNECTOR_FOLLOWUP_RE.test(folded)) return false
+  const recent = (messages ?? []).slice(-4)
+  return recent.some(m => {
+    const parts = ((m as { parts?: unknown }).parts ?? []) as Array<{
+      type?: unknown
+      text?: unknown
+    }>
+    return parts.some(
+      p =>
+        (typeof p?.type === 'string' && CONNECTOR_PART_TYPES.has(p.type)) ||
+        (p?.type === 'text' &&
+          typeof p?.text === 'string' &&
+          p.text.includes('<connector_context>'))
+    )
+  })
+}
+
 // Plain literal words to drop when turning a user request into provider
 // search keywords (matched against foldText output: lowercase, no accents).
 const CONNECTOR_STOPWORDS = new Set(
@@ -71,6 +119,8 @@ const CONNECTOR_STOPWORDS = new Set(
     '|agenda|calendrier|calendar|evenement|evenements|reunion|reunions|rendez-vous' +
     '|github|depot|depots|repo|repos|notion|page|pages' +
     '|dernier|derniers|derniere|dernieres|recent|recents|recente|recentes|nouveau|nouveaux|nouvelle|nouvelles|premier|premiers|premiere|premieres|prochain|prochains|prochaine|prochaines|latest|last|newest' +
+    '|deuxieme|troisieme|second|seconde' +
+    '|demain|hier|aujourdhui|today|yesterday|tomorrow|semaine|week|matin|morning|soir|evening' +
     '|le|la|les|de|des|du|un|une|et|ou|the|a|an|of|from|for|with|about|avec|pour|sur|dans|stp|svp|moi|please'
   ).split('|')
 )
@@ -232,6 +282,7 @@ export async function runConnectorPreloadStructured(
       const r = await settle(gmailSearch(userId, keywords, 3))
       if (!r.ok) {
         if (r.error instanceof ConnectorAuthError) {
+          await markConnectorAuthFailure(userId, 'google')
           return {
             call: {
               service: 'gmail' as const,
@@ -268,6 +319,7 @@ export async function runConnectorPreloadStructured(
       )
       if (!r.ok) {
         if (r.error instanceof ConnectorAuthError) {
+          await markConnectorAuthFailure(userId, 'google')
           return {
             call: {
               service: 'drive' as const,
@@ -297,6 +349,7 @@ export async function runConnectorPreloadStructured(
       const r = await settle(calendarList(userId))
       if (!r.ok) {
         if (r.error instanceof ConnectorAuthError) {
+          await markConnectorAuthFailure(userId, 'google')
           return {
             call: {
               service: 'calendar' as const,
@@ -336,6 +389,7 @@ export async function runConnectorPreloadStructured(
       )
       if (!r.ok) {
         if (r.error instanceof ConnectorAuthError) {
+          await markConnectorAuthFailure(userId, 'github')
           return {
             call: {
               service: 'github' as const,
@@ -367,6 +421,7 @@ export async function runConnectorPreloadStructured(
       const r = await settle(notionSearch(userId, keywords))
       if (!r.ok) {
         if (r.error instanceof ConnectorAuthError) {
+          await markConnectorAuthFailure(userId, 'notion')
           return {
             call: {
               service: 'notion' as const,

@@ -30,7 +30,7 @@ import { normalizeToolCall } from '../tools/runtime/normalize-tool-call'
 import { createSearchTool } from '../tools/search'
 import { createTodoTools } from '../tools/todo'
 import { SearchMode } from '../types/search'
-import { getModel } from '../utils/registry'
+import { getModel, isNonThinkingModelId } from '../utils/registry'
 import { isTracingEnabled } from '../utils/telemetry'
 
 import {
@@ -577,7 +577,8 @@ export async function createResearcher({
   conversationLanguage,
   capabilities,
   userId,
-  connectorCallsSink
+  connectorCallsSink,
+  connectorIntentOverride
 }: {
   model: string
   modelConfig?: Model
@@ -623,6 +624,12 @@ export async function createResearcher({
    * surface them as synthetic tool parts (same UX as native tool calls).
    */
   connectorCallsSink?: ConnectorPreloadCall[]
+  /**
+   * Pre-resolved connector intent from the orchestrator (which can see
+   * history for follow-ups like "et demain ?"). Falls back to detecting
+   * from the current query alone when undefined.
+   */
+  connectorIntentOverride?: boolean
 }) {
   try {
     const currentDate = new Date().toLocaleString()
@@ -765,11 +772,7 @@ export async function createResearcher({
       }
 
       const isNonThinking =
-        modelConfig?.id === 'tencent/hy3:free' ||
-        modelConfig?.id === 'minimax/minimax-m3:free' ||
-        model.includes('tencent/hy3:free') ||
-        model.includes('minimax/minimax-m3:free') ||
-        modelConfig?.id?.includes('hy3:free')
+        isNonThinkingModelId(modelConfig?.id) || isNonThinkingModelId(model)
 
       // LAZY TOOL ARMING: for non-thinking models, a trivial request arms no tools.
       // For thinking models (reasoning models), NEVER wipe out tools because the
@@ -794,7 +797,8 @@ export async function createResearcher({
       // server-side preload layer with the same data as injected text.
       let connectorLayer = ''
       let connectorTools: ConnectorTools | null = null
-      const connectorIntent = detectConnectorIntent(userQuery ?? '')
+      const connectorIntent =
+        connectorIntentOverride ?? detectConnectorIntent(userQuery ?? '')
       const connectorsAllowed =
         Boolean(userId && userId !== 'guest') &&
         connectorIntent &&

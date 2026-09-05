@@ -30,6 +30,20 @@ const NELTH_NON_THINKING_MODELS = new Set([
   'minimax/minimax-m3:free'
 ])
 
+/**
+ * Single shared weak-model gate. Accepts exact ids as well as
+ * provider-prefixed forms (`tencent:tencent/hy3:free`) seen in selection
+ * cookies and agent model strings. Replaces the three slightly different
+ * inline checks that used to disagree across researcher/streaming layers.
+ */
+export function isNonThinkingModelId(
+  modelId: string | null | undefined
+): boolean {
+  if (!modelId) return false
+  if (NELTH_NON_THINKING_MODELS.has(modelId)) return true
+  return modelId.includes('hy3:free') || modelId.includes('minimax-m3:free')
+}
+
 const NELTH_NON_THINKING_BODY = {
   temperature: 0.9,
   top_p: 1.0

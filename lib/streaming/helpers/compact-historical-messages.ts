@@ -245,6 +245,12 @@ function connectorItemLine(item: unknown): string | null {
     const v = o[key]
     if (typeof v === 'string' && v.trim()) extras.push(v.trim())
   }
+  // Keep the snippet: follow-ups like "approfondis le 2e mail" need more
+  // than the subject to resolve against.
+  const snippet = o['snippet']
+  if (typeof snippet === 'string' && snippet.trim()) {
+    extras.push(truncateConnectorText(snippet, 100))
+  }
   const line =
     extras.length > 0 ? `- ${title} (${extras.join(' · ')})` : `- ${title}`
   return truncateConnectorText(line, MAX_CONNECTOR_ITEM_CHARS)

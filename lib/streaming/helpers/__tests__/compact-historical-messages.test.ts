@@ -55,6 +55,7 @@ describe('compactHistoricalMessages connector retention', () => {
     expect(ctx).toBeDefined()
     expect(ctx).toContain('Facture')
     expect(ctx).toContain('shop@x.com')
+    expect(ctx).toContain('Total 42')
   })
 
   it('preserves tool-only connector turns instead of dropping them', () => {
