@@ -393,9 +393,9 @@ export async function createChatStreamResponse(
       // tools, preloads — is never constructed for voice turns.
       const researchAgent = voiceMode
         ? createVoiceAgent({
-            model: context.modelId,
-            modelConfig: model,
-            conversationLanguage
+            conversationLanguage,
+            fallbackModel: context.modelId,
+            fallbackModelConfig: model
           })
         : await researcher({
         model: context.modelId,
