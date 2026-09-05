@@ -724,11 +724,3 @@
     line-clamp: 2;
   }
 }
-
-/* Empty-state safe centering: behaves exactly like justify-center while the
-   content fits, but top-aligns (instead of clipping both ends) when the
-   column overflows on short viewports. Paired with overflow-y-auto so the
-   whole empty state — including the connector card — stays reachable. */
-.nelth-empty-safe-center {
-  justify-content: safe center;
-}
