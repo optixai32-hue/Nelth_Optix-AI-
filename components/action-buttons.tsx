@@ -17,6 +17,7 @@ import { captureClient } from '@/lib/analytics/posthog-client'
 import { cn } from '@/lib/utils'
 
 import { Button } from './ui/button'
+import { ConnectorCard } from './connector/connector-card'
 import {
   Stories,
   StoriesContent,
@@ -490,11 +491,11 @@ export function ActionButtons({
             activeCategory ? 'opacity-0 pointer-events-none' : 'opacity-100'
           )}
         >
-            <div className="flex flex-wrap justify-center gap-2 px-2">
-              {visibleCategories.map(category => {
+          <div className="relative flex flex-wrap justify-center gap-2 px-2">
+            {visibleCategories.map(category => {
               const Icon = category.icon
               return (
-                 <Button
+                <Button
                   key={category.key}
                   type="button"
                   variant="outline"
@@ -515,6 +516,12 @@ export function ActionButtons({
                 </Button>
               )
             })}
+            {/* Connector Card: anchored to the chips row itself (not the
+                fixed-height container), so it sits 1px below the chips with
+                zero impact on the logo, greeting, composer and chips. */}
+            <div className="absolute inset-x-0 top-full z-10 mt-px flex justify-center px-2">
+              <ConnectorCard className="w-full max-w-[530px]" />
+            </div>
           </div>
         </div>
 
