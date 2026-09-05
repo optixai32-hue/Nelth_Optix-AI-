@@ -1,5 +1,8 @@
+import { ConnectorAuthError } from './errors'
 import type { ConnectorProviderId } from './providers'
 import { getValidAccessToken } from './vault'
+
+export { ConnectorAuthError }
 
 /**
  * Authenticated HTTP layer for connector provider APIs.
@@ -10,18 +13,12 @@ import { getValidAccessToken } from './vault'
 
 const FETCH_TIMEOUT_MS = 15_000
 
-/** Thrown when the provider rejects our token: user must reconnect. */
-export class ConnectorAuthError extends Error {
-  provider: ConnectorProviderId
-  constructor(provider: ConnectorProviderId) {
-    super(`${provider} authorization expired or revoked`)
-    this.name = 'ConnectorAuthError'
-    this.provider = provider
-  }
-}
-
 function isAuthStatus(status: number): boolean {
-  return status === 401 || status === 403
+  // 401 ONLY. A 403 from these APIs means something else: GitHub rate
+  // limits, Notion page permissions, Drive export-size limits — mapping
+  // those to "reconnect" sends the user into a useless OAuth loop.
+  // Revoked/expired grants surface as 401 (invalid_credentials).
+  return status === 401
 }
 
 /**

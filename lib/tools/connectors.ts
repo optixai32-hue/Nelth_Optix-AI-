@@ -1,18 +1,22 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 
-import { ConnectorAuthError } from '@/lib/connectors/api-client'
+import { ConnectorAuthError } from '@/lib/connectors/errors'
+import type { ConnectorProviderId } from '@/lib/connectors/providers'
 import {
   calendarList,
   driveRead,
+  driveRecent,
   driveSearch,
   githubRead,
+  githubRecentRepos,
   githubSearch,
   gmailRead,
   gmailSearch,
   notionRead,
   notionSearch
 } from '@/lib/connectors/service-clients'
+import { markConnectorAuthFailure } from '@/lib/connectors/vault'
 import { logToolPayload } from '@/lib/utils/usage-logging'
 
 /**
@@ -25,11 +29,18 @@ import { logToolPayload } from '@/lib/utils/usage-logging'
  * `{ state: 'complete' | 'auth-required' | 'error' }` payload.
  */
 
-function authRequired(provider: string) {
+async function authRequired(
+  userId: string,
+  provider: ConnectorProviderId,
+  label: string
+) {
+  // Persist the dead grant so the status route reports needsReconnect and
+  // the card offers Reconnect instead of staying green.
+  await markConnectorAuthFailure(userId, provider)
   return {
     state: 'auth-required' as const,
-    provider,
-    message: `The ${provider} connection expired or was revoked. Tell the user to reconnect it from the "Connecter une application" connector card, then ask again.`
+    provider: label,
+    message: `The ${label} connection expired or was revoked. Tell the user to reconnect it from the "Connecter une application" connector card, then ask again.`
   }
 }
 
@@ -68,15 +79,13 @@ const gmailTool = (userId: string) =>
           yield { state: 'complete' as const, ...msg }
           return
         }
-        if (!query.trim()) {
-          yield toolError('query is required for action=search')
-          return
-        }
+        // Empty query = list recent mail (same as the server preload).
         const res = await gmailSearch(userId, query, maxResults)
         logToolPayload('gmail', query, { items: res.items })
         yield { state: 'complete' as const, ...res }
       } catch (e) {
-        if (e instanceof ConnectorAuthError) yield authRequired('Google')
+        if (e instanceof ConnectorAuthError)
+          yield await authRequired(userId, 'google', 'Google')
         else yield toolError(e instanceof Error ? e.message : String(e))
       }
     }
@@ -108,15 +117,15 @@ const driveTool = (userId: string) =>
           yield { state: 'complete' as const, ...file }
           return
         }
-        if (!query.trim()) {
-          yield toolError('query is required for action=search')
-          return
-        }
-        const res = await driveSearch(userId, query, maxResults)
+        // Empty query = list recent files (same as the server preload).
+        const res = query.trim()
+          ? await driveSearch(userId, query, maxResults)
+          : await driveRecent(userId, maxResults)
         logToolPayload('drive', query, { items: res.items })
         yield { state: 'complete' as const, ...res }
       } catch (e) {
-        if (e instanceof ConnectorAuthError) yield authRequired('Google')
+        if (e instanceof ConnectorAuthError)
+          yield await authRequired(userId, 'google', 'Google')
         else yield toolError(e instanceof Error ? e.message : String(e))
       }
     }
@@ -130,9 +139,13 @@ const calendarTool = (userId: string) =>
       timeMin: z.string().optional().describe('ISO start (default: now)'),
       timeMax: z.string().optional().describe('ISO end (default: +7 days)'),
       maxResults: z.number().optional().default(10),
-      query: z.string().optional().describe('Keyword filter (e.g. "dentiste")')
+      query: z.string().optional().describe('Keyword filter (e.g. "dentiste")'),
+      timeZone: z
+        .string()
+        .optional()
+        .describe('IANA time zone (e.g. "Indian/Antananarivo") for display')
     }),
-    async *execute({ timeMin, timeMax, maxResults = 10, query }) {
+    async *execute({ timeMin, timeMax, maxResults = 10, query, timeZone }) {
       yield { state: 'connecting' as const, service: 'calendar' as const }
       try {
         const res = await calendarList(
@@ -140,12 +153,14 @@ const calendarTool = (userId: string) =>
           timeMin,
           timeMax,
           maxResults,
-          query
+          query,
+          timeZone
         )
         logToolPayload('calendar', query, { items: res.items })
         yield { state: 'complete' as const, ...res }
       } catch (e) {
-        if (e instanceof ConnectorAuthError) yield authRequired('Google')
+        if (e instanceof ConnectorAuthError)
+          yield await authRequired(userId, 'google', 'Google')
         else yield toolError(e instanceof Error ? e.message : String(e))
       }
     }
@@ -189,14 +204,22 @@ const githubTool = (userId: string) =>
           return
         }
         if (!query.trim()) {
-          yield toolError('query is required for action=search')
+          if (kind === 'code') {
+            yield toolError('query is required to search code')
+            return
+          }
+          // Empty query = list recent repos (same as the server preload).
+          const recent = await githubRecentRepos(userId)
+          logToolPayload('github', query, { items: recent.items })
+          yield { state: 'complete' as const, ...recent }
           return
         }
         const res = await githubSearch(userId, query, kind)
         logToolPayload('github', query, { items: res.items })
         yield { state: 'complete' as const, ...res }
       } catch (e) {
-        if (e instanceof ConnectorAuthError) yield authRequired('GitHub')
+        if (e instanceof ConnectorAuthError)
+          yield await authRequired(userId, 'github', 'GitHub')
         else yield toolError(e instanceof Error ? e.message : String(e))
       }
     }
@@ -227,15 +250,13 @@ const notionTool = (userId: string) =>
           yield { state: 'complete' as const, ...page }
           return
         }
-        if (!query.trim()) {
-          yield toolError('query is required for action=search')
-          return
-        }
+        // Empty query = list everything shared (same as the server preload).
         const res = await notionSearch(userId, query)
         logToolPayload('notion', query, { items: res.items })
         yield { state: 'complete' as const, ...res }
       } catch (e) {
-        if (e instanceof ConnectorAuthError) yield authRequired('Notion')
+        if (e instanceof ConnectorAuthError)
+          yield await authRequired(userId, 'notion', 'Notion')
         else yield toolError(e instanceof Error ? e.message : String(e))
       }
     }

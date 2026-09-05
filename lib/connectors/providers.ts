@@ -252,7 +252,12 @@ export async function exchangeCodeForTokens(args: {
 export async function refreshAccessToken(args: {
   provider: ConnectorProviderId
   refreshToken: string
-}): Promise<{ accessToken: string; expiresAt: number | null }> {
+}): Promise<{
+  accessToken: string
+  expiresAt: number | null
+  /** Present when the provider rotated the refresh token (GitHub Apps). */
+  refreshToken?: string | null
+}> {
   const { provider, refreshToken } = args
   if (provider === 'google') {
     const data = (await postForm('https://oauth2.googleapis.com/token', {
@@ -260,7 +265,11 @@ export async function refreshAccessToken(args: {
       client_secret: requiredEnv('GOOGLE_CLIENT_SECRET'),
       refresh_token: refreshToken,
       grant_type: 'refresh_token'
-    })) as { access_token?: unknown; expires_in?: unknown }
+    })) as {
+      access_token?: unknown
+      expires_in?: unknown
+      refresh_token?: unknown
+    }
     if (typeof data.access_token !== 'string' || !data.access_token) {
       throw new Error('Google refresh did not return an access token')
     }
@@ -269,7 +278,9 @@ export async function refreshAccessToken(args: {
       expiresAt:
         typeof data.expires_in === 'number'
           ? Date.now() + data.expires_in * 1000
-          : null
+          : null,
+      refreshToken:
+        typeof data.refresh_token === 'string' ? data.refresh_token : null
     }
   }
   if (provider === 'github') {
@@ -282,7 +293,11 @@ export async function refreshAccessToken(args: {
         grant_type: 'refresh_token'
       },
       { Accept: 'application/json' }
-    )) as { access_token?: unknown; expires_in?: unknown }
+    )) as {
+      access_token?: unknown
+      expires_in?: unknown
+      refresh_token?: unknown
+    }
     if (typeof data.access_token !== 'string' || !data.access_token) {
       throw new Error('GitHub refresh did not return an access token')
     }
@@ -291,7 +306,9 @@ export async function refreshAccessToken(args: {
       expiresAt:
         typeof data.expires_in === 'number'
           ? Date.now() + data.expires_in * 1000
-          : null
+          : null,
+      refreshToken:
+        typeof data.refresh_token === 'string' ? data.refresh_token : null
     }
   }
   throw new Error('This provider issues non-expiring tokens (no refresh)')

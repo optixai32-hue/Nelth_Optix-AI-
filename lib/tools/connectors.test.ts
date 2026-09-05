@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/connectors/vault', () => ({
   getValidAccessToken: vi.fn(async () => 'test-token'),
-  hasConnection: vi.fn(async () => false)
+  hasConnection: vi.fn(async () => false),
+  markConnectorAuthFailure: vi.fn(async () => {})
 }))
 
 import { createConnectorTools } from './connectors'
@@ -44,7 +45,7 @@ beforeEach(() => {
 describe('gmail tool', () => {
   it('searches then maps metadata', async () => {
     stubFetch(url => {
-      if (url.includes('/messages?q=')) {
+      if (url.includes('/messages?') && url.includes('q=')) {
         return jsonResponse({ messages: [{ id: 'm1' }, { id: 'm2' }] })
       }
       if (url.includes('/messages/m1?')) {
@@ -155,6 +156,21 @@ describe('drive tool', () => {
     const final = chunks[chunks.length - 1] as any
     expect(final).toMatchObject({ state: 'complete', readable: false })
   })
+
+  it('empty search lists recent files instead of erroring', async () => {
+    const calls = stubFetch(() =>
+      jsonResponse({
+        files: [{ id: 'f1', name: 'Recent', mimeType: 'text/plain' }]
+      })
+    )
+    const chunks = await collect(
+      (tools.drive.execute as any)({ action: 'search', query: '' }, {})
+    )
+    const final = chunks[chunks.length - 1] as any
+    expect(final.state).toBe('complete')
+    expect(final.items).toHaveLength(1)
+    expect(calls.some(c => c.includes('name%20contains'))).toBe(false)
+  })
 })
 
 describe('calendar tool', () => {
@@ -204,6 +220,21 @@ describe('github tool', () => {
       (tools.github.execute as any)({ action: 'search', query: 'x' }, {})
     )
     expect(chunks[chunks.length - 1]).toMatchObject({ state: 'error' })
+  })
+
+  it('empty repo search lists recent repos instead of erroring', async () => {
+    const calls = stubFetch(() =>
+      jsonResponse([
+        { full_name: 'me/app', html_url: 'https://github.com/me/app' }
+      ])
+    )
+    const chunks = await collect(
+      (tools.github.execute as any)({ action: 'search', query: '' }, {})
+    )
+    const final = chunks[chunks.length - 1] as any
+    expect(final.state).toBe('complete')
+    expect(final.items[0]).toMatchObject({ repo: 'me/app' })
+    expect(calls.some(c => c.includes('/user/repos'))).toBe(true)
   })
 })
 

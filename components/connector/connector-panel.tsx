@@ -25,6 +25,7 @@ export interface ConnectorPanelProps {
   statuses: Record<ConnectorId, ConnectorStatus>
   connectedIds: ConnectorId[]
   configured: Record<ConnectorProviderId, boolean>
+  needsReconnect?: Record<ConnectorProviderId, boolean>
   providerForService: (id: ConnectorId) => ConnectorProviderId
   onConnect: (id: ConnectorId) => Promise<boolean>
   onDisconnect: (provider: ConnectorProviderId) => Promise<void>
@@ -73,6 +74,7 @@ export function ConnectorPanel({
   statuses,
   connectedIds,
   configured,
+  needsReconnect,
   providerForService,
   onConnect,
   onDisconnect,
@@ -193,7 +195,9 @@ export function ConnectorPanel({
               ? 'connected'
               : (statuses[service.id] ?? 'idle')
             const busy = busyId === service.id
-            const isConfigured = configured[providerForService(service.id)] !== false
+            const provider = providerForService(service.id)
+            const isConfigured = configured[provider] !== false
+            const expired = needsReconnect?.[provider] === true
             return (
               <li
                 key={service.id}
@@ -210,7 +214,50 @@ export function ConnectorPanel({
                     {service.detail}
                   </span>
                 </span>
-                {status === 'connected' ? (
+                {status === 'connected' && expired ? (
+                  <span className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void handleConnect(service.id)}
+                      data-testid={`connector-reconnect-${service.id}`}
+                      title={t('connector.reconnectHint')}
+                      className={cn(
+                        'inline-flex min-w-[6.5rem] shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full bg-amber-100 px-3.5 py-1.5 text-[13px] font-medium text-amber-900',
+                        'transition-all duration-150 hover:bg-amber-200 active:scale-[0.98] disabled:cursor-default',
+                        EASE
+                      )}
+                    >
+                      {busy ? (
+                        <RowSpinner />
+                      ) : (
+                        t('connector.reconnect')
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void (async () => {
+                          setBusyId(service.id)
+                          try {
+                            await onDisconnect(provider)
+                          } finally {
+                            setBusyId(null)
+                          }
+                        })()
+                      }
+                      data-testid={`connector-disconnect-${service.id}`}
+                      title={t('connector.revokeNote')}
+                      className={cn(
+                        'shrink-0 cursor-pointer rounded-full px-2 py-1.5 text-[12px] font-medium text-neutral-400 transition-all duration-150 hover:bg-neutral-100 hover:text-neutral-700 active:scale-95 disabled:cursor-default',
+                        EASE
+                      )}
+                    >
+                      {t('connector.disconnect')}
+                    </button>
+                  </span>
+                ) : status === 'connected' ? (
                   <span className="flex shrink-0 items-center gap-2">
                     <span
                       data-testid={`connector-status-${service.id}`}

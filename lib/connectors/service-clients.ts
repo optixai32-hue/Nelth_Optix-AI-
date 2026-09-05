@@ -1,10 +1,10 @@
 import {
   authedFetch,
-  ConnectorAuthError,
   connectorGetJson,
   connectorPostJson,
   truncateText
 } from './api-client'
+import { ConnectorAuthError } from './errors'
 
 /**
  * Read-only clients for the connected provider APIs.
@@ -62,10 +62,15 @@ export async function gmailSearch(
   maxResults = 5
 ): Promise<{ items: GmailMessageSummary[] }> {
   const capped = Math.min(Math.max(maxResults, 1), 10)
+  // Blank query = list recent mail (the Gmail API treats a missing q as
+  // "all mail", latest first). Never send an empty q= which some gateway
+  // configurations reject, yielding a false-empty preload.
+  const params = new URLSearchParams({ maxResults: String(capped) })
+  if (query.trim()) params.set('q', query)
   const list = await connectorGetJson(
     userId,
     'google',
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${capped}`
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params.toString()}`
   )
   const messages = (list.messages ?? []) as Array<{ id: string }>
   const items = await Promise.all(
@@ -89,6 +94,35 @@ function findPlainBody(payload: any): string | null {
   return null
 }
 
+function findHtmlBody(payload: any): string | null {
+  if (!payload) return null
+  if (
+    payload.mimeType === 'text/html' &&
+    typeof payload.body?.data === 'string'
+  ) {
+    return payload.body.data
+  }
+  for (const part of payload.parts ?? []) {
+    const found = findHtmlBody(part)
+    if (found) return found
+  }
+  return null
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export async function gmailRead(
   userId: string,
   messageId: string
@@ -103,9 +137,15 @@ export async function gmailRead(
     value: string
   }>
   const rawBody = findPlainBody(msg.payload)
+  const rawHtml = rawBody ? null : findHtmlBody(msg.payload)
   const body = rawBody
     ? truncateText(Buffer.from(rawBody, 'base64url').toString('utf-8'), 8000)
-    : (msg.snippet ?? '')
+    : rawHtml
+      ? truncateText(
+          stripHtml(Buffer.from(rawHtml, 'base64url').toString('utf-8')),
+          8000
+        )
+      : (msg.snippet ?? '')
   return {
     id: messageId,
     subject: gmailHeader(headers, 'Subject'),
@@ -142,7 +182,7 @@ export async function driveSearch(
   const res = await connectorGetJson(
     userId,
     'google',
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent('files(id,name,mimeType,modifiedTime,size)')}&pageSize=${capped}&orderBy=modifiedTime desc`
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent('files(id,name,mimeType,modifiedTime,size)')}&pageSize=${capped}&orderBy=modifiedTime desc&supportsAllDrives=true&includeItemsFromAllDrives=true`
   )
   return { items: (res.files ?? []) as DriveFileSummary[] }
 }
@@ -156,7 +196,7 @@ export async function driveRecent(
   const res = await connectorGetJson(
     userId,
     'google',
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent('trashed = false')}&fields=${encodeURIComponent('files(id,name,mimeType,modifiedTime,size)')}&pageSize=${capped}&orderBy=modifiedTime desc`
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent('trashed = false')}&fields=${encodeURIComponent('files(id,name,mimeType,modifiedTime,size)')}&pageSize=${capped}&orderBy=modifiedTime desc&supportsAllDrives=true&includeItemsFromAllDrives=true`
   )
   return { items: (res.files ?? []) as DriveFileSummary[] }
 }
@@ -210,7 +250,9 @@ async function connectorGetJsonRaw(
 ): Promise<string> {
   const res = await authedFetch(userId, 'google', url)
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
+    // 401-only auth mapping (see api-client): 403s are rate limits,
+    // permissions, or export limits — never a reconnect signal.
+    if (res.status === 401) {
       throw new ConnectorAuthError('google')
     }
     throw new Error(`Connector API error ${res.status} for ${url}`)
@@ -225,6 +267,7 @@ export interface CalendarEventSummary {
   summary: string
   start: string
   end: string
+  allDay: boolean
   location?: string
   attendees?: number
 }
@@ -234,7 +277,8 @@ export async function calendarList(
   timeMin?: string,
   timeMax?: string,
   maxResults = 10,
-  query?: string
+  query?: string,
+  timeZone?: string
 ): Promise<{ items: CalendarEventSummary[] }> {
   const capped = Math.min(Math.max(maxResults, 1), 25)
   const params = new URLSearchParams({
@@ -246,6 +290,7 @@ export async function calendarList(
       timeMax || new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString()
   })
   if (query) params.set('q', query)
+  if (timeZone) params.set('timeZone', timeZone)
   const res = await connectorGetJson(
     userId,
     'google',
@@ -256,6 +301,7 @@ export async function calendarList(
     summary: (e.summary ?? '(no title)') as string,
     start: (e.start?.dateTime ?? e.start?.date ?? '') as string,
     end: (e.end?.dateTime ?? e.end?.date ?? '') as string,
+    allDay: Boolean(e.start?.date) && !e.start?.dateTime,
     location: e.location as string | undefined,
     attendees: Array.isArray(e.attendees) ? e.attendees.length : undefined
   }))
@@ -447,40 +493,88 @@ function notionBlockText(block: any): string {
   return ''
 }
 
+function renderNotionLine(block: any): string | null {
+  const text = notionBlockText(block).trim()
+  if (!text) return null
+  if (block.type === 'heading_1') return `# ${text}`
+  if (block.type === 'heading_2') return `## ${text}`
+  if (block.type === 'heading_3') return `### ${text}`
+  if (block.type === 'bulleted_list_item') return `- ${text}`
+  if (block.type === 'numbered_list_item') return `1. ${text}`
+  if (block.type === 'to_do')
+    return `- [${block.to_do?.checked ? 'x' : ' '}] ${text}`
+  if (block.type === 'quote') return `> ${text}`
+  return text
+}
+
+const NOTION_PAGE_SIZE = 50
+const NOTION_MAX_BLOCKS = 150
+
+async function fetchNotionBlocks(
+  userId: string,
+  blockId: string,
+  budget: number
+): Promise<Array<any>> {
+  const out: Array<any> = []
+  let cursor: string | undefined
+  while (out.length < budget) {
+    const params = new URLSearchParams({
+      page_size: String(Math.min(NOTION_PAGE_SIZE, budget - out.length))
+    })
+    if (cursor) params.set('start_cursor', cursor)
+    const res = await connectorGetJson(
+      userId,
+      'notion',
+      `https://api.notion.com/v1/blocks/${blockId}/children?${params.toString()}`,
+      { headers: NOTION_HEADERS }
+    )
+    out.push(...((res.results ?? []) as Array<any>))
+    if (!res.has_more || typeof res.next_cursor !== 'string') break
+    cursor = res.next_cursor
+  }
+  return out
+}
+
 export async function notionRead(
   userId: string,
   pageId: string
 ): Promise<{ id: string; title: string; content: string }> {
   const normalized = pageId.replace(/-/g, '')
-  const [page, blocks] = await Promise.all([
+  const [page, top] = await Promise.all([
     connectorGetJson(
       userId,
       'notion',
       `https://api.notion.com/v1/pages/${normalized}`,
       { headers: NOTION_HEADERS }
     ),
-    connectorGetJson(
-      userId,
-      'notion',
-      `https://api.notion.com/v1/blocks/${normalized}/children?page_size=50`,
-      { headers: NOTION_HEADERS }
-    )
+    fetchNotionBlocks(userId, normalized, NOTION_MAX_BLOCKS)
   ])
-  const lines = ((blocks.results ?? []) as Array<any>)
-    .map(b => {
-      const text = notionBlockText(b).trim()
-      if (!text) return null
-      if (b.type === 'heading_1') return `# ${text}`
-      if (b.type === 'heading_2') return `## ${text}`
-      if (b.type === 'heading_3') return `### ${text}`
-      if (b.type === 'bulleted_list_item') return `- ${text}`
-      if (b.type === 'numbered_list_item') return `1. ${text}`
-      if (b.type === 'to_do')
-        return `- [${b.to_do?.checked ? 'x' : ' '}] ${text}`
-      if (b.type === 'quote') return `> ${text}`
-      return text
-    })
-    .filter((l): l is string => l !== null)
+  // One level of nesting (toggles, child lists), fetched in parallel within
+  // the same block budget.
+  const parentsWithKids = top.filter(b => b?.has_children).slice(0, 10)
+  const nestedLists = await Promise.all(
+    parentsWithKids.map(parent =>
+      fetchNotionBlocks(
+        userId,
+        String(parent.id).replace(/-/g, ''),
+        20
+      ).catch(() => [] as Array<any>)
+    )
+  )
+  const kidsByParent = new Map<string, Array<any>>()
+  parentsWithKids.forEach((parent, i) =>
+    kidsByParent.set(String(parent.id), nestedLists[i] ?? [])
+  )
+  const lines: string[] = []
+  for (const block of top) {
+    const line = renderNotionLine(block)
+    if (line) lines.push(line)
+    for (const kid of kidsByParent.get(String(block?.id)) ?? []) {
+      const kidLine = renderNotionLine(kid)
+      if (kidLine) lines.push(`  ${kidLine}`)
+    }
+    if (lines.length >= NOTION_MAX_BLOCKS) break
+  }
   return {
     id: pageId,
     title: notionTitle(page),

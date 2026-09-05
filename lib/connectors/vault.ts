@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase-admin/firestore'
 import { getAdminApp } from '@/lib/firebase/admin'
 
 import { decryptSecret, encryptSecret } from './crypto'
+import { ConnectorAuthError, isGrantDeadError } from './errors'
 import {
   type ConnectorProviderId,
   refreshAccessToken,
@@ -26,6 +27,8 @@ export interface StoredConnection {
   scope?: string
   providerAccountId?: string
   providerAccountName?: string
+  /** Set when the grant died (revoked/expired): UI shows Reconnect. */
+  authFailedAt?: number | null
   updatedAt: number
 }
 
@@ -65,7 +68,28 @@ export async function saveConnection(
   if (!userId) throw new Error('saveConnection requires a userId')
   await providersCollection(userId)
     .doc(provider)
-    .set(toStored(provider, tokens), { merge: true })
+    .set({ ...toStored(provider, tokens), authFailedAt: null }, { merge: true })
+}
+
+/** Records a dead grant so the UI can offer Reconnect instead of green. */
+export async function markConnectorAuthFailure(
+  userId: string,
+  provider: ConnectorProviderId
+): Promise<void> {
+  if (!userId) return
+  await providersCollection(userId)
+    .doc(provider)
+    .set({ authFailedAt: Date.now(), updatedAt: Date.now() }, { merge: true })
+    .catch(() => {})
+}
+
+/** True when the stored grant is known-dead (needsReconnect UI state). */
+export async function connectionNeedsReconnect(
+  userId: string,
+  provider: ConnectorProviderId
+): Promise<boolean> {
+  const conn = await getConnection(userId, provider).catch(() => null)
+  return Boolean(conn?.authFailedAt)
 }
 
 export async function getConnection(
@@ -102,8 +126,8 @@ export async function hasConnection(
 
 /**
  * Returns a usable access token, refreshing it first when expired.
- * Throws when no connection exists or the refresh fails (caller surfaces a
- * "reconnect" state — never the raw error with token material).
+ * Throws ConnectorAuthError when no connection exists or the grant died
+ * (caller surfaces a "reconnect" state — never token material).
  */
 export async function getValidAccessToken(
   userId: string,
@@ -111,26 +135,47 @@ export async function getValidAccessToken(
 ): Promise<string> {
   const conn = await getConnection(userId, provider)
   if (!conn?.accessTokenSealed) {
-    throw new Error(`No ${provider} connection for this user`)
+    throw new ConnectorAuthError(provider)
   }
   const fresh =
     !conn.expiresAt || conn.expiresAt - Date.now() > REFRESH_SKEW_MS
-  if (fresh) return decryptSecret(conn.accessTokenSealed)
+  if (fresh) {
+    if (conn.authFailedAt) {
+      // A previous call proved the grant dead — don't serve the token.
+      throw new ConnectorAuthError(provider)
+    }
+    return decryptSecret(conn.accessTokenSealed)
+  }
   if (!conn.refreshTokenSealed) {
     // Permanent token past its (unknown) lifetime — return it once and let
     // the API call itself decide; do not delete on suspicion.
     return decryptSecret(conn.accessTokenSealed)
   }
-  const refreshed = await refreshAccessToken({
-    provider,
-    refreshToken: decryptSecret(conn.refreshTokenSealed)
-  })
+  let refreshed: Awaited<ReturnType<typeof refreshAccessToken>>
+  try {
+    refreshed = await refreshAccessToken({
+      provider,
+      refreshToken: decryptSecret(conn.refreshTokenSealed)
+    })
+  } catch (error) {
+    if (isGrantDeadError(error)) {
+      await markConnectorAuthFailure(userId, provider)
+      throw new ConnectorAuthError(provider)
+    }
+    throw error
+  }
   await providersCollection(userId)
     .doc(provider)
     .set(
       {
         accessTokenSealed: encryptSecret(refreshed.accessToken),
         expiresAt: refreshed.expiresAt,
+        // Persist a rotated refresh token (GitHub Apps rotate on refresh);
+        // without this the next refresh uses a dead token.
+        ...(refreshed.refreshToken
+          ? { refreshTokenSealed: encryptSecret(refreshed.refreshToken) }
+          : {}),
+        authFailedAt: null,
         updatedAt: Date.now()
       },
       { merge: true }

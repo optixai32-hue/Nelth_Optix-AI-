@@ -79,6 +79,7 @@ export interface ConnectorServerState {
   connected: Record<ConnectorId, boolean>
   configured: Record<ConnectorProviderId, boolean>
   guest: boolean
+  needsReconnect?: Record<ConnectorProviderId, boolean>
 }
 
 async function fetchServerState(): Promise<ConnectorServerState | null> {
@@ -99,6 +100,11 @@ async function fetchServerState(): Promise<ConnectorServerState | null> {
         google: !!data.configured?.google,
         github: !!data.configured?.github,
         notion: !!data.configured?.notion
+      },
+      needsReconnect: {
+        google: !!data.needsReconnect?.google,
+        github: !!data.needsReconnect?.github,
+        notion: !!data.needsReconnect?.notion
       },
       guest: !!data.guest
     }
@@ -185,6 +191,9 @@ export function useConnectors(options: UseConnectorsOptions = {}) {
   const [configured, setConfigured] = useState<
     Record<ConnectorProviderId, boolean>
   >(() => ({ google: true, github: true, notion: true }))
+  const [needsReconnect, setNeedsReconnect] = useState<
+    Record<ConnectorProviderId, boolean>
+  >(() => ({ google: false, github: false, notion: false }))
   const [guest, setGuest] = useState<boolean>(false)
   const [dismissed, setDismissed] = useState<boolean>(false)
 
@@ -207,6 +216,7 @@ export function useConnectors(options: UseConnectorsOptions = {}) {
       return next
     })
     setConfigured(state.configured)
+    if (state.needsReconnect) setNeedsReconnect(state.needsReconnect)
     setGuest(state.guest)
   }, [])
 
@@ -246,6 +256,12 @@ export function useConnectors(options: UseConnectorsOptions = {}) {
         }
       }
       const provider = providerForService(id)
+      if (guest) {
+        // Never strand guests in an OAuth popup that can only render a raw
+        // 401 — the card/panel shows the sign-in prompt instead.
+        setStatus(id, 'error')
+        return false
+      }
       setStatus(id, 'connecting')
       let popup: Window | null = null
       try {
@@ -272,7 +288,7 @@ export function useConnectors(options: UseConnectorsOptions = {}) {
       setStatus(id, 'error')
       return false
     },
-    [connectImpl, popupTimeoutMs, refresh, setStatus]
+    [connectImpl, popupTimeoutMs, refresh, setStatus, guest]
   )
 
   const disconnect = useCallback(
@@ -312,6 +328,7 @@ export function useConnectors(options: UseConnectorsOptions = {}) {
     connectedCount: connectedIds.length,
     statuses,
     configured,
+    needsReconnect,
     guest,
     dismissed,
     connect,

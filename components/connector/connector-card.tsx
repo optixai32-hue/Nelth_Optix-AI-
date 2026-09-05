@@ -105,6 +105,7 @@ export function ConnectorCard({ className, timings, connectImpl, isGuest }: Conn
     connectedCount,
     statuses,
     configured,
+    needsReconnect,
     dismissed,
     connect,
     disconnect,
@@ -332,6 +333,7 @@ export function ConnectorCard({ className, timings, connectImpl, isGuest }: Conn
         statuses={statuses}
         connectedIds={connectedIds}
         configured={configured}
+        needsReconnect={needsReconnect}
         providerForService={providerForService}
         onConnect={connect}
         onDisconnect={disconnect}

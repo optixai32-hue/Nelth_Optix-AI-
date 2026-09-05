@@ -3,7 +3,7 @@ import {
   configuredProviders,
   type ConnectorProviderId,
   servicesForProvider} from '@/lib/connectors/providers'
-import { hasConnection } from '@/lib/connectors/vault'
+import { connectionNeedsReconnect, hasConnection } from '@/lib/connectors/vault'
 
 export const runtime = 'nodejs'
 
@@ -20,7 +20,8 @@ const ALL_SERVICES: ServiceId[] = [
 /**
  * Connection states for the connector UI. Booleans only — token material
  * never leaves the server. Guests get all-false + guest:true (UI prompts
- * sign-in instead of connecting).
+ * sign-in instead of connecting). `needsReconnect` flags grants proven dead
+ * (revoked/expired) so the UI offers Reconnect instead of staying green.
  */
 export async function GET() {
   const userId = await getCurrentUserId().catch(() => null)
@@ -32,14 +33,22 @@ export async function GET() {
     github: false,
     notion: false
   }
+  const needsReconnect: Record<ConnectorProviderId, boolean> = {
+    google: false,
+    github: false,
+    notion: false
+  }
   if (userId) {
     const providers: ConnectorProviderId[] = ['google', 'github', 'notion']
     const checks = await Promise.all(
       providers.map(async provider => {
         try {
-          return (await hasConnection(userId, provider))
-            ? servicesForProvider(provider)
-            : []
+          const [isConnected, expired] = await Promise.all([
+            hasConnection(userId, provider),
+            connectionNeedsReconnect(userId, provider)
+          ])
+          if (expired) needsReconnect[provider] = true
+          return isConnected ? servicesForProvider(provider) : []
         } catch {
           return []
         }
@@ -49,5 +58,5 @@ export async function GET() {
       connected[ids as ServiceId] = true
     }
   }
-  return Response.json({ connected, configured, guest: !userId })
+  return Response.json({ connected, configured, guest: !userId, needsReconnect })
 }

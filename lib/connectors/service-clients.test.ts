@@ -6,9 +6,13 @@ vi.mock('@/lib/connectors/vault', () => ({
 }))
 
 import {
+  calendarList,
   driveRecent,
+  driveSearch,
   githubRecentRepos,
+  gmailRead,
   gmailSearch,
+  notionRead,
   notionSearch
 } from './service-clients'
 
@@ -87,5 +91,116 @@ describe('recent fallbacks', () => {
       sort: { direction: 'descending', timestamp: 'last_edited_time' }
     })
     expect(bodies[0]).not.toHaveProperty('query')
+  })
+
+  it('driveSearch includes shared drives', async () => {
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        seen.push(url)
+        return jsonResponse({ files: [] })
+      })
+    )
+    await driveSearch('user-1', 'budget', 5)
+    expect(seen[0]).toContain('supportsAllDrives=true')
+    expect(seen[0]).toContain('includeItemsFromAllDrives=true')
+  })
+
+  it('gmailRead falls back to stripped HTML when no plain part', async () => {
+    const html = Buffer.from(
+      '<html><body><p>Hello <b>Marie</b></p><script>evil()</script></body></html>',
+      'utf-8'
+    ).toString('base64url')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          snippet: 'Hello',
+          payload: {
+            headers: [{ name: 'Subject', value: 'Hi' }],
+            parts: [{ mimeType: 'text/html', body: { data: html } }]
+          }
+        })
+      )
+    )
+    const msg = await gmailRead('user-1', 'm1')
+    expect(msg.body).toContain('Hello Marie')
+    expect(msg.body).not.toContain('evil()')
+    expect(msg.body).not.toContain('<p>')
+  })
+
+  it('notionRead follows pagination cursors', async () => {
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        seen.push(url)
+        if (url.includes('/v1/pages/')) {
+          return jsonResponse({
+            properties: {
+              title: { type: 'title', title: [{ plain_text: 'Doc' }] }
+            }
+          })
+        }
+        if (url.includes('start_cursor')) {
+          return jsonResponse({
+            results: [
+              {
+                id: 'b2',
+                type: 'paragraph',
+                paragraph: { rich_text: [{ plain_text: 'page two' }] }
+              }
+            ],
+            has_more: false
+          })
+        }
+        return jsonResponse({
+          results: [
+            {
+              id: 'b1',
+              type: 'paragraph',
+              paragraph: { rich_text: [{ plain_text: 'page one' }] }
+            }
+          ],
+          has_more: true,
+          next_cursor: 'cur-1'
+        })
+      })
+    )
+    const page = await notionRead('user-1', 'p1')
+    expect(page.content).toContain('page one')
+    expect(page.content).toContain('page two')
+    expect(seen.some(u => u.includes('start_cursor'))).toBe(true)
+  })
+
+  it('calendarList flags all-day events and forwards timeZone', async () => {
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        seen.push(url)
+        return jsonResponse({
+          items: [
+            {
+              id: 'e1',
+              summary: 'Fête',
+              start: { date: '2026-09-06' },
+              end: { date: '2026-09-07' }
+            }
+          ]
+        })
+      })
+    )
+    const res = await calendarList(
+      'user-1',
+      undefined,
+      undefined,
+      5,
+      undefined,
+      'Indian/Antananarivo'
+    )
+    expect(res.items[0]).toMatchObject({ summary: 'Fête', allDay: true })
+    expect(seen[0]).toContain('timeZone=Indian%2FAntananarivo')
   })
 })
