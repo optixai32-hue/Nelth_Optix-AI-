@@ -5,8 +5,9 @@ import { type Model } from '@/lib/types/models'
 
 import {
   buildConnectorContext,
+  type ConnectorPreloadCall,
   detectConnectorIntent,
-  runConnectorPreload
+  runConnectorPreloadStructured
 } from '../connectors/context'
 import {
   DOCUMENT_INTENT_RE,
@@ -559,7 +560,8 @@ export async function createResearcher({
   userQuery,
   conversationLanguage,
   capabilities,
-  userId
+  userId,
+  connectorCallsSink
 }: {
   model: string
   modelConfig?: Model
@@ -599,6 +601,12 @@ export async function createResearcher({
    * are armed. Guests ('guest'/undefined) never get connectors.
    */
   userId?: string
+  /**
+   * Optional sink: when the weak-model connector preload runs, its
+   * structured per-service calls are pushed here so the streaming layer can
+   * surface them as synthetic tool parts (same UX as native tool calls).
+   */
+  connectorCallsSink?: ConnectorPreloadCall[]
 }) {
   try {
     const currentDate = new Date().toLocaleString()
@@ -787,14 +795,17 @@ export async function createResearcher({
               connectorTools = createConnectorTools(userId)
               activeToolsList.push(...CONNECTOR_TOOL_NAMES)
             } else {
-              const preload = await runConnectorPreload(
+              const preload = await runConnectorPreloadStructured(
                 userId,
                 userQuery ?? '',
                 ctx.status
               )
-              if (preload) {
-                connectorLayer += preload
+              if (preload.layer) {
+                connectorLayer += preload.layer
                 connectorPreloadAdded = true
+              }
+              if (connectorCallsSink && preload.calls.length > 0) {
+                connectorCallsSink.push(...preload.calls)
               }
             }
             // RUNTIME ENFORCEMENT of the no-image-generation-for-connector

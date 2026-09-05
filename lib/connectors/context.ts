@@ -159,126 +159,253 @@ function clipSection(header: string, body: string): string {
   return line.length > 1200 ? line.slice(0, 1200) + '\n…[truncated]' : line
 }
 
+export type ConnectorPreloadService =
+  | 'gmail'
+  | 'drive'
+  | 'calendar'
+  | 'github'
+  | 'notion'
+
+export interface ConnectorPreloadCall {
+  service: ConnectorPreloadService
+  input: Record<string, unknown>
+  output: {
+    state: 'complete' | 'auth-required' | 'error'
+    [key: string]: unknown
+  }
+}
+
+export interface ConnectorPreloadResult {
+  layer: string
+  calls: ConnectorPreloadCall[]
+}
+
+type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown }
+
+async function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
+  try {
+    return { ok: true, value: await promise }
+  } catch (error) {
+    return { ok: false, error }
+  }
+}
+
+function authRequiredOutput(provider: string) {
+  return {
+    state: 'auth-required' as const,
+    provider,
+    message: `The ${provider} connection expired or was revoked. Tell the user to reconnect it from the "Connecter une application" connector card.`
+  }
+}
+
 /**
  * Best-effort fetch across every connected provider for models that cannot
- * call tools. Returns a text layer (possibly empty) to inject like the
- * preloaded web-search layer. Failures are silent per provider; an expired
- * grant surfaces as a one-line "reconnect" note instead of an error.
+ * call tools. Returns BOTH:
+ * - `layer`: text injected like the preloaded web-search layer so the model
+ *   answers from real data instead of denying access;
+ * - `calls`: structured per-service results, surfaced by the streaming layer
+ *   as synthetic `tool-gmail` / `tool-drive` / … parts so Nelth-3.5 renders
+ *   the exact same activity shimmer + result sections as the Thinking model
+ *   (same pattern as the synthetic `tool-search` for preloaded web search).
+ *
+ * Failures are silent per provider; an expired grant surfaces as a one-line
+ * "reconnect" note instead of an error.
  */
-export async function runConnectorPreload(
+export async function runConnectorPreloadStructured(
   userId: string,
   query: string,
   status: ConnectorStatus
-): Promise<string> {
+): Promise<ConnectorPreloadResult> {
   const keywords = extractConnectorKeywords(query)
+  const calls: ConnectorPreloadCall[] = []
   const sections: string[] = []
 
-  const jobs: Array<Promise<void>> = []
+  type TaskResult = {
+    call: ConnectorPreloadCall | null
+    section: string | null
+  }
+  const tasks: Array<() => Promise<TaskResult>> = []
+
   if (status.google) {
-    jobs.push(
-      gmailSearch(userId, keywords, 3).then(
-        r => {
-          if (r.items.length === 0) return
-          sections.push(
-            clipSection(
-              'GMAIL RESULTS:',
-              r.items
-                .map(
-                  i =>
-                    `- "${i.subject}" — ${i.from} (${i.date})\n  ${i.snippet}`
-                )
-                .join('\n')
-            )
-          )
-        },
-        e => {
-          if (e instanceof ConnectorAuthError) {
-            sections.push('GMAIL: reconnexion requise (connector card).')
+    tasks.push(async () => {
+      const input = { action: 'search', query: keywords, maxResults: 3 }
+      const r = await settle(gmailSearch(userId, keywords, 3))
+      if (!r.ok) {
+        if (r.error instanceof ConnectorAuthError) {
+          return {
+            call: {
+              service: 'gmail' as const,
+              input,
+              output: authRequiredOutput('Google')
+            },
+            section: 'GMAIL: reconnexion requise (connector card).'
           }
         }
-      ),
+        return { call: null, section: null }
+      }
+      if (r.value.items.length === 0) return { call: null, section: null }
+      return {
+        call: {
+          service: 'gmail' as const,
+          input,
+          output: { state: 'complete' as const, items: r.value.items }
+        },
+        section: clipSection(
+          'GMAIL RESULTS:',
+          r.value.items
+            .map(
+              i => `- "${i.subject}" — ${i.from} (${i.date})\n  ${i.snippet}`
+            )
+            .join('\n')
+        )
+      }
+    })
+    tasks.push(async () => {
       // Empty keywords = "my recent stuff": list latest instead of matching.
-      (keywords
-        ? driveSearch(userId, keywords, 5)
-        : driveRecent(userId, 5)
-      ).then(
-        r => {
-          if (r.items.length === 0) return
-          sections.push(
-            clipSection(
-              'DRIVE RESULTS:',
-              r.items.map(i => `- "${i.name}" (${i.mimeType})`).join('\n')
-            )
-          )
-        },
-        e => {
-          if (e instanceof ConnectorAuthError) {
-            sections.push('DRIVE: reconnexion requise (connector card).')
+      const input = { action: 'search', query: keywords || '(récents)' }
+      const r = await settle(
+        keywords ? driveSearch(userId, keywords, 5) : driveRecent(userId, 5)
+      )
+      if (!r.ok) {
+        if (r.error instanceof ConnectorAuthError) {
+          return {
+            call: {
+              service: 'drive' as const,
+              input,
+              output: authRequiredOutput('Google')
+            },
+            section: 'DRIVE: reconnexion requise (connector card).'
           }
         }
-      ),
-      calendarList(userId).then(
-        r => {
-          if (r.items.length === 0) return
-          sections.push(
-            clipSection(
-              'CALENDAR (next 7 days):',
-              r.items.map(i => `- "${i.summary}" — ${i.start}`).join('\n')
-            )
-          )
+        return { call: null, section: null }
+      }
+      if (r.value.items.length === 0) return { call: null, section: null }
+      return {
+        call: {
+          service: 'drive' as const,
+          input,
+          output: { state: 'complete' as const, items: r.value.items }
         },
-        () => {}
-      )
-    )
+        section: clipSection(
+          'DRIVE RESULTS:',
+          r.value.items.map(i => `- "${i.name}" (${i.mimeType})`).join('\n')
+        )
+      }
+    })
+    tasks.push(async () => {
+      const input: Record<string, unknown> = {}
+      const r = await settle(calendarList(userId))
+      if (!r.ok) {
+        if (r.error instanceof ConnectorAuthError) {
+          return {
+            call: {
+              service: 'calendar' as const,
+              input,
+              output: authRequiredOutput('Google')
+            },
+            section: 'CALENDAR: reconnexion requise (connector card).'
+          }
+        }
+        return { call: null, section: null }
+      }
+      if (r.value.items.length === 0) return { call: null, section: null }
+      return {
+        call: {
+          service: 'calendar' as const,
+          input,
+          output: { state: 'complete' as const, items: r.value.items }
+        },
+        section: clipSection(
+          'CALENDAR (next 7 days):',
+          r.value.items.map(i => `- "${i.summary}" — ${i.start}`).join('\n')
+        )
+      }
+    })
   }
   if (status.github) {
-    jobs.push(
-      (keywords
-        ? githubSearch(userId, keywords, 'repositories')
-        : githubRecentRepos(userId)
-      ).then(
-        r => {
-          if (r.items.length === 0) return
-          sections.push(
-            clipSection(
-              'GITHUB RESULTS:',
-              r.items.map(i => `- ${i.title} (${i.url})`).join('\n')
-            )
-          )
-        },
-        e => {
-          if (e instanceof ConnectorAuthError) {
-            sections.push('GITHUB: reconnexion requise (connector card).')
+    tasks.push(async () => {
+      const input = {
+        action: 'search',
+        query: keywords || '(récents)',
+        kind: 'repositories'
+      }
+      const r = await settle(
+        keywords
+          ? githubSearch(userId, keywords, 'repositories')
+          : githubRecentRepos(userId)
+      )
+      if (!r.ok) {
+        if (r.error instanceof ConnectorAuthError) {
+          return {
+            call: {
+              service: 'github' as const,
+              input,
+              output: authRequiredOutput('GitHub')
+            },
+            section: 'GITHUB: reconnexion requise (connector card).'
           }
         }
-      )
-    )
+        return { call: null, section: null }
+      }
+      if (r.value.items.length === 0) return { call: null, section: null }
+      return {
+        call: {
+          service: 'github' as const,
+          input,
+          output: { state: 'complete' as const, items: r.value.items }
+        },
+        section: clipSection(
+          'GITHUB RESULTS:',
+          r.value.items.map(i => `- ${i.title} (${i.url})`).join('\n')
+        )
+      }
+    })
   }
   if (status.notion) {
-    jobs.push(
-      notionSearch(userId, keywords).then(
-        r => {
-          if (r.items.length === 0) return
-          sections.push(
-            clipSection(
-              'NOTION RESULTS:',
-              r.items.map(i => `- "${i.title}"`).join('\n')
-            )
-          )
-        },
-        e => {
-          if (e instanceof ConnectorAuthError) {
-            sections.push('NOTION: reconnexion requise (connector card).')
+    tasks.push(async () => {
+      const input = { action: 'search', query: keywords || '(récents)' }
+      const r = await settle(notionSearch(userId, keywords))
+      if (!r.ok) {
+        if (r.error instanceof ConnectorAuthError) {
+          return {
+            call: {
+              service: 'notion' as const,
+              input,
+              output: authRequiredOutput('Notion')
+            },
+            section: 'NOTION: reconnexion requise (connector card).'
           }
         }
-      )
-    )
+        return { call: null, section: null }
+      }
+      if (r.value.items.length === 0) return { call: null, section: null }
+      return {
+        call: {
+          service: 'notion' as const,
+          input,
+          output: { state: 'complete' as const, items: r.value.items }
+        },
+        section: clipSection(
+          'NOTION RESULTS:',
+          r.value.items.map(i => `- "${i.title}"`).join('\n')
+        )
+      }
+    })
   }
 
-  await Promise.all(jobs)
-  if (sections.length === 0) return ''
+  const settled = await Promise.all(tasks.map(task => task()))
+  for (const s of settled) {
+    if (s.call) calls.push(s.call)
+    if (s.section) sections.push(s.section)
+  }
+
+  if (sections.length === 0) return { layer: '', calls }
   const layer = `\n\nSERVER-PROVIDED CONNECTOR RESULTS (from the user's own connected accounts — answer from these, do NOT emit tool calls):\n${sections.join('\n')}`
-  return layer.length > PRELOAD_BUDGET
-    ? layer.slice(0, PRELOAD_BUDGET) + '\n…[truncated]'
-    : layer
+  return {
+    layer:
+      layer.length > PRELOAD_BUDGET
+        ? layer.slice(0, PRELOAD_BUDGET) + '\n…[truncated]'
+        : layer,
+    calls
+  }
 }

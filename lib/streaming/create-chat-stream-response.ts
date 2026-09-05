@@ -9,7 +9,10 @@ import {
 } from 'ai'
 
 import { researcher } from '@/lib/agents/researcher'
-import { detectConnectorIntent } from '@/lib/connectors/context'
+import {
+  type ConnectorPreloadCall,
+  detectConnectorIntent
+} from '@/lib/connectors/context'
 import {
   createPublicErrorResponse,
   serializePublicError
@@ -351,6 +354,11 @@ export async function createChatStreamResponse(
         userQuery
       )
 
+      // Connector preload sink: for the weak model the researcher fetches
+      // Gmail/Drive/… server-side; the structured calls land here so they can
+      // be surfaced as synthetic tool parts below (same UX as native calls).
+      const connectorPreloadCalls: ConnectorPreloadCall[] = []
+
       // Get the researcher agent with search mode. `imageAttachment` / `needsImageEff`
       // are already resolved above, before the `trivial` gate.
       const researchAgent = await researcher({
@@ -364,6 +372,7 @@ export async function createChatStreamResponse(
         imageAttachment,
         userQuery,
         userId,
+        connectorCallsSink: connectorPreloadCalls,
         capabilities: {
           trivial,
           needsSearch: caps.needsSearch && !preloadedSearchContext,
@@ -462,6 +471,26 @@ export async function createChatStreamResponse(
         output: { ...searchResultsForCitation, state: 'complete' }
       }
 
+      // Surface the preloaded CONNECTOR results as synthetic tool chunks
+      // (tool-gmail, tool-drive, …) so Nelth-3.5 renders the same activity
+      // shimmer + result sections as models with native tool calls.
+      const syntheticConnectorChunks = connectorPreloadCalls.flatMap(call => {
+        const toolCallId = `preloaded-${call.service}`
+        return [
+          {
+            type: 'tool-input-available' as const,
+            toolCallId,
+            toolName: call.service,
+            input: call.input
+          },
+          {
+            type: 'tool-output-available' as const,
+            toolCallId,
+            output: call.output
+          }
+        ]
+      })
+
       // isNonThinkingModel is declared earlier in the function (before the
       // preloaded search block). It is used here to filter reasoning parts from
       // the stream so the client never receives or persists them.
@@ -481,6 +510,7 @@ export async function createChatStreamResponse(
               agentStream as unknown as ReadableStream<unknown>
             ).getReader()
             let searchChunksEmitted = false
+            let connectorChunksEmitted = false
             // Mid-conversation: strip any leading greeting-reset intro fluff
             // ("Salut ! ... Je suis Nelth-IA ...") the weak model prepends to
             // every answer. No prior assistant message = keep greetings.
@@ -542,6 +572,21 @@ export async function createChatStreamResponse(
                     >[0]
                   )
                   writtenPartCount += 2
+                }
+                // Same treatment for preloaded connector calls: emit the
+                // synthetic tool-gmail / tool-drive / … parts first so the
+                // client renders the connector activity + results live.
+                if (
+                  !connectorChunksEmitted &&
+                  syntheticConnectorChunks.length > 0
+                ) {
+                  connectorChunksEmitted = true
+                  for (const chunk of syntheticConnectorChunks) {
+                    writer.write(
+                      chunk as unknown as Parameters<typeof writer.write>[0]
+                    )
+                    writtenPartCount++
+                  }
                 }
                 continue
               }
@@ -660,6 +705,32 @@ export async function createChatStreamResponse(
                   output: { ...searchResultsForCitation, state: 'complete' }
                 } as unknown as (typeof responseMessage.parts)[number]
               ]
+            }
+          }
+          // Also persist the synthetic connector parts so the connector
+          // sections survive a reload. Same condition as the live emit above.
+          if (
+            !isAborted &&
+            responseMessage &&
+            connectorPreloadCalls.length > 0
+          ) {
+            for (const call of connectorPreloadCalls) {
+              const partType = `tool-${call.service}`
+              const hasPart = responseMessage.parts?.some(
+                (p: any) => p.type === partType
+              )
+              if (!hasPart) {
+                responseMessage.parts = [
+                  ...(responseMessage.parts ?? []),
+                  {
+                    type: partType,
+                    toolCallId: `preloaded-${call.service}`,
+                    state: 'output-available',
+                    input: call.input,
+                    output: call.output
+                  } as unknown as (typeof responseMessage.parts)[number]
+                ]
+              }
             }
           }
           // Post-processing (skill enforcement, Firebase/DB persistence, tracing
