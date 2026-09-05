@@ -91,6 +91,13 @@ export function createVoiceAgent({
     instructions: `${VOICE_SYSTEM_PROMPT}\n\n${buildLanguageLayer(conversationLanguage ?? null)}`,
     tools: {},
     stopWhen: [stepCountIs(1)],
+    // Reference Nemotron settings (same provider family as the cloud GLM
+    // config): no thinking trace, straight to speech.
+    providerOptions: {
+      'openai-compatible': {
+        chat_template_kwargs: { enable_thinking: false }
+      }
+    },
     experimental_telemetry: {
       isEnabled: isTracingEnabled(),
       functionId: 'voice-agent',

@@ -215,12 +215,20 @@ export function ChatPanel({
   // Voice mode transcripts bypass the composer entirely and go straight
   // through the message pipeline with a per-request voice flag, so the
   // server answers from the tiny voice-only path (normal submits untouched).
+  // The flag travels twice: useChat options AND an in-band data part (the
+  // part survives even if a transport wrapper drops the options object).
   const handleVoiceSubmit = useCallback(
     (text: string) => {
       const trimmed = text.trim()
       if (!trimmed) return
       append(
-        { role: 'user', parts: [{ type: 'text', text: trimmed }] },
+        {
+          role: 'user',
+          parts: [
+            { type: 'text', text: trimmed },
+            { type: 'data-voiceMode', data: { voice: true } }
+          ]
+        },
         { body: { voiceMode: true } }
       )
     },

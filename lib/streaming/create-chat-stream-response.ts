@@ -470,9 +470,15 @@ export async function createChatStreamResponse(
       const result = await researchAgent.stream({
         messages: modelMessages,
         abortSignal,
-        // Voice turns get a hard output cap (spoken answers must stay
-        // short). Normal turns are unaffected.
-        ...(voiceMode ? { maxOutputTokens: VOICE_MAX_OUTPUT_TOKENS } : {}),
+        // Voice turns get a hard output cap + speech-friendly sampling
+        // (spoken answers must stay short). Normal turns are unaffected.
+        ...(voiceMode
+          ? {
+              maxOutputTokens: VOICE_MAX_OUTPUT_TOKENS,
+              temperature: 1,
+              topP: 0.95
+            }
+          : {}),
         experimental_transform: smoothStream({ chunking: 'word' }),
         ...(isUsageLogging() && {
           onStepFinish: step => {
