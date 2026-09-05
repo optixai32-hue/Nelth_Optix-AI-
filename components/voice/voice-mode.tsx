@@ -29,6 +29,7 @@ type VoicePhase =
   | 'idle'
   | 'connecting'
   | 'listening'
+  | 'transcribing'
   | 'thinking'
   | 'speaking'
   | 'error'
@@ -115,9 +116,13 @@ export function VoiceMode({
       setPhase('connecting')
     } else if (
       state === 'listening' &&
-      (phaseRef.current === 'idle' || phaseRef.current === 'connecting')
+      (phaseRef.current === 'idle' ||
+        phaseRef.current === 'connecting' ||
+        phaseRef.current === 'transcribing')
     ) {
       setPhase('listening')
+    } else if (state === 'transcribing') {
+      setPhase('transcribing')
     } else if (state === 'denied' || state === 'unsupported') {
       setPhase('error')
       setFatal(
@@ -216,7 +221,9 @@ export function VoiceMode({
       ? Math.max(0.08, micLevel)
       : phase === 'speaking'
         ? 0.55
-        : phase === 'thinking' || phase === 'connecting'
+        : phase === 'thinking' ||
+            phase === 'connecting' ||
+            phase === 'transcribing'
           ? 0.3
           : 0
 
@@ -271,13 +278,15 @@ export function VoiceMode({
               {interim ||
                 (phase === 'listening'
                   ? t('voice.listeningHint')
-                  : phase === 'connecting' || phase === 'idle'
-                    ? t('voice.startingHint')
-                    : phase === 'thinking'
-                      ? t('voice.thinkingHint')
-                      : phase === 'speaking'
-                        ? t('voice.speakingHint')
-                        : t('voice.startingHint'))}
+                  : phase === 'transcribing'
+                    ? t('voice.transcribingHint')
+                    : phase === 'connecting' || phase === 'idle'
+                      ? t('voice.startingHint')
+                      : phase === 'thinking'
+                        ? t('voice.thinkingHint')
+                        : phase === 'speaking'
+                          ? t('voice.speakingHint')
+                          : t('voice.startingHint'))}
             </p>
           </>
         )}

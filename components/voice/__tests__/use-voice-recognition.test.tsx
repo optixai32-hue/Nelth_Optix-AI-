@@ -7,40 +7,32 @@ import {
   type VoiceRecognitionCallbacks
 } from '../use-voice-recognition'
 
-class MockRecognition {
-  static instances: MockRecognition[] = []
-  continuous = false
-  interimResults = false
-  maxAlternatives = 1
-  lang = ''
-  onresult: ((e: any) => void) | null = null
-  onerror: ((e: any) => void) | null = null
-  onend: (() => void) | null = null
-  onstart: (() => void) | null = null
-  started = false
-  startCalls = 0
-  constructor() {
-    MockRecognition.instances.push(this)
+class MockMediaRecorder {
+  static instances: MockMediaRecorder[] = []
+  static isTypeSupported = () => true
+  state: 'inactive' | 'recording' = 'inactive'
+  ondataavailable: ((e: any) => void) | null = null
+  onstop: (() => void) | null = null
+  constructor(
+    public stream: any,
+    public opts?: any
+  ) {
+    MockMediaRecorder.instances.push(this)
   }
   start() {
-    this.started = true
-    this.startCalls++
-    // NOTE: onstart is fired explicitly by tests via fireStart(), so the
-    // connecting → listening handshake is observable.
-  }
-  fireStart() {
-    this.onstart?.()
+    this.state = 'recording'
   }
   stop() {
-    this.started = false
-  }
-  emitResult(transcript: string, isFinal: boolean) {
-    this.onresult?.({
-      resultIndex: 0,
-      results: [{ 0: { transcript }, isFinal, length: 1 }]
+    this.state = 'inactive'
+    this.ondataavailable?.({
+      data: new Blob(['x'.repeat(5000)], { type: 'audio/webm' })
     })
+    this.onstop?.()
   }
 }
+
+// Microphone level seen by the analyser (drives energy VAD).
+let fakeLevel = 0
 
 function mockAudio() {
   const stop = vi.fn()
@@ -55,27 +47,51 @@ function mockAudio() {
       }))
     }
   })
-  const analyser = {
-    fftSize: 0,
-    smoothingTimeConstant: 0,
-    frequencyBinCount: 8,
-    getByteFrequencyData: (a: Uint8Array) => a.fill(0)
-  }
   function MockAudioContext(this: any) {
     return {
       state: 'running',
       resume: async () => {},
       createMediaStreamSource: () => ({ connect: () => {} }),
-      createAnalyser: () => analyser,
+      createAnalyser: () => ({
+        fftSize: 0,
+        smoothingTimeConstant: 0,
+        frequencyBinCount: 8,
+        getByteFrequencyData: (a: Uint8Array) => a.fill(fakeLevel)
+      }),
       close: async () => {}
     }
   }
   ;(window as any).AudioContext = MockAudioContext
+  ;(window as any).MediaRecorder = MockMediaRecorder
 }
 
-function makeCallbacks(): VoiceRecognitionCallbacks & {
-  [k: string]: any
-} {
+function stubTranscribe(text: string | null) {
+  const calls: Array<{ url: string; hasAudio: boolean }> = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, init?: RequestInit) => {
+      const body = init?.body as FormData | undefined
+      calls.push({
+        url,
+        hasAudio:
+          !!body &&
+          typeof (body as any).get === 'function' &&
+          (body as any).get('audio') instanceof Blob
+      })
+      if (text === null) {
+        return new Response('boom', { status: 500 })
+      }
+      return Response.json({
+        success: true,
+        transcription: { text },
+        processingMs: 120
+      })
+    })
+  )
+  return calls
+}
+
+function makeCallbacks() {
   return {
     onInterimText: vi.fn(),
     onFinalText: vi.fn(),
@@ -85,24 +101,23 @@ function makeCallbacks(): VoiceRecognitionCallbacks & {
   }
 }
 
+const wait = (ms: number) => new Promise(r => setTimeout(r, ms))
+
 beforeEach(() => {
-  vi.useFakeTimers()
-  MockRecognition.instances = []
-  delete (window as any).SpeechRecognition
-  delete (window as any).webkitSpeechRecognition
+  MockMediaRecorder.instances = []
+  fakeLevel = 0
+  delete (window as any).MediaRecorder
 })
 
 afterEach(() => {
-  vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 
-describe('useVoiceRecognition', () => {
-  it('reports unsupported when no SpeechRecognition class exists', async () => {
+describe('useVoiceRecognition (Space-Z STT)', () => {
+  it('reports unsupported without MediaRecorder', async () => {
     expect(isVoiceRecognitionSupported()).toBe(false)
-    const cbs = makeCallbacks()
-    const ref = { current: cbs }
+    const ref = { current: makeCallbacks() }
     const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
     let ok = true
     await act(async () => {
@@ -112,75 +127,68 @@ describe('useVoiceRecognition', () => {
     expect(result.current.state).toBe('unsupported')
   })
 
-  it('stays honest while connecting, then listens on recognizer start', async () => {
-    ;(window as any).webkitSpeechRecognition = MockRecognition
+  it('records speech, posts it, and submits the transcription', async () => {
     mockAudio()
-    const cbs = makeCallbacks()
-    const ref = { current: cbs }
-    const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
-
-    await act(async () => {
-      await result.current.start()
-    })
-    // Mic open but handshake in flight: NOT listening yet.
-    expect(result.current.state).toBe('connecting')
-    act(() => {
-      MockRecognition.instances[0].fireStart()
-    })
-    expect(result.current.state).toBe('listening')
-  })
-
-  it('fails loudly when the recognizer never starts', async () => {
-    ;(window as any).webkitSpeechRecognition = MockRecognition
-    mockAudio()
-    const cbs = makeCallbacks()
-    const ref = { current: cbs }
-    const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
-
-    await act(async () => {
-      await result.current.start()
-    })
-    expect(result.current.state).toBe('connecting')
-    await act(async () => {
-      vi.advanceTimersByTime(6500)
-    })
-    expect(result.current.state).toBe('error')
-    expect(cbs.onError).toHaveBeenCalled()
-  })
-
-  it('listens once and submits interim text after silence', async () => {
-    ;(window as any).webkitSpeechRecognition = MockRecognition
     expect(isVoiceRecognitionSupported()).toBe(true)
-    mockAudio()
+    const fetchCalls = stubTranscribe('bonjour tout le monde')
     const cbs = makeCallbacks()
     const ref = { current: cbs }
     const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
 
     await act(async () => {
       await result.current.start()
-    })
-    act(() => {
-      MockRecognition.instances[0].fireStart()
     })
     expect(result.current.state).toBe('listening')
-    expect(MockRecognition.instances).toHaveLength(1)
+    expect(MockMediaRecorder.instances).toHaveLength(1)
 
-    const rec = MockRecognition.instances[0]
-    act(() => {
-      rec.emitResult('bonjour', false)
+    // Speak, then go quiet: VAD closes the cycle and transcribes.
+    fakeLevel = 200
+    await act(async () => {
+      await wait(400)
     })
-    expect(cbs.onInterimText).toHaveBeenCalledWith('bonjour')
+    fakeLevel = 0
+    await act(async () => {
+      await wait(2500)
+    })
+
+    expect(fetchCalls.length).toBe(1)
+    expect(fetchCalls[0].url).toBe(
+      'https://nelth-stt.space-z.ai/api/transcribe'
+    )
+    expect(fetchCalls[0].hasAudio).toBe(true)
+    expect(cbs.onFinalText).toHaveBeenCalledWith('bonjour tout le monde')
+    // A fresh cycle is already listening again.
+    expect(result.current.state).toBe('listening')
+  })
+
+  it('mutes by discarding without any network call', async () => {
+    mockAudio()
+    const fetchCalls = stubTranscribe('hello')
+    const cbs = makeCallbacks()
+    const ref = { current: cbs }
+    const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
+
+    await act(async () => {
+      await result.current.start()
+    })
+    fakeLevel = 200
+    await act(async () => {
+      await wait(300)
+    })
+    act(() => {
+      result.current.setMuted(true)
+    })
+    fakeLevel = 0
+    await act(async () => {
+      await wait(1500)
+    })
+    expect(fetchCalls.length).toBe(0)
     expect(cbs.onFinalText).not.toHaveBeenCalled()
-
-    await act(async () => {
-      vi.advanceTimersByTime(900)
-    })
-    expect(cbs.onFinalText).toHaveBeenCalledWith('bonjour')
   })
 
-  it('ignores results while muted (no session restart)', async () => {
-    ;(window as any).webkitSpeechRecognition = MockRecognition
+  it('stays silent on empty transcription and keeps listening', async () => {
     mockAudio()
+    stubTranscribe('   ')
     const cbs = makeCallbacks()
     const ref = { current: cbs }
     const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
@@ -188,23 +196,21 @@ describe('useVoiceRecognition', () => {
     await act(async () => {
       await result.current.start()
     })
-    act(() => {
-      MockRecognition.instances[0].fireStart()
+    fakeLevel = 200
+    await act(async () => {
+      await wait(400)
     })
-    act(() => {
-      result.current.setMuted(true)
+    fakeLevel = 0
+    await act(async () => {
+      await wait(2500)
     })
-    act(() => {
-      MockRecognition.instances[0].emitResult('hello', false)
-    })
-    expect(cbs.onInterimText).not.toHaveBeenCalled()
-    // Session still alive: no extra recognition instance was created.
-    expect(MockRecognition.instances).toHaveLength(1)
+    expect(cbs.onFinalText).not.toHaveBeenCalled()
+    expect(result.current.state).toBe('listening')
   })
 
-  it('maps mic denial to the denied state', async () => {
-    ;(window as any).webkitSpeechRecognition = MockRecognition
+  it('survives endpoint errors without breaking the session', async () => {
     mockAudio()
+    stubTranscribe(null)
     const cbs = makeCallbacks()
     const ref = { current: cbs }
     const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
@@ -212,50 +218,15 @@ describe('useVoiceRecognition', () => {
     await act(async () => {
       await result.current.start()
     })
-    act(() => {
-      MockRecognition.instances[0].fireStart()
-    })
-    act(() => {
-      MockRecognition.instances[0].onerror?.({ error: 'not-allowed' })
-    })
-    expect(result.current.state).toBe('denied')
-    expect(cbs.onError).toHaveBeenCalled()
-  })
-
-  it('revives the session when unmuting after it ended muted', async () => {
-    ;(window as any).webkitSpeechRecognition = MockRecognition
-    mockAudio()
-    const cbs = makeCallbacks()
-    const ref = { current: cbs }
-    const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
-
+    fakeLevel = 200
     await act(async () => {
-      await result.current.start()
+      await wait(400)
     })
-    act(() => {
-      MockRecognition.instances[0].fireStart()
-    })
-    const rec = MockRecognition.instances[0]
-    const startsBefore = rec.startCalls
-
-    // Mute (AI speaking), then the session ends underneath.
-    act(() => {
-      result.current.setMuted(true)
-    })
-    act(() => {
-      rec.onend?.()
-    })
-    // No restart while muted — and no new instance.
-    expect(MockRecognition.instances).toHaveLength(1)
-    expect(rec.startCalls).toBe(startsBefore)
-
-    // Unmuting revives the dead session on the SAME instance.
-    act(() => {
-      result.current.setMuted(false)
-    })
+    fakeLevel = 0
     await act(async () => {
-      vi.advanceTimersByTime(200)
+      await wait(2500)
     })
-    expect(rec.startCalls).toBe(startsBefore + 1)
+    expect(cbs.onFinalText).not.toHaveBeenCalled()
+    expect(result.current.state).toBe('listening')
   })
 })

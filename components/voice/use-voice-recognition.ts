@@ -6,6 +6,7 @@ export type VoiceRecState =
   | 'idle'
   | 'connecting'
   | 'listening'
+  | 'transcribing'
   | 'denied'
   | 'unsupported'
   | 'error'
@@ -18,62 +19,97 @@ export interface VoiceRecognitionCallbacks {
   onError?: (message: string) => void
 }
 
-interface RecognitionCtor {
-  new (): any
+/**
+ * Space-Z speech-to-text endpoint. Override with
+ * NEXT_PUBLIC_VOICE_STT_BASE_URL when self-hosting.
+ */
+const STT_BASE = (
+  process.env.NEXT_PUBLIC_VOICE_STT_BASE_URL ?? 'https://nelth-stt.space-z.ai'
+).replace(/\/+$/, '')
+
+const STT_TIMEOUT_MS = 30_000
+// Energy voice-activity detection on the mic analyser.
+const VAD_SPEECH_THRESHOLD = 0.12
+const VAD_SILENCE_END_MS = 900
+const MAX_RECORD_MS = 30_000
+const MIN_BLOB_BYTES = 1500
+
+function mediaSupport(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined')
+    return false
+  return (
+    !!navigator.mediaDevices?.getUserMedia &&
+    typeof MediaRecorder !== 'undefined'
+  )
 }
 
-function getRecognitionClass(): RecognitionCtor | null {
-  if (typeof window === 'undefined') return null
-  const w = window as unknown as Record<string, unknown>
-  const Cls = w.SpeechRecognition ?? w.webkitSpeechRecognition
-  return (typeof Cls === 'function' ? Cls : null) as RecognitionCtor | null
-}
-
-/** True when the browser can do in-browser speech recognition at all. */
+/** True when the browser can record microphone audio at all. */
 export function isVoiceRecognitionSupported(): boolean {
-  return getRecognitionClass() !== null
+  return mediaSupport()
 }
 
-const SILENCE_SUBMIT_MS = 800
-const FINAL_SUBMIT_MS = 300
-const RESTART_DELAY_MS = 150
-const MAX_RESTARTS_PER_WINDOW = 5
-const RESTART_WINDOW_MS = 3000
-// If the recognizer never fires onstart (blocked service, frozen tab),
-// fail loudly instead of showing "listening" forever.
-const START_WATCHDOG_MS = 6000
+function pickMimeType(): string {
+  try {
+    const MR = MediaRecorder as unknown as {
+      isTypeSupported?: (mime: string) => boolean
+    }
+    if (typeof MR.isTypeSupported !== 'function') return ''
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg'
+    ]
+    for (const mime of candidates) {
+      try {
+        if (MR.isTypeSupported(mime)) return mime
+      } catch {
+        /* try next */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return ''
+}
+
+function extForMime(mime: string): string {
+  if (mime.includes('mp4')) return 'mp4'
+  if (mime.includes('ogg')) return 'ogg'
+  return 'webm'
+}
 
 /**
- * Continuous Web Speech recognition for the voice mode.
+ * Microphone → Space-Z STT for the voice mode.
  *
- * One session = ONE recognition.start(). This is the whole "no beep on
- * every listen" strategy: on Android, Chrome plays an OS-level beep each
- * time recognition starts and no web page can suppress it — so we start
- * once when voice mode opens and keep the session alive, muting (ignoring
- * results) while the AI thinks or speaks instead of stopping/restarting.
- * The beep then fires at most once per voice session, on every device,
- * with zero server STT involved.
+ * One recording cycle per spoken turn (MediaRecorder has no system beep on
+ * any device, so per-turn record/stop is silent — including Android):
+ * mic level drives voice-activity detection, 900 ms of silence (or 30 s
+ * max) closes the cycle, the blob is POSTed as FormData to
+ * `/api/transcribe`, and `transcription.text` is submitted. While the AI
+ * thinks or speaks the recorder stays stopped (no TTS echo); a new cycle
+ * starts on unmute.
  */
 export function useVoiceRecognition(
   callbacksRef: React.MutableRefObject<VoiceRecognitionCallbacks>,
   locale: string
 ) {
   const [state, setState] = useState<VoiceRecState>('idle')
-  const recognitionRef = useRef<any>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
-  const levelFrameRef = useRef<number | null>(null)
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const startWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const levelTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const mimeRef = useRef('')
   const listeningRef = useRef(false)
   const mutedRef = useRef(false)
-  // True when the recognition session ended while muted (Chrome ends idle
-  // sessions after ~60s even mid-conversation). The next unmute must restart
-  // it — otherwise the mic looks alive but transcribes nothing.
-  const endedRef = useRef(false)
+  const transcribingRef = useRef(false)
+  const discardRef = useRef(false)
+  const cycleStartRef = useRef(0)
+  const hadSpeechRef = useRef(false)
+  const lastSpeechRef = useRef(0)
   const langRef = useRef('fr-FR')
-  const restartStampsRef = useRef<number[]>([])
   const stateRef = useRef<VoiceRecState>('idle')
 
   const setRecState = useCallback(
@@ -85,52 +121,21 @@ export function useVoiceRecognition(
     [callbacksRef]
   )
 
-  const clearSilenceTimer = useCallback(() => {
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current)
-      silenceTimerRef.current = null
-    }
-  }, [])
-
-  const clearStartWatchdog = useCallback(() => {
-    if (startWatchdogRef.current) {
-      clearTimeout(startWatchdogRef.current)
-      startWatchdogRef.current = null
-    }
-  }, [])
-
   const submitFinal = useCallback(
     (text: string) => {
       const clean = text.trim()
-      clearSilenceTimer()
       if (!clean) return
       callbacksRef.current.onFinalText(clean)
     },
-    [callbacksRef, clearSilenceTimer]
+    [callbacksRef]
   )
 
   const stopLevelLoop = useCallback(() => {
-    if (levelFrameRef.current !== null) {
-      cancelAnimationFrame(levelFrameRef.current)
-      levelFrameRef.current = null
+    if (levelTimerRef.current !== null) {
+      clearInterval(levelTimerRef.current)
+      levelTimerRef.current = null
     }
   }, [])
-
-  const startLevelLoop = useCallback(() => {
-    const analyser = analyserRef.current
-    if (!analyser) return
-    const data = new Uint8Array(analyser.frequencyBinCount)
-    const tick = () => {
-      if (!listeningRef.current) return
-      analyser.getByteFrequencyData(data)
-      let sum = 0
-      for (let i = 0; i < data.length; i++) sum += data[i]
-      const level = Math.min(1, sum / data.length / 80)
-      callbacksRef.current.onAudioLevel?.(level)
-      levelFrameRef.current = requestAnimationFrame(tick)
-    }
-    tick()
-  }, [callbacksRef])
 
   const teardownAudio = useCallback(() => {
     stopLevelLoop()
@@ -149,120 +154,166 @@ export function useVoiceRecognition(
     analyserRef.current = null
   }, [stopLevelLoop])
 
-  const restartRecognition = useCallback(() => {
-    if (!listeningRef.current || mutedRef.current) return
-    // Guard against hot restart loops.
-    const now = Date.now()
-    restartStampsRef.current = restartStampsRef.current.filter(
-      t => now - t < RESTART_WINDOW_MS
-    )
-    if (restartStampsRef.current.length >= MAX_RESTARTS_PER_WINDOW) {
-      listeningRef.current = false
-      setRecState('error')
-      callbacksRef.current.onError?.(
-        'Speech recognition keeps stopping. Check your connection, then reopen voice mode.'
-      )
+  const transcribeBlob = useCallback(async (blob: Blob): Promise<string> => {
+    const fd = new FormData()
+    fd.append('audio', blob, `speech.${extForMime(mimeRef.current)}`)
+    const res = await fetch(`${STT_BASE}/api/transcribe`, {
+      method: 'POST',
+      body: fd,
+      signal: AbortSignal.timeout(STT_TIMEOUT_MS)
+    })
+    if (!res.ok) throw new Error(`STT HTTP ${res.status}`)
+    const data = (await res.json().catch(() => null)) as {
+      success?: unknown
+      transcription?: { text?: unknown }
+    } | null
+    if (!data?.success) return ''
+    const text = data.transcription?.text
+    return typeof text === 'string' ? text.trim() : ''
+  }, [])
+
+  const startCycle = useCallback(() => {
+    if (
+      !listeningRef.current ||
+      mutedRef.current ||
+      transcribingRef.current ||
+      recorderRef.current
+    ) {
       return
     }
-    restartStampsRef.current.push(now)
-    window.setTimeout(() => {
-      if (listeningRef.current && !mutedRef.current) {
-        endedRef.current = false
-        try {
-          recognitionRef.current?.start()
-        } catch {
-          /* already started — ignore */
-        }
-      }
-    }, RESTART_DELAY_MS)
-  }, [callbacksRef, setRecState])
-
-  const beginRecognition = useCallback(() => {
-    const Cls = getRecognitionClass()
-    if (!Cls) return
+    const stream = streamRef.current
+    if (!stream) return
     try {
-      const recognition = new Cls()
-      recognition.continuous = true
-      recognition.interimResults = true
-      recognition.maxAlternatives = 1
-      recognition.lang = langRef.current
-
-      recognition.onstart = () => {
-        endedRef.current = false
-        // The recognizer is REALLY ready now — only here may the UI claim
-        // "listening". Claiming it earlier loses the user's first words.
-        clearStartWatchdog()
-        if (listeningRef.current) setRecState('listening')
-      }
-
-      recognition.onresult = (event: any) => {
-        if (mutedRef.current || !listeningRef.current) return
-        let finalText = ''
-        let interimText = ''
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript as string
-          if (event.results[i].isFinal) finalText += transcript
-          else interimText += transcript
+      const mime = pickMimeType()
+      mimeRef.current = mime
+      chunksRef.current = []
+      hadSpeechRef.current = false
+      discardRef.current = false
+      cycleStartRef.current = Date.now()
+      lastSpeechRef.current = 0
+      const recorder = mime
+        ? new MediaRecorder(stream, { mimeType: mime })
+        : new MediaRecorder(stream)
+      recorder.ondataavailable = (event: BlobEvent) => {
+        if (event.data && event.data.size > 0) {
+          chunksRef.current.push(event.data)
         }
-        const current = (finalText || interimText).trim()
-        if (!current) return
-        callbacksRef.current.onInterimText(current)
-        clearSilenceTimer()
-        // Final token → quick submit; interim only → wait for a real pause.
-        silenceTimerRef.current = setTimeout(
-          () => submitFinal(finalText || current),
-          finalText ? FINAL_SUBMIT_MS : SILENCE_SUBMIT_MS
-        )
       }
-
-      recognition.onerror = (event: any) => {
-        const code = event?.error as string | undefined
-        if (code === 'not-allowed' || code === 'service-not-allowed') {
-          listeningRef.current = false
-          setRecState('denied')
-          callbacksRef.current.onError?.(
-            'Microphone access was denied. Allow it in the browser settings, then reopen voice mode.'
-          )
-        }
-        // 'aborted', 'no-speech', 'network', 'audio-capture': the onend
-        // auto-restart below recovers transparently — stay silent.
+      recorder.onstop = () => {
+        void finishCycle()
       }
-
-      recognition.onend = () => {
-        if (!listeningRef.current) return
-        // The session ended (Chrome ends idle sessions after ~1 min or on
-        // network blips). If muted, just record it — the unmute below will
-        // revive the session. Otherwise restart transparently.
-        endedRef.current = true
-        if (mutedRef.current) return
-        restartRecognition()
-      }
-
-      recognitionRef.current = recognition
-      recognition.start()
+      recorderRef.current = recorder
+      recorder.start(250)
     } catch {
-      listeningRef.current = false
-      setRecState('error')
+      recorderRef.current = null
     }
-  }, [
-    callbacksRef,
-    clearSilenceTimer,
-    clearStartWatchdog,
-    restartRecognition,
-    setRecState,
-    submitFinal
-  ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const finishCycle = useCallback(async () => {
+    if (!listeningRef.current) return
+    const chunks = chunksRef.current
+    chunksRef.current = []
+    const discard = discardRef.current
+    discardRef.current = false
+    const hadSpeech = hadSpeechRef.current
+    hadSpeechRef.current = false
+    if (mutedRef.current || discard || !hadSpeech) {
+      // Silence, echo window, or discarded turn — listen again, no network.
+      if (listeningRef.current && !mutedRef.current) startCycle()
+      return
+    }
+    const blob = new Blob(chunks, {
+      type: mimeRef.current || 'audio/webm'
+    })
+    if (blob.size < MIN_BLOB_BYTES) {
+      if (listeningRef.current && !mutedRef.current) startCycle()
+      return
+    }
+    transcribingRef.current = true
+    setRecState('transcribing')
+    try {
+      const text = await transcribeBlob(blob)
+      if (!listeningRef.current || mutedRef.current) return
+      if (text) submitFinal(text)
+    } catch {
+      // Transient turn failure (endpoint down, timeout): stay silent and
+      // keep listening instead of breaking the whole voice session.
+    } finally {
+      transcribingRef.current = false
+      if (listeningRef.current && !mutedRef.current) {
+        setRecState('listening')
+        startCycle()
+      }
+    }
+  }, [setRecState, startCycle, submitFinal, transcribeBlob])
+
+  const endCycle = useCallback(
+    (discard: boolean) => {
+      const recorder = recorderRef.current
+      recorderRef.current = null
+      if (!recorder) return
+      discardRef.current = discardRef.current || discard
+      try {
+        if (recorder.state !== 'inactive') recorder.stop()
+        else void finishCycle()
+      } catch {
+        void finishCycle()
+      }
+    },
+    [finishCycle]
+  )
+
+  const startLevelLoop = useCallback(() => {
+    const analyser = analyserRef.current
+    if (!analyser || levelTimerRef.current !== null) return
+    const data = new Uint8Array(analyser.frequencyBinCount)
+    // 10 Hz polling (not rAF): deterministic in every browser AND in tests,
+    // still smooth enough for the Orb, and it doubles as the VAD clock.
+    levelTimerRef.current = setInterval(() => {
+      if (!listeningRef.current) return
+      analyser.getByteFrequencyData(data)
+      let sum = 0
+      for (let i = 0; i < data.length; i++) sum += data[i]
+      const level = Math.min(1, sum / data.length / 80)
+      callbacksRef.current.onAudioLevel?.(level)
+      // Energy VAD: speech starts a turn, sustained silence ends it.
+      const cycling =
+        recorderRef.current !== null &&
+        !mutedRef.current &&
+        !transcribingRef.current
+      if (cycling) {
+        const now = Date.now()
+        if (level > VAD_SPEECH_THRESHOLD) {
+          hadSpeechRef.current = true
+          lastSpeechRef.current = now
+        } else if (
+          hadSpeechRef.current &&
+          lastSpeechRef.current > 0 &&
+          now - lastSpeechRef.current > VAD_SILENCE_END_MS
+        ) {
+          // NOTE: do NOT clear hadSpeechRef here — finishCycle (fired from
+          // the async onstop event) still needs it to decide transcribe vs
+          // restart. Clearing first silently drops every turn.
+          endCycle(false)
+        } else if (now - cycleStartRef.current > MAX_RECORD_MS) {
+          endCycle(false)
+        }
+      }
+    }, 100)
+  }, [callbacksRef, endCycle])
 
   const start = useCallback(async () => {
     if (listeningRef.current) return true
-    if (!getRecognitionClass()) {
+    if (!mediaSupport()) {
       setRecState('unsupported')
       return false
     }
     mutedRef.current = false
-    endedRef.current = false
-    restartStampsRef.current = []
+    transcribingRef.current = false
+    discardRef.current = false
     try {
+      setRecState('connecting')
       streamRef.current = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -291,24 +342,11 @@ export function useVoiceRecognition(
       }
       listeningRef.current = true
       startLevelLoop()
-      beginRecognition()
-      // Honest state: mic is open but the recognizer handshake (notably the
-      // Android beep + Google server round-trip) is still in flight. The UI
-      // shows "starting" until onstart confirms — 'listening' is set there.
-      setRecState('connecting')
-      startWatchdogRef.current = setTimeout(() => {
-        if (stateRef.current === 'connecting') {
-          listeningRef.current = false
-          setRecState('error')
-          callbacksRef.current.onError?.(
-            'Speech recognition did not start. Check your connection, then reopen voice mode.'
-          )
-        }
-      }, START_WATCHDOG_MS)
+      startCycle()
+      setRecState('listening')
       return true
     } catch {
       listeningRef.current = false
-      clearStartWatchdog()
       teardownAudio()
       setRecState('denied')
       callbacksRef.current.onError?.(
@@ -316,70 +354,52 @@ export function useVoiceRecognition(
       )
       return false
     }
-  }, [
-    beginRecognition,
-    clearStartWatchdog,
-    setRecState,
-    startLevelLoop,
-    teardownAudio,
-    callbacksRef
-  ])
+  }, [callbacksRef, setRecState, startCycle, startLevelLoop, teardownAudio])
 
   const stop = useCallback(() => {
     listeningRef.current = false
     mutedRef.current = false
-    endedRef.current = false
-    clearStartWatchdog()
-    clearSilenceTimer()
-    restartStampsRef.current = []
-    if (recognitionRef.current) {
+    transcribingRef.current = false
+    discardRef.current = true
+    if (recorderRef.current) {
+      const recorder = recorderRef.current
+      recorderRef.current = null
       try {
-        recognitionRef.current.onend = null
-        recognitionRef.current.stop()
+        recorder.onstop = null
+        if (recorder.state !== 'inactive') recorder.stop()
       } catch {
         /* ignore */
       }
-      recognitionRef.current = null
     }
     teardownAudio()
     if (stateRef.current !== 'idle') setRecState('idle')
-  }, [clearSilenceTimer, clearStartWatchdog, setRecState, teardownAudio])
+  }, [setRecState, teardownAudio])
 
-  /** Ignore mic results without killing the session (no restart = no beep). */
+  /**
+   * Mute stops the current cycle silently (no TTS echo transcribed) and
+   * unmute opens a fresh one. No system beep anywhere: MediaRecorder never
+   * plays one, on any device.
+   */
   const setMuted = useCallback(
     (muted: boolean) => {
       mutedRef.current = muted
       if (muted) {
-        clearSilenceTimer()
-      } else if (listeningRef.current && endedRef.current) {
-        // The session died while muted — revive it now, otherwise the mic
-        // looks alive but transcribes nothing.
-        endedRef.current = false
-        restartRecognition()
+        endCycle(true)
+      } else if (
+        listeningRef.current &&
+        !recorderRef.current &&
+        !transcribingRef.current
+      ) {
+        startCycle()
       }
     },
-    [clearSilenceTimer, restartRecognition]
+    [endCycle, startCycle]
   )
 
   const setLanguage = useCallback((nextLocale: string) => {
-    const lower = (nextLocale ?? '').toLowerCase()
-    const map: Record<string, string> = {
-      fr: 'fr-FR',
-      en: 'en-US',
-      es: 'es-ES',
-      de: 'de-DE',
-      it: 'it-IT',
-      ar: 'ar-SA'
-    }
-    const short = lower.split('-')[0]
-    langRef.current = map[short] ?? 'fr-FR'
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.lang = langRef.current
-      } catch {
-        /* ignore */
-      }
-    }
+    // Kept for API stability. The endpoint auto-detects the spoken language,
+    // so this is currently informational only.
+    langRef.current = nextLocale ?? 'fr-FR'
   }, [])
 
   useEffect(() => {
