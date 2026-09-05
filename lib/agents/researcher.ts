@@ -588,6 +588,7 @@ export async function createResearcher({
     trivial?: boolean
     needsSearch?: boolean
     needsImage?: boolean
+    needsDocument?: boolean
     founderPhoto?: boolean
     webImageSearch?: boolean
   }
@@ -781,6 +782,7 @@ export async function createResearcher({
           const ctx = await buildConnectorContext(userId)
           connectorLayer = ctx.text
           if (ctx.anyConnected) {
+            let connectorPreloadAdded = false
             if (!isNonThinking) {
               connectorTools = createConnectorTools(userId)
               activeToolsList.push(...CONNECTOR_TOOL_NAMES)
@@ -790,7 +792,10 @@ export async function createResearcher({
                 userQuery ?? '',
                 ctx.status
               )
-              if (preload) connectorLayer += preload
+              if (preload) {
+                connectorLayer += preload
+                connectorPreloadAdded = true
+              }
             }
             // RUNTIME ENFORCEMENT of the no-image-generation-for-connector
             // rule. Observed failure: "résume mes derniers mails" → the
@@ -810,6 +815,16 @@ export async function createResearcher({
                   `[Researcher] Connector request engaged — generateImage disarmed, tools=[${activeToolsList.join(',')}]`
                 )
               }
+            }
+            // Same enforcement for the weak model holding preloaded connector
+            // data: it must ANSWER from the provided results, not flee into
+            // the document tool (observed: "résume mes mails" → generated a
+            // .docx template + claimed Gmail was unreadable). Keep document
+            // only when explicitly requested (".docx", "pdf", …).
+            if (connectorPreloadAdded && !capabilities?.needsDocument) {
+              activeToolsList = activeToolsList.filter(
+                t => t !== 'document'
+              )
             }
           }
         } catch (e) {

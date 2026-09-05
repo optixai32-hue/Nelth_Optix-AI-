@@ -3,7 +3,9 @@ import { foldText, intentRe } from '@/lib/skills/text-fold'
 import { ConnectorAuthError } from './api-client'
 import {
   calendarList,
+  driveRecent,
   driveSearch,
+  githubRecentRepos,
   githubSearch,
   gmailSearch,
   notionSearch
@@ -55,6 +57,36 @@ export function detectConnectorIntent(query: string): boolean {
 export function isStatusOnlyIntent(query: string): boolean {
   const folded = foldText(query ?? '')
   return STATUS_INTENT_RE.test(folded) && !DATA_INTENT_RE.test(folded)
+}
+
+// Plain literal words to drop when turning a user request into provider
+// search keywords (matched against foldText output: lowercase, no accents).
+const CONNECTOR_STOPWORDS = new Set(
+  (
+    'resume|resumer|cherche|chercher|retrouve|retrouver|trouve|trouver|montre|montrer|affiche|afficher|liste|lister|donne|donner|recupere|recuperer|vois|voir|lis|lire|envoie|envoyer' +
+    '|summarize|summarise|summary|list|show|find|search|get|fetch|read|give' +
+    '|mes|mon|ma|my' +
+    '|mail|mails|email|emails|e-mail|e-mails|courriel|courriels|courrier|gmail|outlook|yahoo' +
+    '|drive|fichier|fichiers|document|documents|doc|docs|dossier|dossiers' +
+    '|agenda|calendrier|calendar|evenement|evenements|reunion|reunions|rendez-vous' +
+    '|github|depot|depots|repo|repos|notion|page|pages' +
+    '|dernier|derniers|derniere|dernieres|recent|recents|recente|recentes|nouveau|nouveaux|nouvelle|nouvelles|premier|premiers|premiere|premieres|prochain|prochains|prochaine|prochaines|latest|last|newest' +
+    '|le|la|les|de|des|du|un|une|et|ou|the|a|an|of|from|for|with|about|avec|pour|sur|dans|stp|svp|moi|please'
+  ).split('|')
+)
+
+/**
+ * Turns "résume mes derniers mails" into "" (→ list recent) and "retrouve
+ * le mail de facturation" into "facturation". The raw user sentence must
+ * NEVER be sent as a provider query: command verbs and possessives match
+ * nothing and yield empty preloads that make the model wrongly deny access.
+ */
+export function extractConnectorKeywords(query: string): string {
+  const words = foldText(query ?? '')
+    .replace(/[^a-z0-9_\s@.-]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w && !CONNECTOR_STOPWORDS.has(w))
+  return words.join(' ').slice(0, 120)
 }
 
 export interface ConnectorStatus {
@@ -138,14 +170,13 @@ export async function runConnectorPreload(
   query: string,
   status: ConnectorStatus
 ): Promise<string> {
-  const q = (query ?? '').trim().slice(0, 200)
-  if (!q) return ''
+  const keywords = extractConnectorKeywords(query)
   const sections: string[] = []
 
   const jobs: Array<Promise<void>> = []
   if (status.google) {
     jobs.push(
-      gmailSearch(userId, q, 3).then(
+      gmailSearch(userId, keywords, 3).then(
         r => {
           if (r.items.length === 0) return
           sections.push(
@@ -166,7 +197,11 @@ export async function runConnectorPreload(
           }
         }
       ),
-      driveSearch(userId, q, 5).then(
+      // Empty keywords = "my recent stuff": list latest instead of matching.
+      (keywords
+        ? driveSearch(userId, keywords, 5)
+        : driveRecent(userId, 5)
+      ).then(
         r => {
           if (r.items.length === 0) return
           sections.push(
@@ -198,7 +233,10 @@ export async function runConnectorPreload(
   }
   if (status.github) {
     jobs.push(
-      githubSearch(userId, q, 'repositories').then(
+      (keywords
+        ? githubSearch(userId, keywords, 'repositories')
+        : githubRecentRepos(userId)
+      ).then(
         r => {
           if (r.items.length === 0) return
           sections.push(
@@ -218,7 +256,7 @@ export async function runConnectorPreload(
   }
   if (status.notion) {
     jobs.push(
-      notionSearch(userId, q).then(
+      notionSearch(userId, keywords).then(
         r => {
           if (r.items.length === 0) return
           sections.push(

@@ -147,6 +147,20 @@ export async function driveSearch(
   return { items: (res.files ?? []) as DriveFileSummary[] }
 }
 
+/** Most recently modified files (fallback when no search keywords). */
+export async function driveRecent(
+  userId: string,
+  maxResults = 5
+): Promise<{ items: DriveFileSummary[] }> {
+  const capped = Math.min(Math.max(maxResults, 1), 20)
+  const res = await connectorGetJson(
+    userId,
+    'google',
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent('trashed = false')}&fields=${encodeURIComponent('files(id,name,mimeType,modifiedTime,size)')}&pageSize=${capped}&orderBy=modifiedTime desc`
+  )
+  return { items: (res.files ?? []) as DriveFileSummary[] }
+}
+
 export async function driveRead(
   userId: string,
   fileId: string
@@ -298,6 +312,25 @@ export async function githubSearch(
   }
 }
 
+/** Most recently updated repos of the user (fallback, no keywords). */
+export async function githubRecentRepos(
+  userId: string
+): Promise<{ items: GithubSearchHit[] }> {
+  const res = await connectorGetJson(
+    userId,
+    'github',
+    'https://api.github.com/user/repos?sort=updated&per_page=10',
+    { headers: GITHUB_HEADERS }
+  )
+  return {
+    items: (Array.isArray(res) ? res : []).map((r: any) => ({
+      repo: r.full_name as string,
+      title: r.full_name as string,
+      url: (r.html_url ?? '') as string
+    }))
+  }
+}
+
 export async function githubRead(
   userId: string,
   owner: string,
@@ -380,11 +413,18 @@ export async function notionSearch(
   userId: string,
   query: string
 ): Promise<{ items: NotionHit[] }> {
+  // Empty query = list everything shared (most recently edited first).
+  const body: Record<string, unknown> = query.trim()
+    ? { query, page_size: 10 }
+    : {
+        page_size: 10,
+        sort: { direction: 'descending', timestamp: 'last_edited_time' }
+      }
   const res = await connectorPostJson(
     userId,
     'notion',
     'https://api.notion.com/v1/search',
-    { query, page_size: 10 },
+    body,
     { headers: NOTION_HEADERS }
   )
   return {

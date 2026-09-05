@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   buildConnectorContext,
   detectConnectorIntent,
+  extractConnectorKeywords,
   isStatusOnlyIntent
 } from './context'
 import { hasConnection } from './vault'
@@ -62,6 +63,23 @@ describe('isStatusOnlyIntent', () => {
   it('flags connection questions without data access', () => {
     expect(isStatusOnlyIntent('quelles apps sont connectées ?')).toBe(true)
     expect(isStatusOnlyIntent('lis mes mails')).toBe(false)
+  })
+})
+
+describe('extractConnectorKeywords', () => {
+  it('strips commands so "latest mails" falls back to recent listing', () => {
+    expect(extractConnectorKeywords('résume mes derniers mails')).toBe('')
+    expect(extractConnectorKeywords('summarize my recent emails')).toBe('')
+    expect(extractConnectorKeywords('résume mes mails')).toBe('')
+  })
+
+  it('keeps real search terms', () => {
+    expect(extractConnectorKeywords('retrouve le mail de facturation')).toBe(
+      'facturation'
+    )
+    expect(extractConnectorKeywords('cherche le doc budget')).toContain(
+      'budget'
+    )
   })
 })
 

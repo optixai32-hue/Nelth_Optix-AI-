@@ -367,7 +367,8 @@ export async function createChatStreamResponse(
         capabilities: {
           trivial,
           needsSearch: caps.needsSearch && !preloadedSearchContext,
-          needsImage: needsImageEff
+          needsImage: needsImageEff,
+          needsDocument: caps.needsDocument
         }
       })
 
