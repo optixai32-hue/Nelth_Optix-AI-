@@ -37,7 +37,7 @@ describe('ActionButtons connector anchoring', () => {
     const anchor = card.parentElement
     expect(anchor?.className).toContain('absolute')
     expect(anchor?.className).toContain('top-full')
-    expect(anchor?.className).toContain('mt-4')
+    expect(anchor?.className).toContain('mt-5')
     // The chips row itself is the positioning context.
     expect(anchor?.parentElement?.className).toContain('relative')
     void container
