@@ -110,7 +110,8 @@ export async function buildConnectorContext(
   }
   lines.push(
     '- When a connector tool returns state "auth-required", tell the user to reconnect that app from the connector card and STOP — do not retry in a loop.',
-    '- Cite what you actually found (subject / file name / date). If nothing was found, say so plainly.'
+    '- Cite what you actually found (subject / file name / date). If nothing was found, say so plainly.',
+    '- Reading personal data never requires image generation: do NOT call generateImage for a connector request.'
   )
   return {
     text: lines.join('\n'),

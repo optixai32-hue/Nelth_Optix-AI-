@@ -792,6 +792,25 @@ export async function createResearcher({
               )
               if (preload) connectorLayer += preload
             }
+            // RUNTIME ENFORCEMENT of the no-image-generation-for-connector
+            // rule. Observed failure: "résume mes derniers mails" → the
+            // model announces the Gmail lookup, then mis-fires the
+            // generateImage tool (an image can never answer a personal-data
+            // request) and the loop stops on the generated image with the
+            // mailbox never read. Physically remove generateImage while a
+            // connector request is engaged — unless the query explicitly
+            // asks for an image too (capabilities.needsImage).
+            if (!capabilities?.needsImage) {
+              const before = activeToolsList.join(',')
+              activeToolsList = activeToolsList.filter(
+                t => t !== 'generateImage'
+              )
+              if (before !== activeToolsList.join(',')) {
+                console.log(
+                  `[Researcher] Connector request engaged — generateImage disarmed, tools=[${activeToolsList.join(',')}]`
+                )
+              }
+            }
           }
         } catch (e) {
           console.error('[Researcher] Connector context failed:', e)
