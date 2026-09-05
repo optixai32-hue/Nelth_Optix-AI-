@@ -12,6 +12,7 @@ import { extractCitationMapsFromMessages } from '@/lib/utils/citation'
 import { AnimatedLogo } from './ui/animated-logo'
 import { ChatError } from './chat-error'
 import { ChatFooterMessage } from './chat-footer-message'
+import { useI18n } from './i18n-provider'
 import { NelthLoadingLabel } from './nelth-loading-label'
 import { RenderMessage } from './render-message'
 import { UploadedFileList } from './uploaded-file-list'
@@ -46,15 +47,6 @@ const DESKTOP_LATEST_SECTION_OFFSET = 196
 const MOBILE_LATEST_SECTION_OFFSET_FALLBACK = 180
 const MOBILE_FOLLOW_UP_TOP_CLEARANCE_FALLBACK = 56
 
-// Activity messages for connector tools while they reach the user's apps.
-const CONNECTOR_TOOL_ACTIVITY: Record<string, string> = {
-  'tool-gmail': 'Connexion à Gmail…',
-  'tool-drive': 'Lecture de Drive…',
-  'tool-calendar': 'Consultation de l’agenda…',
-  'tool-github': 'Recherche dans GitHub…',
-  'tool-notion': 'Lecture de Notion…'
-}
-
 export function ChatMessages({
   sections,
   status,
@@ -77,6 +69,7 @@ export function ChatMessages({
   const toolCountCacheRef = useRef<Map<string, number>>(new Map())
   const isLoading = status === 'submitted' || status === 'streaming'
   const isMobile = useMediaQuery('(max-width: 767px)')
+  const { t } = useI18n()
 
   // Shimmer loading label for ALL models while waiting for the first real
   // text token in the UI. The label is intentionally DELAYED 500ms:
@@ -123,7 +116,18 @@ export function ChatMessages({
   // output beat like searching/fetching/connecting). A completed tool
   // returns null so the label falls back to the generic rotating phases
   // until the first text token arrives.
-  const currentActivity = useMemo(() => {
+  //
+  // Intentionally NOT memoized: the strings depend on `t` (locale) and the
+  // scan is a handful of parts — cheaper than fighting the React Compiler
+  // over manual memoization with unstable deps.
+  const currentActivity = (() => {
+    const activityFor: Record<string, string> = {
+      'tool-gmail': t('connector.activity.gmail'),
+      'tool-drive': t('connector.activity.drive'),
+      'tool-calendar': t('connector.activity.calendar'),
+      'tool-github': t('connector.activity.github'),
+      'tool-notion': t('connector.activity.notion')
+    }
     const latestSection = sections[sections.length - 1]
     const parts = (latestSection?.assistantMessages[
       latestSection.assistantMessages.length - 1
@@ -134,24 +138,33 @@ export function ChatMessages({
       if (p.state === 'output-available') {
         const beat = p.output?.state
         if (beat === 'searching') {
-          const q = typeof p.output?.query === 'string' ? p.output.query.trim().slice(0, 60) : ''
-          return q ? `Recherche : ${q}…` : 'Recherche sur le web…'
+          const q =
+            typeof p.output?.query === 'string'
+              ? p.output.query.trim().slice(0, 60)
+              : ''
+          return q
+            ? `${t('connector.activity.searching')} : ${q}…`
+            : `${t('connector.activity.searching')}…`
         }
-        if (beat === 'fetching') return 'Lecture de la page…'
+        if (beat === 'fetching') return t('connector.activity.readingPage')
         if (beat === 'connecting')
-          return CONNECTOR_TOOL_ACTIVITY[p.type] ?? 'Connexion…'
-        if (beat === 'generating') return 'Génération de l’image…'
+          return activityFor[p.type] ?? t('connector.activity.searching')
+        if (beat === 'generating')
+          return t('connector.activity.generatingImage')
         return null
       }
-      if (p.type === 'tool-search') return 'Recherche sur le web…'
-      if (p.type === 'tool-fetch') return 'Lecture de la page…'
-      if (CONNECTOR_TOOL_ACTIVITY[p.type]) return CONNECTOR_TOOL_ACTIVITY[p.type]
-      if (p.type === 'tool-document') return 'Génération du document…'
-      if (p.type === 'tool-generateImage') return 'Génération de l’image…'
+      if (p.type === 'tool-search')
+        return `${t('connector.activity.searching')}…`
+      if (p.type === 'tool-fetch') return t('connector.activity.readingPage')
+      if (activityFor[p.type]) return activityFor[p.type]
+      if (p.type === 'tool-document')
+        return t('connector.activity.generatingDoc')
+      if (p.type === 'tool-generateImage')
+        return t('connector.activity.generatingImage')
       return null
     }
     return null
-  }, [sections])
+  })()
 
   // Delayed visibility for the shimmer label: the 500ms timer fires inside a
   // callback (no synchronous setState in the effect body). Hiding is derived

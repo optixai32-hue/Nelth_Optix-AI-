@@ -26,7 +26,7 @@ describe('instrumentation', () => {
     await register()
 
     expect(registerOTel).toHaveBeenCalledWith({
-      serviceName: 'morphic-ai-search',
+      serviceName: 'nelth-ia-search',
       spanProcessors: [langfuseSpanProcessor]
     })
   })

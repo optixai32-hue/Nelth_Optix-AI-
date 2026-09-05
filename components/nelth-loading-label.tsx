@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 
+import { useI18n } from './i18n-provider'
+
 /**
  * Rotating loading label shown next to the AnimatedLogo while any model is
  * generating a response.
@@ -18,13 +20,14 @@ import { useEffect, useState } from 'react'
  * text has been streamed yet (handled by the parent ChatMessages component).
  */
 
-const PHASES = [
-  'Analyse en cours\u2026',
-  'Lecture des comp\u00e9tences\u2026',
-  'Pr\u00e9paration de la r\u00e9ponse\u2026',
+const PHASE_KEYS = [
+  'loading.phase1',
+  'loading.phase2',
+  'loading.phase3',
 ] as const
 
 export function NelthLoadingLabel({ activity }: { activity?: string | null }) {
+  const { t } = useI18n()
   const [phaseIdx, setPhaseIdx] = useState(0)
   const [visible, setVisible] = useState(true)
 
@@ -33,7 +36,7 @@ export function NelthLoadingLabel({ activity }: { activity?: string | null }) {
       // Fade out, swap message, fade in
       setVisible(false)
       const swap = setTimeout(() => {
-        setPhaseIdx(p => (p + 1) % PHASES.length)
+        setPhaseIdx(p => (p + 1) % PHASE_KEYS.length)
         setVisible(true)
       }, 260)
       return () => clearTimeout(swap)
@@ -45,7 +48,7 @@ export function NelthLoadingLabel({ activity }: { activity?: string | null }) {
   return (
     <span
       aria-live="polite"
-      aria-label={activity || 'Nelth-IA réfléchit'}
+      aria-label={activity || t('loading.thinking')}
       className="text-sm select-none"
       style={{
         opacity: visible ? 1 : 0,
@@ -61,7 +64,7 @@ export function NelthLoadingLabel({ activity }: { activity?: string | null }) {
         animation: 'shimmer 1.6s linear infinite',
       }}
     >
-      {activity || PHASES[phaseIdx]}
+      {activity || t(PHASE_KEYS[phaseIdx])}
     </span>
   )
 }

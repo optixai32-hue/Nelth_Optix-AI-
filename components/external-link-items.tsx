@@ -2,28 +2,14 @@
 
 import Link from 'next/link'
 
-import {
-  IconBrandDiscord as SiDiscord,
-  IconBrandGithub as SiGithub,
-  IconBrandX as SiX
-} from '@tabler/icons-react'
+import { IconBrandGithub as SiGithub } from '@tabler/icons-react'
 
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 
 const externalLinks = [
   {
-    name: 'X',
-    href: 'https://x.com/morphic_ai',
-    icon: <SiX className="size-4" />
-  },
-  {
-    name: 'Discord',
-    href: 'https://discord.gg/zRxaseCuGq',
-    icon: <SiDiscord className="size-4" />
-  },
-  {
     name: 'GitHub',
-    href: 'https://git.new/morphic',
+    href: 'https://github.com/optixai32-hue/Nelth_Optix-AI-',
     icon: <SiGithub className="size-4" />
   }
 ]

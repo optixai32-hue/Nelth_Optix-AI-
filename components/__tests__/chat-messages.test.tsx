@@ -60,17 +60,11 @@ describe('ChatMessages loading shimmer', () => {
       />
     )
     // Hidden immediately (500ms delay gate).
-    expect(labelWrapper('Analyse en cours…')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    )
+    expect(labelWrapper('Analyzing…')).toHaveAttribute('aria-hidden', 'true')
     await act(async () => {
       vi.advanceTimersByTime(600)
     })
-    expect(labelWrapper('Analyse en cours…')).toHaveAttribute(
-      'aria-hidden',
-      'false'
-    )
+    expect(labelWrapper('Analyzing…')).toHaveAttribute('aria-hidden', 'false')
   })
 
   test('connector activity overrides generic phases', async () => {
@@ -107,7 +101,7 @@ describe('ChatMessages loading shimmer', () => {
     await act(async () => {
       vi.advanceTimersByTime(600)
     })
-    expect(labelWrapper('Connexion à Gmail…')).toHaveAttribute(
+    expect(labelWrapper('Connecting to Gmail…')).toHaveAttribute(
       'aria-hidden',
       'false'
     )
@@ -124,9 +118,6 @@ describe('ChatMessages loading shimmer', () => {
     await act(async () => {
       vi.advanceTimersByTime(2000)
     })
-    expect(labelWrapper('Analyse en cours…')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    )
+    expect(labelWrapper('Analyzing…')).toHaveAttribute('aria-hidden', 'true')
   })
 })

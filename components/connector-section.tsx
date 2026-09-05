@@ -18,6 +18,7 @@ import { ShimmerSkeleton } from '@/components/ui/shimmer-skeleton'
 
 import { TextShimmer } from '@/components/prompt-kit/text-shimmer'
 
+import { useI18n } from './i18n-provider'
 import ProcessHeader from './process-header'
 
 interface ConnectorSectionProps {
@@ -32,36 +33,36 @@ interface ConnectorSectionProps {
 
 const SERVICE_META: Record<
   string,
-  { label: string; connecting: string; Icon: typeof MailIcon }
+  { label: string; activityKey: string; Icon: typeof MailIcon }
 > = {
   'tool-gmail': {
     label: 'Gmail',
-    connecting: 'Connexion à Gmail…',
+    activityKey: 'connector.activity.gmail',
     Icon: MailIcon
   },
   'tool-drive': {
     label: 'Drive',
-    connecting: 'Lecture de Drive…',
+    activityKey: 'connector.activity.drive',
     Icon: FolderIcon
   },
   'tool-calendar': {
     label: 'Agenda',
-    connecting: 'Consultation de l’agenda…',
+    activityKey: 'connector.activity.calendar',
     Icon: CalendarIcon
   },
   'tool-github': {
     label: 'GitHub',
-    connecting: 'Recherche dans GitHub…',
+    activityKey: 'connector.activity.github',
     Icon: GithubIcon
   },
   'tool-notion': {
     label: 'Notion',
-    connecting: 'Lecture de Notion…',
+    activityKey: 'connector.activity.notion',
     Icon: NotionIcon
   }
 }
 
-function describeInput(tool: ToolPart): string {
+function describeInput(tool: ToolPart, readFallback: string): string {
   const input = (tool.input ?? {}) as Record<string, unknown>
   const str = (v: unknown) =>
     typeof v === 'string' && v.trim() ? v.trim() : null
@@ -73,16 +74,16 @@ function describeInput(tool: ToolPart): string {
   if (repoPath) return repoPath
   return (
     str(input.pageId) ??
-    (typeof input.action === 'string' ? input.action : 'lecture')
+    (typeof input.action === 'string' ? input.action : readFallback)
   )
 }
 
-function itemTitle(item: Record<string, unknown>): string {
+function itemTitle(item: Record<string, unknown>, fallback: string): string {
   for (const key of ['subject', 'name', 'summary', 'title']) {
     const v = item[key]
     if (typeof v === 'string' && v.trim()) return v.trim()
   }
-  return 'Élément'
+  return fallback
 }
 
 export function ConnectorSection({
@@ -94,9 +95,10 @@ export function ConnectorSection({
   isFirst = false,
   isLast = false
 }: ConnectorSectionProps) {
+  const { t } = useI18n()
   const meta = SERVICE_META[tool.type] ?? {
     label: tool.type.replace('tool-', ''),
-    connecting: 'Connexion…',
+    activityKey: 'connector.activity.searching',
     Icon: FolderIcon
   }
   const { Icon } = meta
@@ -127,11 +129,11 @@ export function ConnectorSection({
   else if (isComplete && contentLength !== undefined) resultCount = 1
 
   const errorText = isAuthRequired
-    ? 'Reconnexion requise'
+    ? t('connector.authRequired')
     : typeof output?.message === 'string'
       ? output.message
       : tool.state === 'output-error'
-        ? (tool.errorText ?? 'Échec de la lecture')
+        ? (tool.errorText ?? t('connector.readFallback'))
         : undefined
 
   const header = (
@@ -141,7 +143,7 @@ export function ConnectorSection({
         <div className="flex min-w-0 items-center gap-2 overflow-hidden">
           <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="block min-w-0 max-w-full truncate">
-            {meta.label} : {describeInput(tool)}
+            {meta.label} : {describeInput(tool, t('connector.readFallback'))}
           </span>
         </div>
       }
@@ -150,7 +152,10 @@ export function ConnectorSection({
           <>
             <Check size={16} className="text-green-500" />
             <span>
-              {resultCount} résultat{resultCount > 1 ? 's' : ''}
+              {resultCount}{' '}
+              {resultCount > 1
+                ? t('connector.resultOther')
+                : t('connector.resultOne')}
             </span>
           </>
         ) : isOutputError || isAuthRequired ? (
@@ -160,7 +165,7 @@ export function ConnectorSection({
           </>
         ) : isToolLoading || isConnecting ? (
           <TextShimmer className="text-xs text-muted-foreground">
-            {meta.connecting}
+            {t(meta.activityKey)}
           </TextShimmer>
         ) : undefined
       }
@@ -196,7 +201,7 @@ export function ConnectorSection({
           <ul className="space-y-1 pt-2">
             {items.slice(0, 3).map((item, i) => (
               <li key={i} className="truncate text-sm text-foreground/80">
-                {itemTitle(item)}
+                {itemTitle(item, t('connector.itemFallback'))}
               </li>
             ))}
           </ul>
@@ -204,14 +209,13 @@ export function ConnectorSection({
         {isComplete && items.length === 0 && contentLength !== undefined ? (
           <p className="pt-1 text-xs text-muted-foreground">
             {contentLength > 1000
-              ? `${Math.round(contentLength / 1000)}k caractères lus`
-              : `${contentLength} caractères lus`}
+              ? `${Math.round(contentLength / 1000)}k ${t('connector.charsRead')}`
+              : `${contentLength} ${t('connector.charsRead')}`}
           </p>
         ) : null}
         {isAuthRequired ? (
           <p className="pt-1 text-xs text-muted-foreground">
-            Reconnecte {meta.label} depuis la carte « Connecter une application
-            », puis repose ta question.
+            {t('connector.authHint')}
           </p>
         ) : null}
         {isOutputError && !isAuthRequired && errorText ? (

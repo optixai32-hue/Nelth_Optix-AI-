@@ -7,7 +7,7 @@ export const langfuseSpanProcessor = new LangfuseSpanProcessor()
 
 export async function register() {
   registerOTel({
-    serviceName: 'morphic-ai-search',
+    serviceName: 'nelth-ia-search',
     spanProcessors: [langfuseSpanProcessor]
   })
 

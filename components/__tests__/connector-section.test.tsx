@@ -26,7 +26,7 @@ describe('ConnectorSection', () => {
         }
       />
     )
-    expect(screen.getByText('Connexion à Gmail…')).toBeInTheDocument()
+    expect(screen.getByText('Connecting to Gmail…')).toBeInTheDocument()
     expect(screen.getByText('Gmail : facture')).toBeInTheDocument()
   })
 
@@ -48,7 +48,7 @@ describe('ConnectorSection', () => {
         }
       />
     )
-    expect(screen.getByText('2 résultats')).toBeInTheDocument()
+    expect(screen.getByText('2 results')).toBeInTheDocument()
     expect(screen.getByText('Facture')).toBeInTheDocument()
   })
 
@@ -67,9 +67,9 @@ describe('ConnectorSection', () => {
         }
       />
     )
-    expect(screen.getByText('Reconnexion requise')).toBeInTheDocument()
+    expect(screen.getByText('Reconnect required')).toBeInTheDocument()
     expect(
-      screen.getByText(/Reconnecte Drive depuis la carte/)
+      screen.getByText(/Reconnect the app from the/)
     ).toBeInTheDocument()
   })
 
@@ -88,6 +88,6 @@ describe('ConnectorSection', () => {
         }
       />
     )
-    expect(screen.getByText('3 caractères lus')).toBeInTheDocument()
+    expect(screen.getByText('3 characters read')).toBeInTheDocument()
   })
 })

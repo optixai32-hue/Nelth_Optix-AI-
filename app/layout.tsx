@@ -42,10 +42,10 @@ const fontSans = FontSans({
 
 const title = 'Nelth-IA'
 const description =
-  'A fully open-source AI-powered answer engine with a generative UI.'
+  'Nelth-IA — your AI assistant for answers, documents, mail and calendar, with your apps connected.'
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://morphic.sh'),
+  metadataBase: new URL('https://nelth-ai.vercel.app'),
   title,
   description,
   openGraph: {
@@ -55,8 +55,7 @@ export const metadata: Metadata = {
   twitter: {
     title,
     description,
-    card: 'summary_large_image',
-    creator: '@miiura'
+    card: 'summary_large_image'
   }
 }
 

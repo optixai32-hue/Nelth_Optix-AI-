@@ -960,6 +960,7 @@ export function ChatPanel({
                   variant="outline"
                   size="icon"
                   onClick={handleNewChat}
+                  aria-label={t('common.newChat')}
                   className="shrink-0 size-8 md:size-10 rounded-full group"
                   type="button"
                   disabled={isLoading}
@@ -970,6 +971,7 @@ export function ChatPanel({
               <Button
                 type={isLoading ? 'button' : 'submit'}
                 size={'icon'}
+                aria-label={isLoading ? t('common.stop') : t('common.send')}
                 className={cn(
                   isLoading && 'animate-pulse',
                   'size-8 md:size-10 rounded-full transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:-translate-y-0.5 hover:scale-110 active:scale-95'
@@ -981,7 +983,7 @@ export function ChatPanel({
                 title={
                   hasAvailableModels
                     ? undefined
-                    : 'No enabled model is available'
+                    : t('chat.noModelAvailable')
                 }
               >
                 {isLoading ? (
