@@ -168,6 +168,23 @@ export const EXECUTION_REQUIREMENTS_BY_SLUG: Record<string, string[]> = {
   'algorithmic-art': [
     'Self-contained generative piece (canvas/SVG); animated pieces respect prefers-reduced-motion with a static fallback.',
     'Valid JS only; no external libraries unless explicitly requested.'
+  ],
+  // Document deliverables: the source content is OFTEN already in the
+  // conversation (your own previous answer, connector results, uploaded file
+  // you already read). Observed failure: "génère un docx avec ce résumé"
+  // right after a Gmail summary → the model asked the user to re-paste the
+  // mails instead of using the summary sitting directly above.
+  'docx': [
+    'When the user refers to content already in the conversation ("ce résumé", "ces mails", "ces résultats", your own previous answer, connector results, a file you already read) as the document source, USE IT DIRECTLY to build the spec — never ask the user to re-paste, re-upload, or re-share what is already visible above. Ask for source material ONLY when the conversation genuinely contains none.'
+  ],
+  'pdf': [
+    'When the user refers to content already in the conversation ("ce résumé", "ces mails", "ces résultats", your own previous answer, connector results, a file you already read) as the document source, USE IT DIRECTLY to build the spec — never ask the user to re-paste, re-upload, or re-share what is already visible above. Ask for source material ONLY when the conversation genuinely contains none.'
+  ],
+  'xlsx': [
+    'When the user refers to content already in the conversation ("ce résumé", "ces mails", "ces résultats", your own previous answer, connector results, a file you already read) as the document source, USE IT DIRECTLY to build the spec — never ask the user to re-paste, re-upload, or re-share what is already visible above. Ask for source material ONLY when the conversation genuinely contains none.'
+  ],
+  'pptx': [
+    'When the user refers to content already in the conversation ("ce résumé", "ces mails", "ces résultats", your own previous answer, connector results, a file you already read) as the document source, USE IT DIRECTLY to build the spec — never ask the user to re-paste, re-upload, or re-share what is already visible above. Ask for source material ONLY when the conversation genuinely contains none.'
   ]
 }
 
