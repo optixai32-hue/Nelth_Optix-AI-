@@ -519,7 +519,7 @@ export function ActionButtons({
             {/* Connector Card: anchored to the chips row itself (not the
                 fixed-height container), so it sits 1px below the chips with
                 zero impact on the logo, greeting, composer and chips. */}
-            <div className="absolute inset-x-0 top-full z-10 mt-3 flex justify-center px-2">
+            <div className="absolute inset-x-0 top-full z-10 mt-4 flex justify-center px-2">
               <ConnectorCard className="w-full max-w-[530px]" />
             </div>
           </div>
