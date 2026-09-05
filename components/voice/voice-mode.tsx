@@ -25,7 +25,13 @@ export interface VoiceModeProps {
   locale: string
 }
 
-type VoicePhase = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error'
+type VoicePhase =
+  | 'idle'
+  | 'connecting'
+  | 'listening'
+  | 'thinking'
+  | 'speaking'
+  | 'error'
 
 function lastAssistantText(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -105,7 +111,12 @@ export function VoiceMode({
   }
   callbacksRef.current.onStateChange = (state: string) => {
     if (closingRef.current) return
-    if (state === 'listening' && phaseRef.current === 'idle') {
+    if (state === 'connecting') {
+      setPhase('connecting')
+    } else if (
+      state === 'listening' &&
+      (phaseRef.current === 'idle' || phaseRef.current === 'connecting')
+    ) {
       setPhase('listening')
     } else if (state === 'denied' || state === 'unsupported') {
       setPhase('error')
@@ -188,22 +199,24 @@ export function VoiceMode({
   }, [rec, stopTts, close])
 
   const orbState: OrbState =
-    phase === 'listening'
-      ? 'listening'
-      : phase === 'thinking'
-        ? 'thinking'
-        : phase === 'speaking'
-          ? 'speaking'
-          : phase === 'error'
-            ? 'error'
-            : 'idle'
+    phase === 'connecting'
+      ? 'connecting'
+      : phase === 'listening'
+        ? 'listening'
+        : phase === 'thinking'
+          ? 'thinking'
+          : phase === 'speaking'
+            ? 'speaking'
+            : phase === 'error'
+              ? 'error'
+              : 'idle'
 
   const orbVolume =
     phase === 'listening'
       ? Math.max(0.08, micLevel)
       : phase === 'speaking'
         ? 0.55
-        : phase === 'thinking'
+        : phase === 'thinking' || phase === 'connecting'
           ? 0.3
           : 0
 
@@ -258,11 +271,13 @@ export function VoiceMode({
               {interim ||
                 (phase === 'listening'
                   ? t('voice.listeningHint')
-                  : phase === 'thinking'
-                    ? t('voice.thinkingHint')
-                    : phase === 'speaking'
-                      ? t('voice.speakingHint')
-                      : t('voice.startingHint'))}
+                  : phase === 'connecting' || phase === 'idle'
+                    ? t('voice.startingHint')
+                    : phase === 'thinking'
+                      ? t('voice.thinkingHint')
+                      : phase === 'speaking'
+                        ? t('voice.speakingHint')
+                        : t('voice.startingHint'))}
             </p>
           </>
         )}

@@ -25,6 +25,10 @@ class MockRecognition {
   start() {
     this.started = true
     this.startCalls++
+    // NOTE: onstart is fired explicitly by tests via fireStart(), so the
+    // connecting → listening handshake is observable.
+  }
+  fireStart() {
     this.onstart?.()
   }
   stop() {
@@ -108,6 +112,42 @@ describe('useVoiceRecognition', () => {
     expect(result.current.state).toBe('unsupported')
   })
 
+  it('stays honest while connecting, then listens on recognizer start', async () => {
+    ;(window as any).webkitSpeechRecognition = MockRecognition
+    mockAudio()
+    const cbs = makeCallbacks()
+    const ref = { current: cbs }
+    const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
+
+    await act(async () => {
+      await result.current.start()
+    })
+    // Mic open but handshake in flight: NOT listening yet.
+    expect(result.current.state).toBe('connecting')
+    act(() => {
+      MockRecognition.instances[0].fireStart()
+    })
+    expect(result.current.state).toBe('listening')
+  })
+
+  it('fails loudly when the recognizer never starts', async () => {
+    ;(window as any).webkitSpeechRecognition = MockRecognition
+    mockAudio()
+    const cbs = makeCallbacks()
+    const ref = { current: cbs }
+    const { result } = renderHook(() => useVoiceRecognition(ref, 'fr'))
+
+    await act(async () => {
+      await result.current.start()
+    })
+    expect(result.current.state).toBe('connecting')
+    await act(async () => {
+      vi.advanceTimersByTime(6500)
+    })
+    expect(result.current.state).toBe('error')
+    expect(cbs.onError).toHaveBeenCalled()
+  })
+
   it('listens once and submits interim text after silence', async () => {
     ;(window as any).webkitSpeechRecognition = MockRecognition
     expect(isVoiceRecognitionSupported()).toBe(true)
@@ -118,6 +158,9 @@ describe('useVoiceRecognition', () => {
 
     await act(async () => {
       await result.current.start()
+    })
+    act(() => {
+      MockRecognition.instances[0].fireStart()
     })
     expect(result.current.state).toBe('listening')
     expect(MockRecognition.instances).toHaveLength(1)
@@ -130,7 +173,7 @@ describe('useVoiceRecognition', () => {
     expect(cbs.onFinalText).not.toHaveBeenCalled()
 
     await act(async () => {
-      vi.advanceTimersByTime(1300)
+      vi.advanceTimersByTime(900)
     })
     expect(cbs.onFinalText).toHaveBeenCalledWith('bonjour')
   })
@@ -144,6 +187,9 @@ describe('useVoiceRecognition', () => {
 
     await act(async () => {
       await result.current.start()
+    })
+    act(() => {
+      MockRecognition.instances[0].fireStart()
     })
     act(() => {
       result.current.setMuted(true)
@@ -167,6 +213,9 @@ describe('useVoiceRecognition', () => {
       await result.current.start()
     })
     act(() => {
+      MockRecognition.instances[0].fireStart()
+    })
+    act(() => {
       MockRecognition.instances[0].onerror?.({ error: 'not-allowed' })
     })
     expect(result.current.state).toBe('denied')
@@ -182,6 +231,9 @@ describe('useVoiceRecognition', () => {
 
     await act(async () => {
       await result.current.start()
+    })
+    act(() => {
+      MockRecognition.instances[0].fireStart()
     })
     const rec = MockRecognition.instances[0]
     const startsBefore = rec.startCalls

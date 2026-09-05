@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type VoiceRecState =
   | 'idle'
+  | 'connecting'
   | 'listening'
   | 'denied'
   | 'unsupported'
@@ -33,11 +34,14 @@ export function isVoiceRecognitionSupported(): boolean {
   return getRecognitionClass() !== null
 }
 
-const SILENCE_SUBMIT_MS = 1000
-const FINAL_SUBMIT_MS = 350
+const SILENCE_SUBMIT_MS = 800
+const FINAL_SUBMIT_MS = 300
 const RESTART_DELAY_MS = 150
 const MAX_RESTARTS_PER_WINDOW = 5
 const RESTART_WINDOW_MS = 3000
+// If the recognizer never fires onstart (blocked service, frozen tab),
+// fail loudly instead of showing "listening" forever.
+const START_WATCHDOG_MS = 6000
 
 /**
  * Continuous Web Speech recognition for the voice mode.
@@ -61,6 +65,7 @@ export function useVoiceRecognition(
   const analyserRef = useRef<AnalyserNode | null>(null)
   const levelFrameRef = useRef<number | null>(null)
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const startWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const listeningRef = useRef(false)
   const mutedRef = useRef(false)
   // True when the recognition session ended while muted (Chrome ends idle
@@ -84,6 +89,13 @@ export function useVoiceRecognition(
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current)
       silenceTimerRef.current = null
+    }
+  }, [])
+
+  const clearStartWatchdog = useCallback(() => {
+    if (startWatchdogRef.current) {
+      clearTimeout(startWatchdogRef.current)
+      startWatchdogRef.current = null
     }
   }, [])
 
@@ -177,6 +189,10 @@ export function useVoiceRecognition(
 
       recognition.onstart = () => {
         endedRef.current = false
+        // The recognizer is REALLY ready now — only here may the UI claim
+        // "listening". Claiming it earlier loses the user's first words.
+        clearStartWatchdog()
+        if (listeningRef.current) setRecState('listening')
       }
 
       recognition.onresult = (event: any) => {
@@ -231,6 +247,7 @@ export function useVoiceRecognition(
   }, [
     callbacksRef,
     clearSilenceTimer,
+    clearStartWatchdog,
     restartRecognition,
     setRecState,
     submitFinal
@@ -275,10 +292,23 @@ export function useVoiceRecognition(
       listeningRef.current = true
       startLevelLoop()
       beginRecognition()
-      setRecState('listening')
+      // Honest state: mic is open but the recognizer handshake (notably the
+      // Android beep + Google server round-trip) is still in flight. The UI
+      // shows "starting" until onstart confirms — 'listening' is set there.
+      setRecState('connecting')
+      startWatchdogRef.current = setTimeout(() => {
+        if (stateRef.current === 'connecting') {
+          listeningRef.current = false
+          setRecState('error')
+          callbacksRef.current.onError?.(
+            'Speech recognition did not start. Check your connection, then reopen voice mode.'
+          )
+        }
+      }, START_WATCHDOG_MS)
       return true
     } catch {
       listeningRef.current = false
+      clearStartWatchdog()
       teardownAudio()
       setRecState('denied')
       callbacksRef.current.onError?.(
@@ -288,6 +318,7 @@ export function useVoiceRecognition(
     }
   }, [
     beginRecognition,
+    clearStartWatchdog,
     setRecState,
     startLevelLoop,
     teardownAudio,
@@ -298,6 +329,7 @@ export function useVoiceRecognition(
     listeningRef.current = false
     mutedRef.current = false
     endedRef.current = false
+    clearStartWatchdog()
     clearSilenceTimer()
     restartStampsRef.current = []
     if (recognitionRef.current) {
@@ -311,7 +343,7 @@ export function useVoiceRecognition(
     }
     teardownAudio()
     if (stateRef.current !== 'idle') setRecState('idle')
-  }, [clearSilenceTimer, setRecState, teardownAudio])
+  }, [clearSilenceTimer, clearStartWatchdog, setRecState, teardownAudio])
 
   /** Ignore mic results without killing the session (no restart = no beep). */
   const setMuted = useCallback(
