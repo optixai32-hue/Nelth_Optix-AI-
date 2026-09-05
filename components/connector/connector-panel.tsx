@@ -9,6 +9,7 @@ import { useI18n } from '../i18n-provider'
 
 import type {
   ConnectorId,
+  ConnectorProviderId,
   ConnectorService,
   ConnectorStatus
 } from './use-connectors'
@@ -23,7 +24,10 @@ export interface ConnectorPanelProps {
   services: ConnectorService[]
   statuses: Record<ConnectorId, ConnectorStatus>
   connectedIds: ConnectorId[]
+  configured: Record<ConnectorProviderId, boolean>
+  providerForService: (id: ConnectorId) => ConnectorProviderId
   onConnect: (id: ConnectorId) => Promise<boolean>
+  onDisconnect: (provider: ConnectorProviderId) => Promise<void>
   onConnected: () => void
   onError: () => void
 }
@@ -68,7 +72,10 @@ export function ConnectorPanel({
   services,
   statuses,
   connectedIds,
+  configured,
+  providerForService,
   onConnect,
+  onDisconnect,
   onConnected,
   onError
 }: ConnectorPanelProps) {
@@ -181,10 +188,12 @@ export function ConnectorPanel({
 
         <ul className="mt-3 space-y-1.5">
           {services.map(service => {
-            const status: ConnectorStatus = connectedIds.includes(service.id)
+            const isConnected = connectedIds.includes(service.id)
+            const status: ConnectorStatus = isConnected
               ? 'connected'
               : (statuses[service.id] ?? 'idle')
             const busy = busyId === service.id
+            const isConfigured = configured[providerForService(service.id)] !== false
             return (
               <li
                 key={service.id}
@@ -202,26 +211,60 @@ export function ConnectorPanel({
                   </span>
                 </span>
                 {status === 'connected' ? (
-                  <span
-                    data-testid={`connector-status-${service.id}`}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[13px] font-medium text-emerald-700"
-                  >
-                    <svg
-                      viewBox="0 0 16 16"
-                      className="size-3.5"
-                      aria-hidden="true"
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span
+                      data-testid={`connector-status-${service.id}`}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[13px] font-medium text-emerald-700"
                     >
-                      <path
-                        d="M3 8.5 6.5 12 13 4.5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="nelth-check-draw"
-                      />
-                    </svg>
-                    {t('connector.connected')}
+                      <svg
+                        viewBox="0 0 16 16"
+                        className="size-3.5"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M3 8.5 6.5 12 13 4.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="nelth-check-draw"
+                        />
+                      </svg>
+                      {t('connector.connected')}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void (async () => {
+                          setBusyId(service.id)
+                          try {
+                            await onDisconnect(
+                              providerForService(service.id)
+                            )
+                          } finally {
+                            setBusyId(null)
+                          }
+                        })()
+                      }
+                      data-testid={`connector-disconnect-${service.id}`}
+                      title={t('connector.revokeNote')}
+                      className={cn(
+                        'shrink-0 cursor-pointer rounded-full px-2 py-1.5 text-[12px] font-medium text-neutral-400 transition-all duration-150 hover:bg-neutral-100 hover:text-neutral-700 active:scale-95 disabled:cursor-default',
+                        EASE
+                      )}
+                    >
+                      {t('connector.disconnect')}
+                    </button>
+                  </span>
+                ) : !isConfigured ? (
+                  <span
+                    data-testid={`connector-unconfigured-${service.id}`}
+                    title={t('connector.notConfigured')}
+                    className="inline-flex min-w-[6.5rem] shrink-0 cursor-not-allowed items-center justify-center gap-2 rounded-full bg-neutral-50 px-3.5 py-1.5 text-[13px] font-medium text-neutral-400"
+                  >
+                    {t('connector.notConfigured')}
                   </span>
                 ) : (
                   <button

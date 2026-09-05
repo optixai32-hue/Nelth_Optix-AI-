@@ -520,7 +520,10 @@ export function ActionButtons({
                 fixed-height container), so it sits 1px below the chips with
                 zero impact on the logo, greeting, composer and chips. */}
             <div className="absolute inset-x-0 top-full z-10 mt-9 flex justify-center px-2">
-              <ConnectorCard className="w-full max-w-[530px]" />
+              <ConnectorCard
+                className="w-full max-w-[530px]"
+                isGuest={isGuest}
+              />
             </div>
           </div>
         </div>

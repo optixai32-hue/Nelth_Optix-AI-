@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { toast } from 'sonner'
+
 import { captureClient } from '@/lib/analytics/posthog-client'
 import { cn } from '@/lib/utils'
 
@@ -13,7 +15,7 @@ import {
   GoogleDriveIcon
 } from './connector-icons'
 import { ConnectorPanel } from './connector-panel'
-import { useConnectors } from './use-connectors'
+import { providerForService, useConnectors } from './use-connectors'
 
 type CardPhase =
   | 'entering'
@@ -30,6 +32,8 @@ const PRESS_MS = 130
 
 export interface ConnectorCardProps {
   className?: string
+  /** Guests cannot OAuth (no user to attach tokens to) — prompts sign-in. */
+  isGuest?: boolean
   /** Shortens simulated timings (tests). */
   timings?: { pressMs?: number }
   /** Custom connect implementation (tests / future real OAuth). */
@@ -93,15 +97,17 @@ function CheckMark({ className }: { className?: string }) {
  * interaction system: press scaling, stable-width loading, success pulse,
  * subtle error shake, animated dismiss, animated OAuth panel.
  */
-export function ConnectorCard({ className, timings, connectImpl }: ConnectorCardProps) {
+export function ConnectorCard({ className, timings, connectImpl, isGuest }: ConnectorCardProps) {
   const { t } = useI18n()
   const {
     services,
     connectedIds,
     connectedCount,
     statuses,
+    configured,
     dismissed,
     connect,
+    disconnect,
     dismiss
   } = useConnectors(connectImpl ? { connectImpl } : undefined)
 
@@ -138,6 +144,10 @@ export function ConnectorCard({ className, timings, connectImpl }: ConnectorCard
 
   const handleConnectClick = useCallback(() => {
     if (phase === 'connecting') return
+    if (isGuest) {
+      toast.info(t('connector.signInRequired'))
+      return
+    }
     try {
       captureClient('connector_card_connect_clicked', {})
     } catch {
@@ -153,7 +163,7 @@ export function ConnectorCard({ className, timings, connectImpl }: ConnectorCard
         openPanel()
       }, 650)
     }, timings?.pressMs ?? PRESS_MS)
-  }, [connectedCount, later, openPanel, phase, timings?.pressMs])
+  }, [connectedCount, isGuest, later, openPanel, phase, t, timings?.pressMs])
 
   const handleConnectedInPanel = useCallback(() => {
     setPulseKey(k => k + 1)
@@ -321,7 +331,10 @@ export function ConnectorCard({ className, timings, connectImpl }: ConnectorCard
         services={services}
         statuses={statuses}
         connectedIds={connectedIds}
+        configured={configured}
+        providerForService={providerForService}
         onConnect={connect}
+        onDisconnect={disconnect}
         onConnected={handleConnectedInPanel}
         onError={handlePanelError}
       />

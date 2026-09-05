@@ -49,6 +49,11 @@ const en: Dict = {
   'connector.connecting': 'Connecting…',
   'connector.connected': 'Connected',
   'connector.retry': 'Retry',
+  'connector.disconnect': 'Disconnect',
+  'connector.notConfigured': 'Not configured',
+  'connector.signInRequired': 'Sign in to connect apps',
+  'connector.revokeNote':
+    'Also revoke access in the provider settings to fully disconnect.',
   'connector.manage': 'Manage',
   'connector.dismiss': 'Dismiss connector suggestions',
   'connector.panelTitle': 'Connect an app',
@@ -135,6 +140,12 @@ const fr: Dict = {
   'connector.connecting': 'Connexion…',
   'connector.connected': 'Connecté',
   'connector.retry': 'Réessayer',
+  'connector.disconnect': 'Déconnecter',
+  'connector.notConfigured': 'Non configuré',
+  'connector.signInRequired':
+    'Connectez-vous pour connecter des applications',
+  'connector.revokeNote':
+    'Révoquez aussi l’accès dans les paramètres du fournisseur pour une déconnexion complète.',
   'connector.manage': 'Gérer',
   'connector.dismiss': 'Masquer les suggestions de connexion',
   'connector.panelTitle': 'Connecter une application',

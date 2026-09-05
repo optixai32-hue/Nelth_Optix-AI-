@@ -61,8 +61,10 @@ describe('ConnectorCard', () => {
     expect(screen.getByTestId('connector-service-github')).toBeInTheDocument()
   })
 
-  test('connecting a service shows success and persists it', async () => {
-    render(<ConnectorCard />)
+  test('connecting a service shows success via injected impl', async () => {
+    render(
+      <ConnectorCard connectImpl={() => Promise.resolve()} />
+    )
     fireEvent.click(screen.getByTestId('connector-connect'))
     await waitFor(() => {
       expect(screen.getByTestId('connector-panel')).toBeInTheDocument()
@@ -73,9 +75,6 @@ describe('ConnectorCard', () => {
         screen.getByTestId('connector-status-drive')
       ).toBeInTheDocument()
     })
-    expect(JSON.parse(window.localStorage.getItem(CONNECTED_KEY) ?? '[]')).toContain(
-      'drive'
-    )
   })
 
   test('a failing connect surfaces retry state', async () => {
@@ -105,5 +104,134 @@ describe('ConnectorCard', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('connector-panel')).not.toBeInTheDocument()
     })
+  })
+
+  test('hydrates connected state from the server (vault is source of truth)', async () => {
+    const fetchMock = vi.fn(async (url: unknown) => {
+      if (String(url).includes('/api/connectors/status')) {
+        return {
+          ok: true,
+          json: async () => ({
+            connected: {
+              drive: false,
+              gmail: false,
+              calendar: false,
+              github: true,
+              notion: false
+            },
+            configured: { google: true, github: true, notion: true },
+            guest: false
+          })
+        }
+      }
+      throw new Error(`unexpected fetch: ${String(url)}`)
+    })
+    const realFetch = globalThis.fetch
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      render(<ConnectorCard />)
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          '/api/connectors/status',
+          expect.anything()
+        )
+      })
+      fireEvent.click(screen.getByTestId('connector-connect'))
+      await waitFor(() => {
+        expect(screen.getByTestId('connector-panel')).toBeInTheDocument()
+      })
+      // GitHub comes from the server as connected — no localStorage involved.
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('connector-status-github')
+        ).toBeInTheDocument()
+      })
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  test('unconfigured providers show a disabled state', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        connected: {
+          drive: false,
+          gmail: false,
+          calendar: false,
+          github: false,
+          notion: false
+        },
+        configured: { google: false, github: false, notion: true },
+        guest: false
+      })
+    }))
+    const realFetch = globalThis.fetch
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      render(<ConnectorCard />)
+      fireEvent.click(screen.getByTestId('connector-connect'))
+      await waitFor(() => {
+        expect(screen.getByTestId('connector-panel')).toBeInTheDocument()
+      })
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('connector-unconfigured-drive')
+        ).toBeInTheDocument()
+      })
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  test('disconnect calls the API and clears the row', async () => {
+    const calls: unknown[] = []
+    const fetchMock = vi.fn(async (url: unknown, init?: unknown) => {
+      calls.push({ url: String(url), init })
+      if (String(url).includes('/api/connectors/disconnect')) {
+        return { ok: true, json: async () => ({ ok: true }) }
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          connected: {
+            drive: true,
+            gmail: true,
+            calendar: true,
+            github: false,
+            notion: false
+          },
+          configured: { google: true, github: true, notion: true },
+          guest: false
+        })
+      }
+    })
+    const realFetch = globalThis.fetch
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      render(<ConnectorCard />)
+      fireEvent.click(screen.getByTestId('connector-connect'))
+      await waitFor(() => {
+        expect(screen.getByTestId('connector-panel')).toBeInTheDocument()
+      })
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('connector-status-drive')
+        ).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByTestId('connector-disconnect-drive'))
+      await waitFor(() => {
+        expect(
+          calls.some(
+            c =>
+              (c as { url: string }).url.includes(
+                '/api/connectors/disconnect'
+              )
+          )
+        ).toBe(true)
+      })
+    } finally {
+      globalThis.fetch = realFetch
+    }
   })
 })
