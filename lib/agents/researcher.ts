@@ -946,6 +946,10 @@ Requirements for the artifact:
       // Without this ordering, an image-edit / image-generation request that also
       // contains a current-info word would be hard-forced to the `search` tool and
       // never call the intended image tool.
+      // Connector-first: when connector tools are armed, the answer lives in
+      // the user's own accounts — never hard-force the web search tool or the
+      // model would burn its first (and often only) step on the public web.
+      // The model still sees `search` and can use it after the connectors.
       ...(capabilities?.needsImage && activeToolsList.includes('generateImage')
         ? {
             toolChoice: {
@@ -953,7 +957,9 @@ Requirements for the artifact:
               toolName: 'generateImage' as const
             }
           }
-        : capabilities?.needsSearch && activeToolsList.includes('search')
+        : capabilities?.needsSearch &&
+            activeToolsList.includes('search') &&
+            !connectorTools
           ? { toolChoice: { type: 'tool' as const, toolName: 'search' as const } }
           : {}),
       prepareStep: ({ steps }) => {

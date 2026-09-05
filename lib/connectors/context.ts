@@ -29,9 +29,11 @@ const DATA_INTENT_RE = intentRe(
     '|calendar|agenda|calendrier|rendez-?vous|reunions?(?:\\s?(?:a venir|prochain|demain|cette semaine))?' +
     '|github|depot|pull\\s?request|commit' +
     '|notion|page\\s?notion|base\\s?notion' +
-    '|mes\\s?(?:mails?|e-?mails?|fichiers?|documents?|evenements?|repos?)' +
-    '|mon\\s?(?:agenda|calendrier|drive|github|notion)' +
-    '|ma\\s?(?:boite\\s?(?:mail|reception)|prochaine\\s?reunion)'
+    // Possessive + up to 2 filler words ("mes DERNIERS mails", "my LATEST
+    // emails", "mon PROCHAIN agenda") — adjectives must not break detection.
+    '|m(?:es|on|a)\\s+(?:\\S+\\s+){0,2}(?:mails?|e-?mails?|fichiers?|documents?|evenements?|reunions?|agenda|calendrier|drive|github|notion|repos?)' +
+    '|my\\s+(?:\\S+\\s+){0,2}(?:mails?|e-?mails?|files?|documents?|events?|meetings?|repos?|agenda|calendar|drive|github|notion)' +
+    '|boite(\\s+de)?\\s+(mail|reception)|inbox'
 )
 
 // "Is anything connected / how do I connect" — needs the status block but no

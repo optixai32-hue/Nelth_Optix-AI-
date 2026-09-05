@@ -9,6 +9,7 @@ import {
 } from 'ai'
 
 import { researcher } from '@/lib/agents/researcher'
+import { detectConnectorIntent } from '@/lib/connectors/context'
 import {
   createPublicErrorResponse,
   serializePublicError
@@ -239,7 +240,18 @@ export async function createChatStreamResponse(
       // is true), we fetch results server-side and provide them directly to the model.
       // We ALSO surface these results as synthetic tool chunks in the stream so the
       // UI displays the search process, Sources panel, and inline citations.
-      const shouldPreloadSearch = Boolean(caps.needsSearch)
+      // Connector-first: when the turn targets the user's OWN connected apps
+      // (Gmail, Drive, Calendar, GitHub, Notion), a web search is the wrong
+      // move — the answer lives in their accounts, not on the public web.
+      // Skip the server-side web preload so the researcher arms the connector
+      // tools (or the connector preload for the weak model) instead. Guests
+      // have no vault, so the preload stays for them.
+      const connectorDataIntent =
+        detectConnectorIntent(userQuery ?? '') &&
+        Boolean(userId) &&
+        userId !== 'guest'
+      const shouldPreloadSearch =
+        Boolean(caps.needsSearch) && !connectorDataIntent
       let preloadedSearchContext: string | undefined
       let preloadedSearchQuery: string | undefined
       let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined

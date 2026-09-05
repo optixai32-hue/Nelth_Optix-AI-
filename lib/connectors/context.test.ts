@@ -21,7 +21,14 @@ beforeEach(() => {
 describe('detectConnectorIntent', () => {
   const positive = [
     'retrouve mes mails sur la facture',
+    'résume mes derniers mails',
+    'mes derniers mails',
+    'résume mes mails récents',
     'cherche dans ma boîte mail',
+    'vérifie ma boîte de réception',
+    'check my inbox',
+    'summarize my recent emails',
+    'what are my latest emails about',
     'un résumé de mes e-mails reçus',
     'dans mon Drive, le fichier budget',
     'mes événements de la semaine',
