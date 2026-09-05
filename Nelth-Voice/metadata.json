@@ -1,0 +1,7 @@
+{
+  "name": "Nelth-Voice backend",
+  "description": "Backend-only realtime voice backend: Microsoft Edge-TTS speech synthesis and LLM speech turns over HTTP and WebSocket. Speech-to-text runs 100% client-side via the Web Speech API (all devices).",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
