@@ -88,6 +88,40 @@ describe('fetch-models', () => {
     }
   })
 
+  it('hides retired models from the static env list too', async () => {
+    mockIsProviderEnabled.mockImplementation(
+      providerId => providerId === 'openai-compatible'
+    )
+    process.env.OPENAI_COMPATIBLE_MODELS =
+      'minimax/minimax-m3:free, poolside/laguna-s-2.1:free'
+
+    try {
+      const models = await fetchModels.fetchOpenAICompatibleModels()
+      const ids = models.map(model => model.id)
+      expect(ids).not.toContain('minimax/minimax-m3:free')
+      expect(ids).toContain('poolside/laguna-s-2.1:free')
+    } finally {
+      delete process.env.OPENAI_COMPATIBLE_MODELS
+    }
+  })
+
+  it('always lists the Nelth-3.5 default when its provider is enabled', async () => {
+    mockIsProviderEnabled.mockImplementation(
+      providerId => providerId === 'kilo-gateway'
+    )
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const grouped = await fetchModels.fetchAvailableModels({
+      forceRefresh: true
+    })
+    const ids = Object.values(grouped)
+      .flat()
+      .map(model => model.id)
+    expect(ids).toContain('poolside/laguna-s-2.1:free')
+    expect(ids).not.toContain('minimax/minimax-m3:free')
+  })
+
   it('groups models by provider and caches results', async () => {
     mockIsProviderEnabled.mockImplementation(
       providerId => providerId === 'openai' || providerId === 'anthropic'

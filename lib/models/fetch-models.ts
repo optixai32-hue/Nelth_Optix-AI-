@@ -1,5 +1,6 @@
 import { createGateway } from '@ai-sdk/gateway'
 
+import { DEFAULT_MODEL } from '@/lib/config/default-model'
 import { Model } from '@/lib/types/models'
 import { isProviderEnabled } from '@/lib/utils/registry'
 
@@ -369,6 +370,7 @@ export async function fetchOpenAICompatibleModels(): Promise<Model[]> {
           .split(',')
           .map(id => id.trim())
           .filter(Boolean)
+          .filter(id => !HIDDEN_MODEL_IDS.has(id))
           .map(id => {
             const isKilo = KILO_GATEWAY_MODEL_IDS.has(id)
             return {
@@ -514,16 +516,24 @@ export async function fetchAvailableModels(options?: {
       fetchGatewayModels()
     ])
 
-  const grouped = groupByProvider(
-    dedupeModels([
-      ...openai,
-      ...anthropic,
-      ...google,
-      ...openaiCompatible,
-      ...ollama,
-      ...gateway
-    ])
-  )
+  const fetched = [
+    ...openai,
+    ...anthropic,
+    ...google,
+    ...openaiCompatible,
+    ...ollama,
+    ...gateway
+  ]
+  // The product default (Nelth-3.5) must always be selectable, even when
+  // provider catalogs or static env lists omit it.
+  if (
+    !fetched.some(model => model.id === DEFAULT_MODEL.id) &&
+    isProviderEnabled(DEFAULT_MODEL.providerId)
+  ) {
+    fetched.push({ ...DEFAULT_MODEL })
+  }
+
+  const grouped = groupByProvider(dedupeModels(fetched))
 
   // Keep stable ordering for each provider list.
   const normalized = Object.fromEntries(
