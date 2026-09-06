@@ -17,8 +17,9 @@ function normalizeOpenAICompatibleBaseURL(raw: string): string {
 // Nelth-3.5 (poolside/laguna-s-2.1:free) and Nelth-3.5 Thinking
 // (stepfun/step-3.7-flash:free) are both served from the Kilo AI gateway
 // (https://api.kilo.ai/api/gateway/chat/completions). Nelth-3.5 must run with
-// thinking OFF — we send `chat_template_kwargs.reasoning_effort: "no_think"`
-// inside `extra_body`, matching the gateway's expected request shape.
+// thinking OFF — we send `enable_thinking: false` plus
+// `reasoning_effort: "none"` in `extra_body`, matching the gateway's expected
+// request shape.
 // Nelth-3.5 Thinking stays on the gateway with thinking ON (untouched).
 //
 // NOTE: we never send a reasoning budget — with thinking disabled a reasoning
@@ -184,16 +185,18 @@ const nelthFetch: typeof fetch = async (input, init) => {
           parsed.model.endsWith('/laguna-s-2.1:free'))
       ) {
         // Laguna models served via the Kilo gateway disable thinking
-        // with `enable_thinking: false` sent as a TOP-LEVEL request field (Hunyuan
-        // native OpenAI-compatible contract). Some gateways instead expect it
-        // nested under `chat_template_kwargs` (vLLM/Qwen style), so we send both.
+        // with `enable_thinking: false` sent as a TOP-LEVEL request field.
+        // Some gateways instead expect it nested under `chat_template_kwargs`
+        // (vLLM/Qwen style), so we send both. NOTE: `reasoning_effort` MUST
+        // be "none" — the provider rejects anything else (e.g. "no_think")
+        // with HTTP 400, which used to blank every Nelth-3.5 answer.
         // The SDK flattens `extra_body` into the root before fetch, so a bare
         // `extra_body` key is ignored by the gateway — we mirror the params there
         // too for the Kilo gateway convention, but the root fields are what work.
         const nelthThinkingOff = {
           enable_thinking: false,
           clear_thinking: true,
-          reasoning_effort: 'no_think'
+          reasoning_effort: 'none'
         }
         parsed.enable_thinking = false
         parsed.chat_template_kwargs = {
@@ -209,7 +212,9 @@ const nelthFetch: typeof fetch = async (input, init) => {
           }
         }
         for (const [key, value] of Object.entries(NELTH_NON_THINKING_BODY)) {
-          parsed[key] = value
+          // Defaults only: an explicit caller value (e.g. voice sampling
+          // temperature/top_p) always wins over these.
+          if (parsed[key] === undefined) parsed[key] = value
         }
         init = { ...init, body: JSON.stringify(parsed) }
       }

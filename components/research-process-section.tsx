@@ -103,7 +103,7 @@ export function ResearchProcessSection({
   const baseParts = (partsOverride ?? (message.parts || [])) as MessagePart[]
 
   // Nelth-3.5 (laguna, served from the Kilo gateway) runs with thinking
-  // OFF (reasoning_effort: "no_think"), but we keep this guard so the final
+  // OFF (reasoning_effort: "none"), but we keep this guard so the final
   // answer is shown cleanly if any reasoning block ever leaks through.
   const modelId = (message.metadata as UIMessageMetadata | undefined)?.modelId
   const hideReasoning =
