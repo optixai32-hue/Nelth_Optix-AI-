@@ -55,6 +55,39 @@ describe('fetch-models', () => {
     expect(models.map(model => model.id)).toEqual(['gpt-5-mini', 'o3-mini'])
   })
 
+  it('hides retired models (minimax) from network lists', async () => {
+    mockIsProviderEnabled.mockImplementation(
+      providerId => providerId === 'openai-compatible'
+    )
+    process.env.OPENAI_COMPATIBLE_API_BASE_URL = 'https://api.kilo.ai'
+    process.env.OPENAI_COMPATIBLE_API_KEY = 'test-key'
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        data: [
+          { id: 'minimax/minimax-m3:free' },
+          { id: 'poolside/laguna-s-2.1:free' },
+          { id: 'stepfun/step-3.7-flash:free' }
+        ]
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    try {
+      const models = await fetchModels.fetchOpenAICompatibleModels()
+      const ids = models.map(model => model.id)
+      expect(ids).not.toContain('minimax/minimax-m3:free')
+      expect(ids).toContain('poolside/laguna-s-2.1:free')
+      expect(ids).toContain('stepfun/step-3.7-flash:free')
+    } finally {
+      delete process.env.OPENAI_COMPATIBLE_API_BASE_URL
+      delete process.env.OPENAI_COMPATIBLE_API_KEY
+    }
+  })
+
   it('groups models by provider and caches results', async () => {
     mockIsProviderEnabled.mockImplementation(
       providerId => providerId === 'openai' || providerId === 'anthropic'

@@ -45,6 +45,13 @@ const OPENAI_COMPATIBLE_EXCLUDED_KEYWORDS = [
   'realtime'
 ]
 
+// Models retired from the product: fetched from providers but never shown
+// in the selector and never selectable (stale cookies fall back to default).
+const HIDDEN_MODEL_IDS = new Set([
+  // Replaced by Laguna S 2.1 as Nelth-3.5 (quota-exhausted upstream).
+  'minimax/minimax-m3:free'
+])
+
 // Friendly display names for the static OPENAI_COMPATIBLE_MODELS list. The list
 // only carries raw ids, so map the ones we want to brand explicitly.
 const OPENAI_COMPATIBLE_DISPLAY_NAMES: Record<string, string> = {
@@ -209,6 +216,7 @@ export async function fetchOpenAIModels(): Promise<Model[]> {
         data
           .map(item => String(item?.id ?? ''))
           .filter(Boolean)
+          .filter(id => !HIDDEN_MODEL_IDS.has(id))
         .filter(passesOpenAIFilters)
       .map(id => {
         const isKilo = KILO_GATEWAY_MODEL_IDS.has(id)
@@ -391,6 +399,7 @@ export async function fetchOpenAICompatibleModels(): Promise<Model[]> {
         data
           .map(item => String(item?.id ?? ''))
           .filter(Boolean)
+          .filter(id => !HIDDEN_MODEL_IDS.has(id))
           .filter(passesOpenAICompatibleFilters)
           .map(id => ({
             id,
