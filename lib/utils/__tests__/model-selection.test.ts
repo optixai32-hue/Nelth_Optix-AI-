@@ -148,6 +148,21 @@ describe('selectModel', () => {
     expect(result).toEqual(DEFAULT_MODEL)
   })
 
+  it('rejects retired cookie ids (minimax, laguna-s) and uses DEFAULT_MODEL', async () => {
+    mockIsCloudDeployment.mockReturnValue(false)
+    mockIsProviderEnabled.mockReturnValue(true)
+
+    for (const retired of [
+      'kilo-gateway:minimax/minimax-m3:free',
+      'kilo-gateway:poolside/laguna-s-2.1:free'
+    ]) {
+      const result = await selectModel({
+        cookieStore: createCookieStore(retired)
+      })
+      expect(result).toEqual(DEFAULT_MODEL)
+    }
+  })
+
   it('sets ollama think provider options for thinking models from cookie', async () => {
     mockIsCloudDeployment.mockReturnValue(false)
     mockIsProviderEnabled.mockImplementation(

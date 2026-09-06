@@ -55,6 +55,11 @@ const HIDDEN_MODEL_IDS = new Set([
   'poolside/laguna-s-2.1:free'
 ])
 
+/** True for retired ids: never listed, never selectable, never honored. */
+export function isRetiredModelId(id: string): boolean {
+  return HIDDEN_MODEL_IDS.has(id)
+}
+
 // Friendly display names for the static OPENAI_COMPATIBLE_MODELS list. The list
 // only carries raw ids, so map the ones we want to brand explicitly.
 const OPENAI_COMPATIBLE_DISPLAY_NAMES: Record<string, string> = {

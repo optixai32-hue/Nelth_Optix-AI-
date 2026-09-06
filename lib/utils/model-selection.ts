@@ -7,7 +7,7 @@ import {
   parseModelSelectionCookie
 } from '@/lib/config/model-selection-cookie'
 import { getModelForMode } from '@/lib/config/model-types'
-import { fetchAvailableModels } from '@/lib/models/fetch-models'
+import { fetchAvailableModels, isRetiredModelId } from '@/lib/models/fetch-models'
 import { Model } from '@/lib/types/models'
 import { SearchMode } from '@/lib/types/search'
 import { isProviderEnabled } from '@/lib/utils/registry'
@@ -118,6 +118,12 @@ export async function selectModel({
         if (!isProviderEnabled(parsedCookie.providerId)) {
           console.warn(
             `[ModelSelection] Saved model provider "${parsedCookie.providerId}" is not enabled.`
+          )
+        } else if (isRetiredModelId(parsedCookie.modelId)) {
+          // Retired ids (minimax, laguna-s) must never come back through a
+          // stale selection cookie — fall through to the default below.
+          console.warn(
+            `[ModelSelection] Saved model "${parsedCookie.modelId}" is retired; using default.`
           )
         } else {
           return buildLocalCookieModel(
