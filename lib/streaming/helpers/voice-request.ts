@@ -8,16 +8,26 @@
  *     travels inside the message itself and therefore cannot be dropped by
  *     any transport wrapper.
  *
- * The marker part is stripped here so it is never persisted, never shown to
- * the model, and never leaks into later turns. Exported for unit testing.
+ * The marker part is stripped from the current message AND from the whole
+ * `messages` history (the client keeps it in memory) so it is never
+ * persisted, never shown to any model, and never leaks into later turns —
+ * in ANY trigger (submit, regenerate, reload). Exported for unit testing.
  */
 export function detectVoiceRequest(body: {
   voiceMode?: unknown
   message?: { parts?: unknown }
+  messages?: Array<{ parts?: unknown }>
 }): boolean {
   if (!body || typeof body !== 'object') return false
-  if ((body as { voiceMode?: unknown }).voiceMode === true) return true
-  const parts = (body as { message?: { parts?: unknown } }).message?.parts
+  let found = body.voiceMode === true
+  if (stripVoiceMarker(body.message?.parts)) found = true
+  for (const m of body.messages ?? []) {
+    stripVoiceMarker(m?.parts)
+  }
+  return found
+}
+
+function stripVoiceMarker(parts: unknown): boolean {
   if (!Array.isArray(parts)) return false
   const idx = parts.findIndex(
     (p: unknown) =>

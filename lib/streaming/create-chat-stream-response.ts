@@ -61,6 +61,10 @@ import {
   convertDataPart,
   mapFilePartsToDataParts
 } from './helpers/convert-data-part'
+import {
+  emptyResponseText,
+  shouldInjectEmptyFallback
+} from './helpers/empty-response'
 import { normalizeConversationHistory } from './helpers/normalize-conversation'
 import { persistStreamResults } from './helpers/persist-stream-results'
 import { prepareMessages } from './helpers/prepare-messages'
@@ -553,6 +557,7 @@ export async function createChatStreamResponse(
       // emitted by the agent stream) must NOT replace the delivered answer
       // with "We could not generate a response".
       let wroteContent = false
+      let wroteToolPart = false
       let writtenPartCount = 0
 
       const stream = createUIMessageStream({
@@ -582,6 +587,30 @@ export async function createChatStreamResponse(
                     type: 'text-delta',
                     id: 'txt-0',
                     delta: remaining
+                  } as unknown as Parameters<typeof writer.write>[0])
+                  wroteContent = true
+                  writtenPartCount++
+                }
+                // Silent-empty guard: the weak model sometimes answers with
+                // ONLY fake <tool_call> XML, which the sanitizer strips down
+                // to nothing — no text, no tool parts, no error. The client
+                // would render a blank bubble with no Retry. Inject an honest
+                // fallback line instead (localized, counted as content so a
+                // trailing stream error stays suppressed).
+                if (
+                  shouldInjectEmptyFallback({
+                    wroteContent,
+                    wroteToolPart,
+                    aborted: abortSignal?.aborted === true
+                  })
+                ) {
+                  console.error(
+                    '[Stream] silent-empty response — injecting fallback text'
+                  )
+                  writer.write({
+                    type: 'text-delta',
+                    id: 'txt-0',
+                    delta: emptyResponseText(conversationLanguage?.lang)
                   } as unknown as Parameters<typeof writer.write>[0])
                   wroteContent = true
                   writtenPartCount++
@@ -624,6 +653,7 @@ export async function createChatStreamResponse(
                     >[0]
                   )
                   writtenPartCount += 2
+                  wroteToolPart = true
                 }
                 // Same treatment for preloaded connector calls: emit the
                 // synthetic tool-gmail / tool-drive / … parts first so the
@@ -639,6 +669,7 @@ export async function createChatStreamResponse(
                     )
                     writtenPartCount++
                   }
+                  wroteToolPart = true
                 }
                 continue
               }
@@ -695,6 +726,13 @@ export async function createChatStreamResponse(
                 part.type === 'text'
               ) {
                 wroteContent = true
+              }
+              if (
+                part &&
+                typeof part.type === 'string' &&
+                part.type.startsWith('tool-')
+              ) {
+                wroteToolPart = true
               }
             }
           } catch (streamErr) {

@@ -32,4 +32,24 @@ describe('detectVoiceRequest', () => {
     expect(detectVoiceRequest({})).toBe(false)
     expect(detectVoiceRequest(null as never)).toBe(false)
   })
+
+  it('strips markers hiding in the history array too', () => {
+    const body = {
+      message: { parts: [{ type: 'text', text: 'suite ?' }] },
+      messages: [
+        { parts: [{ type: 'text', text: 'bonjour' }] },
+        {
+          parts: [
+            { type: 'text', text: 'résume mes mails' },
+            { type: 'data-voiceMode', data: { voice: true } }
+          ]
+        }
+      ]
+    }
+    // No flag on THIS turn (plain follow-up) — but the stale marker must go.
+    expect(detectVoiceRequest(body)).toBe(false)
+    expect(body.messages[1].parts).toEqual([
+      { type: 'text', text: 'résume mes mails' }
+    ])
+  })
 })
