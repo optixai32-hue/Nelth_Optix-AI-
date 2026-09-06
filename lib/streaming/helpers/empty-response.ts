@@ -16,6 +16,27 @@ export function shouldInjectEmptyFallback(args: {
   return !args.aborted && !args.wroteContent && !args.wroteToolPart
 }
 
+/**
+ * Internal-retry gate: when an attempt streamed nothing at all (no text,
+ * no tool parts — so no side effect could have run), the pipeline replays
+ * the agent stream instead of giving up immediately. Bounded by the caller.
+ * Exported for unit testing.
+ */
+export function shouldRetryEmptyAttempt(args: {
+  hasContent: boolean
+  hasTools: boolean
+  attempt: number
+  maxAttempts: number
+  aborted: boolean
+}): boolean {
+  return (
+    !args.aborted &&
+    !args.hasContent &&
+    !args.hasTools &&
+    args.attempt < args.maxAttempts
+  )
+}
+
 export function emptyResponseText(lang: string | null | undefined): string {
   return lang === 'en'
     ? 'Sorry, I could not generate a response. Please try again.'

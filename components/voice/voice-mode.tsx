@@ -13,7 +13,6 @@ import { getTextFromParts } from '@/lib/utils/message-utils'
 import { useI18n } from '../i18n-provider'
 
 import { useVoiceRecognition } from './use-voice-recognition'
-import { useVoiceTts } from './use-voice-tts'
 
 const EXIT_MS = 240
 
@@ -31,7 +30,6 @@ type VoicePhase =
   | 'listening'
   | 'transcribing'
   | 'thinking'
-  | 'speaking'
   | 'error'
 
 function lastAssistantText(messages: UIMessage[]): string {
@@ -50,12 +48,14 @@ function lastAssistantText(messages: UIMessage[]): string {
 }
 
 /**
- * Full-screen voice takeover: Orb + continuous listen → chat → speak loop.
+ * Full-screen voice takeover (UI only — no voice backend): Orb + continuous
+ * listen → normal chat turns. The transcript submits as plain user text and
+ * the answer displays in the chat thread.
  *
- * - One recognition session per opening (no restart = no repeated beep,
- *   including Android where the OS beep is unsuppressible).
- * - Mic is muted (not stopped) while the AI thinks/speaks: no TTS echo,
- *   no session restart.
+ * - One recording session per opening (MediaRecorder: no system beep on any
+ *   device, including Android).
+ * - The recorder stays stopped while the AI thinks (no echo transcribed);
+ *   a fresh cycle opens on unmute.
  * - X stops everything, plays the leave animation, then unmounts.
  */
 export function VoiceMode({
@@ -75,11 +75,9 @@ export function VoiceMode({
 
   const closingRef = useRef(false)
   const awaitingReplyRef = useRef(false)
-  const spokenForRef = useRef('')
+  const seenReplyRef = useRef('')
   const phaseRef = useRef<VoicePhase>('idle')
   phaseRef.current = phase
-
-  const { speak, stop: stopTts } = useVoiceTts(locale)
 
   const close = useCallback(() => {
     if (closingRef.current) return
@@ -105,7 +103,7 @@ export function VoiceMode({
     setInterim('')
     setCaption(text)
     awaitingReplyRef.current = true
-    spokenForRef.current = ''
+    seenReplyRef.current = ''
     setPhase('thinking')
     rec.setMuted(true)
     onSubmitText(text)
@@ -148,7 +146,6 @@ export function VoiceMode({
     rec.start()
     return () => {
       rec.stop()
-      stopTts()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -163,8 +160,8 @@ export function VoiceMode({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // When the chat finishes answering our voice turn, speak the reply aloud,
-  // then reopen the mic for the next turn.
+  // When the chat finishes answering our voice turn, show the reply and
+  // reopen the mic for the next turn.
   const replyText = useMemo(
     () => (awaitingReplyRef.current ? lastAssistantText(messages) : ''),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -173,19 +170,14 @@ export function VoiceMode({
 
   useEffect(() => {
     if (closingRef.current || !awaitingReplyRef.current) return
-    if (status !== 'ready' || !replyText || spokenForRef.current === replyText)
+    if (status !== 'ready' || !replyText || seenReplyRef.current === replyText)
       return
-    spokenForRef.current = replyText
+    seenReplyRef.current = replyText
     awaitingReplyRef.current = false
-    setPhase('speaking')
+    setPhase('listening')
     setCaption(replyText)
-    void (async () => {
-      await speak(replyText)
-      if (closingRef.current) return
-      rec.setMuted(false)
-      setInterim('')
-      setPhase('listening')
-    })()
+    rec.setMuted(false)
+    setInterim('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replyText, status])
 
@@ -199,9 +191,8 @@ export function VoiceMode({
 
   const handleClose = useCallback(() => {
     rec.stop()
-    stopTts()
     close()
-  }, [rec, stopTts, close])
+  }, [rec, close])
 
   const orbState: OrbState =
     phase === 'connecting'
@@ -210,22 +201,18 @@ export function VoiceMode({
         ? 'listening'
         : phase === 'thinking'
           ? 'thinking'
-          : phase === 'speaking'
-            ? 'speaking'
-            : phase === 'error'
-              ? 'error'
-              : 'idle'
+          : phase === 'error'
+            ? 'error'
+            : 'idle'
 
   const orbVolume =
     phase === 'listening'
       ? Math.max(0.08, micLevel)
-      : phase === 'speaking'
-        ? 0.55
-        : phase === 'thinking' ||
-            phase === 'connecting' ||
-            phase === 'transcribing'
-          ? 0.3
-          : 0
+      : phase === 'thinking' ||
+          phase === 'connecting' ||
+          phase === 'transcribing'
+        ? 0.3
+        : 0
 
   return (
     <div
@@ -284,9 +271,7 @@ export function VoiceMode({
                       ? t('voice.startingHint')
                       : phase === 'thinking'
                         ? t('voice.thinkingHint')
-                        : phase === 'speaking'
-                          ? t('voice.speakingHint')
-                          : t('voice.startingHint'))}
+                        : t('voice.startingHint'))}
             </p>
           </>
         )}

@@ -10,10 +10,6 @@ import {
 
 import { researcher } from '@/lib/agents/researcher'
 import {
-  createVoiceAgent,
-  VOICE_MAX_OUTPUT_TOKENS
-} from '@/lib/agents/voice-agent'
-import {
   type ConnectorPreloadCall,
   detectConnectorIntent,
   isConnectorFollowUp
@@ -29,7 +25,8 @@ import {
 import { detectRequestCapabilities } from '@/lib/skills/capability-detection'
 import {
   type AttachmentLike,
-  extractAttachmentFormats} from '@/lib/skills/document-runtime'
+  extractAttachmentFormats
+} from '@/lib/skills/document-runtime'
 import {
   enforceSkillOutput,
   stripEmojiFromCodeInMessage
@@ -63,14 +60,14 @@ import {
 } from './helpers/convert-data-part'
 import {
   emptyResponseText,
-  shouldInjectEmptyFallback
+  shouldInjectEmptyFallback,
+  shouldRetryEmptyAttempt
 } from './helpers/empty-response'
 import { normalizeConversationHistory } from './helpers/normalize-conversation'
 import { persistStreamResults } from './helpers/persist-stream-results'
 import { prepareMessages } from './helpers/prepare-messages'
 import { stripSpecFromMessages } from './helpers/strip-spec-from-messages'
 import type { StreamContext } from './helpers/types'
-import { toVoiceHistory } from './helpers/voice-history'
 import { BaseStreamConfig } from './types'
 
 import { langfuseSpanProcessor } from '@/instrumentation'
@@ -120,8 +117,7 @@ export async function createChatStreamResponse(
     messageId,
     abortSignal,
     isNewChat,
-    searchMode,
-    voiceMode
+    searchMode
   } = config
 
   // Verify that chatId is provided
@@ -229,13 +225,8 @@ export async function createChatStreamResponse(
       // it (e.g. an uploaded document). Everything else (greetings, simple chat,
       // translations, plain explanations) skips skill loading and the research
       // agent entirely.
-      // Voice mode bypasses the whole research pipeline (long system
-      // prompt, skill router, tools, web/connector preloads) — the voice
-      // agent answers from its own tiny system prompt. Nothing below this
-      // flag affects normal turns.
       const skillNeeded =
-        !voiceMode &&
-        (caps.candidateSkillSlugs.length > 0 || attachmentFormats.length > 0)
+        caps.candidateSkillSlugs.length > 0 || attachmentFormats.length > 0
 
       // Detect an uploaded image in the current user message BEFORE the `trivial`
       // gate below. The generateImage tool needs it to force the image-to-image
@@ -285,12 +276,14 @@ export async function createChatStreamResponse(
         hasVault &&
         isConnectorFollowUp(userQuery ?? '', initialChat?.messages)
       const connectorIntent = rawConnectorIntent || connectorFollowUp
-      const connectorDataIntent = connectorIntent && hasVault && !voiceMode
+      const connectorDataIntent = connectorIntent && hasVault
       const shouldPreloadSearch =
-        Boolean(caps.needsSearch) && !connectorDataIntent && !voiceMode
+        Boolean(caps.needsSearch) && !connectorDataIntent
       let preloadedSearchContext: string | undefined
       let preloadedSearchQuery: string | undefined
-      let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
+      let searchResultsForCitation:
+        | Awaited<ReturnType<typeof runWebSearch>>
+        | undefined
       if (shouldPreloadSearch) {
         const effectiveSearchQuery = resolveContextualSearchQuery(
           userQuery,
@@ -374,10 +367,9 @@ export async function createChatStreamResponse(
 
       // Assemble the skill context string only when a skill was loaded
       // (LEVEL 2 full SKILL.md). Empty otherwise → the model streams immediately.
-      const skillContext =
-        skillCtx?.operationalPrompt
-          ? `${skillCtx.context}\n\n${skillCtx.operationalPrompt}`
-          : skillCtx?.context ?? ''
+      const skillContext = skillCtx?.operationalPrompt
+        ? `${skillCtx.context}\n\n${skillCtx.operationalPrompt}`
+        : (skillCtx?.context ?? '')
 
       // Active conversation language (persisted preference from history or
       // current request): injected near the top of the system instructions
@@ -395,11 +387,9 @@ export async function createChatStreamResponse(
       // Voice mode: isolated minimal agent (tiny voice-only system prompt,
       // zero tools, hard token cap). The researcher — long prompt, skills,
       // tools, preloads — is never constructed for voice turns.
-      const researchAgent = voiceMode
-        ? createVoiceAgent({
-            conversationLanguage
-          })
-        : await researcher({
+      // Get the researcher agent with search mode. `imageAttachment` / `needsImageEff`
+      // are already resolved above, before the `trivial` gate.
+      const researchAgent = await researcher({
         model: context.modelId,
         modelConfig: model,
         searchMode,
@@ -413,9 +403,7 @@ export async function createChatStreamResponse(
         connectorCallsSink: connectorPreloadCalls,
         // A connector follow-up ("et demain ?") looks trivial to the
         // capability gate but needs the data path — don't let it disarm.
-        connectorIntentOverride: connectorFollowUp
-          ? true
-          : undefined,
+        connectorIntentOverride: connectorFollowUp ? true : undefined,
         capabilities: {
           trivial: trivial && !connectorFollowUp,
           needsSearch: caps.needsSearch && !preloadedSearchContext,
@@ -425,14 +413,9 @@ export async function createChatStreamResponse(
       })
 
       const messagesWithoutSpec = stripSpecFromMessages(messagesToModel)
-      // Voice turns carry text-only recent history: the voice agent owns no
-      // tools, so replaying tool/file/data parts would be dead weight.
-      const messagesToConvert = voiceMode
-        ? toVoiceHistory(messagesWithoutSpec)
-        : compactHistoricalMessages(messagesWithoutSpec)
-      const messagesWithoutFileParts = mapFilePartsToDataParts(
-        messagesToConvert
-      )
+      const messagesToConvert = compactHistoricalMessages(messagesWithoutSpec)
+      const messagesWithoutFileParts =
+        mapFilePartsToDataParts(messagesToConvert)
 
       // Convert to model messages and apply context window management
       let modelMessages = await convertToModelMessages(
@@ -471,18 +454,9 @@ export async function createChatStreamResponse(
       perfLog(
         `researchAgent.stream - Start: model=${context.modelId}, searchMode=${searchMode}`
       )
-      const result = await researchAgent.stream({
+      const agentStreamOpts: Parameters<typeof researchAgent.stream>[0] = {
         messages: modelMessages,
         abortSignal,
-        // Voice turns get a hard output cap + speech-friendly sampling
-        // (spoken answers must stay short). Normal turns are unaffected.
-        ...(voiceMode
-          ? {
-              maxOutputTokens: VOICE_MAX_OUTPUT_TOKENS,
-              temperature: 1,
-              topP: 0.95
-            }
-          : {}),
         experimental_transform: smoothStream({ chunking: 'word' }),
         ...(isUsageLogging() && {
           onStepFinish: step => {
@@ -493,7 +467,8 @@ export async function createChatStreamResponse(
             )
           }
         })
-      })
+      }
+      const result = await researchAgent.stream(agentStreamOpts)
       perfTime('[TTFT] model request sent (T4)', llmStart)
       // Log the session-total usage once the stream settles (does not block the
       // response; the reader below drives the agent stream to completion).
@@ -563,177 +538,236 @@ export async function createChatStreamResponse(
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
           try {
-            const reader = (
-              agentStream as unknown as ReadableStream<unknown>
-            ).getReader()
             let searchChunksEmitted = false
             let connectorChunksEmitted = false
-            // Mid-conversation: strip any leading greeting-reset intro fluff
-            // ("Salut ! ... Je suis Nelth-IA ...") the weak model prepends to
-            // every answer. No prior assistant message = keep greetings.
-            const textSanitizer = new StreamTextSanitizer({
-              stripLeadingIntroReset: modelMessages.some(
-                m => m.role === 'assistant'
-              ),
-              userQuery
-            })
+            const makeSanitizer = () =>
+              // Mid-conversation: strip any leading greeting-reset intro fluff
+              // ("Salut ! ... Je suis Nelth-IA ...") the weak model prepends to
+              // every answer. No prior assistant message = keep greetings.
+              // Fresh per attempt: attempt 1 state must not leak into a retry.
+              new StreamTextSanitizer({
+                stripLeadingIntroReset: modelMessages.some(
+                  m => m.role === 'assistant'
+                ),
+                userQuery
+              })
 
-            while (true) {
-              const { done, value } = await reader.read()
-              if (done) {
-                const remaining = textSanitizer.flush()
-                if (remaining) {
-                  writer.write({
-                    type: 'text-delta',
-                    id: 'txt-0',
-                    delta: remaining
-                  } as unknown as Parameters<typeof writer.write>[0])
-                  wroteContent = true
-                  writtenPartCount++
+            // Pumps ONE agent stream into the client writer. Per-attempt
+            // outcome feeds the internal-retry driver below; the shared
+            // wroteContent/wroteToolPart/writtenPartCount accumulate across
+            // attempts for the onError gate and the empty fallback.
+            const pumpAttempt = async (
+              attemptReader: ReadableStreamDefaultReader<unknown>,
+              sanitizer: StreamTextSanitizer,
+              attempt: number
+            ): Promise<{ content: boolean; tools: boolean }> => {
+              let attemptContent = false
+              let attemptTools = false
+              const markContent = () => {
+                attemptContent = true
+                wroteContent = true
+              }
+              const markTools = () => {
+                attemptTools = true
+                wroteToolPart = true
+              }
+
+              while (true) {
+                const { done, value } = await attemptReader.read()
+                if (done) {
+                  const remaining = sanitizer.flush()
+                  if (remaining) {
+                    writer.write({
+                      type: 'text-delta',
+                      id: 'txt-0',
+                      delta: remaining
+                    } as unknown as Parameters<typeof writer.write>[0])
+                    markContent()
+                    writtenPartCount++
+                  }
+                  return { content: attemptContent, tools: attemptTools }
                 }
-                // Silent-empty guard: the weak model sometimes answers with
-                // ONLY fake <tool_call> XML, which the sanitizer strips down
-                // to nothing — no text, no tool parts, no error. The client
-                // would render a blank bubble with no Retry. Inject an honest
-                // fallback line instead (localized, counted as content so a
-                // trailing stream error stays suppressed).
+                const part = value as
+                  | { type?: string; delta?: string; id?: string }
+                  | undefined
+
+                // Pass stream start through first, then immediately emit the preloaded
+                // search results so the client renders the search card and sources
+                // before text generation begins
                 if (
-                  shouldInjectEmptyFallback({
-                    wroteContent,
-                    wroteToolPart,
-                    aborted: abortSignal?.aborted === true
-                  })
+                  part &&
+                  typeof part.type === 'string' &&
+                  (part.type === 'start' || part.type === 'start-step')
+                ) {
+                  // Retry attempts reuse the already-open client stream: never
+                  // re-emit start chunks (the emit-once flags below already
+                  // guard the synthetic parts against duplicates).
+                  if (attempt === 1) {
+                    writer.write(
+                      value as unknown as Parameters<typeof writer.write>[0]
+                    )
+                    writtenPartCount++
+                  }
+
+                  if (
+                    !searchChunksEmitted &&
+                    searchResultsForCitation &&
+                    (searchResultsForCitation.results.length > 0 ||
+                      searchResultsForCitation.images.length > 0 ||
+                      (searchResultsForCitation.videos?.length ?? 0) > 0)
+                  ) {
+                    searchChunksEmitted = true
+                    writer.write(
+                      syntheticSearchInputChunk as unknown as Parameters<
+                        typeof writer.write
+                      >[0]
+                    )
+                    writer.write(
+                      syntheticSearchOutputChunk as unknown as Parameters<
+                        typeof writer.write
+                      >[0]
+                    )
+                    writtenPartCount += 2
+                    markTools()
+                  }
+                  // Same treatment for preloaded connector calls: emit the
+                  // synthetic tool-gmail / tool-drive / … parts first so the
+                  // client renders the connector activity + results live.
+                  if (
+                    !connectorChunksEmitted &&
+                    syntheticConnectorChunks.length > 0
+                  ) {
+                    connectorChunksEmitted = true
+                    for (const chunk of syntheticConnectorChunks) {
+                      writer.write(
+                        chunk as unknown as Parameters<typeof writer.write>[0]
+                      )
+                      writtenPartCount++
+                    }
+                    markTools()
+                  }
+                  continue
+                }
+
+                if (
+                  isNonThinkingModel &&
+                  part &&
+                  typeof part.type === 'string' &&
+                  part.type.includes('reasoning')
+                ) {
+                  continue
+                }
+
+                // Real-time filtering of fake XML tool-call text leaks
+                if (
+                  part &&
+                  part.type === 'text-delta' &&
+                  typeof part.delta === 'string'
+                ) {
+                  const cleanDelta = sanitizer.process(part.delta)
+                  if (cleanDelta) {
+                    writer.write({
+                      ...part,
+                      delta: cleanDelta
+                    } as unknown as Parameters<typeof writer.write>[0])
+                    writtenPartCount++
+                    markContent()
+                  }
+                  continue
+                }
+
+                // Skip error parts emitted by the agent stream — they would
+                // otherwise be written to the client and rendered as
+                // "We could not generate a response" even when real answer
+                // content was already delivered.
+                if (
+                  part &&
+                  typeof part.type === 'string' &&
+                  (part.type === 'error' || part.type.endsWith('-error'))
                 ) {
                   console.error(
-                    '[Stream] silent-empty response — injecting fallback text'
+                    '[Stream] skipping error part from agent stream:',
+                    part
                   )
-                  writer.write({
-                    type: 'text-delta',
-                    id: 'txt-0',
-                    delta: emptyResponseText(conversationLanguage?.lang)
-                  } as unknown as Parameters<typeof writer.write>[0])
-                  wroteContent = true
-                  writtenPartCount++
+                  continue
                 }
-                break
-              }
-              const part = value as
-                | { type?: string; delta?: string; id?: string }
-                | undefined
-
-              // Pass stream start through first, then immediately emit the preloaded
-              // search results so the client renders the search card and sources
-              // before text generation begins
-              if (
-                part &&
-                typeof part.type === 'string' &&
-                (part.type === 'start' || part.type === 'start-step')
-              ) {
                 writer.write(
                   value as unknown as Parameters<typeof writer.write>[0]
                 )
                 writtenPartCount++
-
                 if (
-                  !searchChunksEmitted &&
-                  searchResultsForCitation &&
-                  (searchResultsForCitation.results.length > 0 ||
-                    searchResultsForCitation.images.length > 0 ||
-                    (searchResultsForCitation.videos?.length ?? 0) > 0)
+                  part &&
+                  typeof part.type === 'string' &&
+                  part.type === 'text'
                 ) {
-                  searchChunksEmitted = true
-                  writer.write(
-                    syntheticSearchInputChunk as unknown as Parameters<
-                      typeof writer.write
-                    >[0]
-                  )
-                  writer.write(
-                    syntheticSearchOutputChunk as unknown as Parameters<
-                      typeof writer.write
-                    >[0]
-                  )
-                  writtenPartCount += 2
-                  wroteToolPart = true
+                  markContent()
                 }
-                // Same treatment for preloaded connector calls: emit the
-                // synthetic tool-gmail / tool-drive / … parts first so the
-                // client renders the connector activity + results live.
                 if (
-                  !connectorChunksEmitted &&
-                  syntheticConnectorChunks.length > 0
+                  part &&
+                  typeof part.type === 'string' &&
+                  part.type.startsWith('tool-')
                 ) {
-                  connectorChunksEmitted = true
-                  for (const chunk of syntheticConnectorChunks) {
-                    writer.write(
-                      chunk as unknown as Parameters<typeof writer.write>[0]
-                    )
-                    writtenPartCount++
-                  }
-                  wroteToolPart = true
+                  markTools()
                 }
-                continue
               }
+            }
 
-              if (
-                isNonThinkingModel &&
-                part &&
-                typeof part.type === 'string' &&
-                part.type.includes('reasoning')
-              ) {
-                continue
-              }
-
-              // Real-time filtering of fake XML tool-call text leaks
-              if (
-                part &&
-                part.type === 'text-delta' &&
-                typeof part.delta === 'string'
-              ) {
-                const cleanDelta = textSanitizer.process(part.delta)
-                if (cleanDelta) {
-                  writer.write({
-                    ...part,
-                    delta: cleanDelta
-                  } as unknown as Parameters<typeof writer.write>[0])
-                  writtenPartCount++
-                  wroteContent = true
-                }
-                continue
-              }
-
-              // Skip error parts emitted by the agent stream — they would
-              // otherwise be written to the client and rendered as
-              // "We could not generate a response" even when real answer
-              // content was already delivered.
-              if (
-                part &&
-                typeof part.type === 'string' &&
-                (part.type === 'error' || part.type.endsWith('-error'))
-              ) {
-                console.error(
-                  '[Stream] skipping error part from agent stream:',
-                  part
-                )
-                continue
-              }
-              writer.write(
-                value as unknown as Parameters<typeof writer.write>[0]
+            // Internal-retry driver: a fully silent attempt (no text, no tool
+            // parts — hence no side effect could have run) is replayed from a
+            // fresh agent stream instead of surfacing a blank bubble. Bounded
+            // at MAX_STREAM_ATTEMPTS total attempts.
+            const MAX_STREAM_ATTEMPTS = 2
+            let currentStream = agentStream
+            for (let attempt = 1; ; attempt++) {
+              const outcome = await pumpAttempt(
+                (
+                  currentStream as unknown as ReadableStream<unknown>
+                ).getReader(),
+                makeSanitizer(),
+                attempt
               )
+              if (
+                !shouldRetryEmptyAttempt({
+                  hasContent: outcome.content,
+                  hasTools: outcome.tools,
+                  attempt,
+                  maxAttempts: MAX_STREAM_ATTEMPTS,
+                  aborted: abortSignal?.aborted === true
+                })
+              ) {
+                break
+              }
+              console.warn(
+                `[Stream] silent-empty attempt ${attempt} — internal retry`
+              )
+              currentStream = (
+                await researchAgent.stream(agentStreamOpts)
+              ).toUIMessageStream()
+            }
+
+            // Silent-empty guard: the weak model sometimes answers with ONLY
+            // fake <tool_call> XML, which the sanitizer strips down to
+            // nothing — no text, no tool parts, no error. The client would
+            // render a blank bubble with no Retry. Inject an honest fallback
+            // line instead (localized, counted as content so a trailing
+            // stream error stays suppressed).
+            if (
+              shouldInjectEmptyFallback({
+                wroteContent,
+                wroteToolPart,
+                aborted: abortSignal?.aborted === true
+              })
+            ) {
+              console.error(
+                '[Stream] silent-empty response — injecting fallback text'
+              )
+              writer.write({
+                type: 'text-delta',
+                id: 'txt-0',
+                delta: emptyResponseText(conversationLanguage?.lang)
+              } as unknown as Parameters<typeof writer.write>[0])
+              wroteContent = true
               writtenPartCount++
-              if (
-                part &&
-                typeof part.type === 'string' &&
-                part.type === 'text'
-              ) {
-                wroteContent = true
-              }
-              if (
-                part &&
-                typeof part.type === 'string' &&
-                part.type.startsWith('tool-')
-              ) {
-                wroteToolPart = true
-              }
             }
           } catch (streamErr) {
             console.error(
@@ -857,7 +891,10 @@ export async function createChatStreamResponse(
                     modelMessages
                   })
                 } catch (enfErr) {
-                  console.error('Skill enforcement error (kept original):', enfErr)
+                  console.error(
+                    'Skill enforcement error (kept original):',
+                    enfErr
+                  )
                 }
               }
 

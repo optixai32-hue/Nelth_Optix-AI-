@@ -33,8 +33,6 @@ export type UIDataTypes = {
   quotedContext?: { text: string }
   noteContext?: { title?: string; text: string }
   sourceUrl?: { url: string }
-  // Voice-mode marker part (stripped server-side, never persisted).
-  voiceMode?: { voice: boolean }
 }
 
 // Create todo tools instance for type inference

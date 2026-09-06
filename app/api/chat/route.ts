@@ -18,7 +18,6 @@ import {
 } from '@/lib/search-mode-availability'
 import { createChatStreamResponse } from '@/lib/streaming/create-chat-stream-response'
 import { createEphemeralChatStreamResponse } from '@/lib/streaming/create-ephemeral-chat-stream-response'
-import { detectVoiceRequest } from '@/lib/streaming/helpers/voice-request'
 import { SearchMode } from '@/lib/types/search'
 import { getTextFromParts } from '@/lib/utils/message-utils'
 import { selectModel } from '@/lib/utils/model-selection'
@@ -41,9 +40,6 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { message, messages, chatId, trigger, messageId, isNewChat } = body
     const analyticsId: unknown = body.analyticsId
-    // Voice-mode turns (flagged per-request by the voice UI) take an
-    // isolated minimal path server-side. Absent = normal chat, untouched.
-    const voiceMode = detectVoiceRequest(body)
 
     // Normalize the message id up front so persistence and analytics agree on it.
     if (message && !message.id) {
@@ -198,8 +194,7 @@ export async function POST(req: Request) {
           messageId,
           abortSignal,
           isNewChat,
-          searchMode,
-          voiceMode
+          searchMode
         })
 
     perfTime('createChatStreamResponse resolved', streamStart)
