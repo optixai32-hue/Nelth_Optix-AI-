@@ -14,7 +14,7 @@ function normalizeOpenAICompatibleBaseURL(raw: string): string {
   return raw.replace(/\/+$/, '').replace(/\/v1$/, '') + '/v1'
 }
 
-// Nelth-3.5 (poolside/laguna-s-2.1:free) and Nelth-3.5 Thinking
+// Nelth-3.5 (poolside/laguna-xs-2.1:free) and Nelth-3.5 Thinking
 // (stepfun/step-3.7-flash:free) are both served from the Kilo AI gateway
 // (https://api.kilo.ai/api/gateway/chat/completions). Nelth-3.5 must run with
 // thinking OFF — we send `enable_thinking: false` plus
@@ -26,7 +26,7 @@ function normalizeOpenAICompatibleBaseURL(raw: string): string {
 // budget is contradictory. Skills are applied via the prompt layer
 // (researcher.ts), which instructs the model to output the COMPLETE artifact
 // directly (no separate "design brief").
-const NELTH_NON_THINKING_MODELS = new Set(['poolside/laguna-s-2.1:free'])
+const NELTH_NON_THINKING_MODELS = new Set(['poolside/laguna-xs-2.1:free'])
 
 /**
  * Single shared weak-model gate. Accepts exact ids as well as
@@ -39,7 +39,7 @@ export function isNonThinkingModelId(
 ): boolean {
   if (!modelId) return false
   if (NELTH_NON_THINKING_MODELS.has(modelId)) return true
-  return modelId.includes('laguna-s-2.1:free')
+  return modelId.includes('laguna-xs-2.1:free')
 }
 
 const NELTH_NON_THINKING_BODY = {
@@ -182,7 +182,7 @@ const nelthFetch: typeof fetch = async (input, init) => {
       if (
         typeof parsed?.model === 'string' &&
         (NELTH_NON_THINKING_MODELS.has(parsed.model) ||
-          parsed.model.endsWith('/laguna-s-2.1:free'))
+          parsed.model.endsWith('/laguna-xs-2.1:free'))
       ) {
         // Laguna models served via the Kilo gateway disable thinking
         // with `enable_thinking: false` sent as a TOP-LEVEL request field.

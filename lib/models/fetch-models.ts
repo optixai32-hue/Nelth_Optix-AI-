@@ -49,15 +49,17 @@ const OPENAI_COMPATIBLE_EXCLUDED_KEYWORDS = [
 // Models retired from the product: fetched from providers but never shown
 // in the selector and never selectable (stale cookies fall back to default).
 const HIDDEN_MODEL_IDS = new Set([
-  // Replaced by Laguna S 2.1 as Nelth-3.5 (quota-exhausted upstream).
-  'minimax/minimax-m3:free'
+  // Replaced by Laguna XS 2.1 as Nelth-3.5 (quota-exhausted upstream).
+  'minimax/minimax-m3:free',
+  // Replaced by Laguna XS 2.1 (faster sibling).
+  'poolside/laguna-s-2.1:free'
 ])
 
 // Friendly display names for the static OPENAI_COMPATIBLE_MODELS list. The list
 // only carries raw ids, so map the ones we want to brand explicitly.
 const OPENAI_COMPATIBLE_DISPLAY_NAMES: Record<string, string> = {
   'stepfun/step-3.7-flash:free': 'Nelth-3.5 Thinking',
-  'poolside/laguna-s-2.1:free': 'Nelth-3.5'
+  'poolside/laguna-xs-2.1:free': 'Nelth-3.5'
 }
 
 // Models served by the Kilo AI gateway rather than the default
@@ -66,7 +68,7 @@ const OPENAI_COMPATIBLE_DISPLAY_NAMES: Record<string, string> = {
 // (stepfun/step-3.7-flash:free) do not hit NVIDIA.
 const KILO_GATEWAY_MODEL_IDS = new Set([
   'stepfun/step-3.7-flash:free',
-  'poolside/laguna-s-2.1:free'
+  'poolside/laguna-xs-2.1:free'
 ])
 
 let modelsCache:

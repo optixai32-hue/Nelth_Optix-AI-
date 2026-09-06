@@ -107,7 +107,7 @@ export function ResearchProcessSection({
   // answer is shown cleanly if any reasoning block ever leaks through.
   const modelId = (message.metadata as UIMessageMetadata | undefined)?.modelId
   const hideReasoning =
-    typeof modelId === 'string' && modelId.includes('laguna-s-2.1:free')
+    typeof modelId === 'string' && modelId.includes('laguna-xs-2.1:free')
 
   const allParts = hideReasoning
     ? baseParts.filter(p => !isReasoningPart(p))
