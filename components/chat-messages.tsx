@@ -38,7 +38,7 @@ interface ChatMessagesProps {
   reload?: (messageId: string) => Promise<void | string | null | undefined>
   error?: Error | string | null | undefined
   onQuoteContext?: (text: string) => void
-  /** The model selection cookie value (e.g. "tencent:tencent/hy3:free").
+  /** The model selection cookie value (e.g. "kilo-gateway:minimax/minimax-m3:free").
    *  Kept for API compatibility; the loading label now shows for all models. */
   selectedModelKey?: string
 }

@@ -14,7 +14,7 @@ function normalizeOpenAICompatibleBaseURL(raw: string): string {
   return raw.replace(/\/+$/, '').replace(/\/v1$/, '') + '/v1'
 }
 
-// Nelth-3.5 (tencent/hy3:free) and Nelth-3.5 Thinking
+// Nelth-3.5 (minimax/minimax-m3:free) and Nelth-3.5 Thinking
 // (stepfun/step-3.7-flash:free) are both served from the Kilo AI gateway
 // (https://api.kilo.ai/api/gateway/chat/completions). Nelth-3.5 must run with
 // thinking OFF — we send `chat_template_kwargs.reasoning_effort: "no_think"`
@@ -25,23 +25,20 @@ function normalizeOpenAICompatibleBaseURL(raw: string): string {
 // budget is contradictory. Skills are applied via the prompt layer
 // (researcher.ts), which instructs the model to output the COMPLETE artifact
 // directly (no separate "design brief").
-const NELTH_NON_THINKING_MODELS = new Set([
-  'tencent/hy3:free',
-  'minimax/minimax-m3:free'
-])
+const NELTH_NON_THINKING_MODELS = new Set(['minimax/minimax-m3:free'])
 
 /**
  * Single shared weak-model gate. Accepts exact ids as well as
- * provider-prefixed forms (`tencent:tencent/hy3:free`) seen in selection
- * cookies and agent model strings. Replaces the three slightly different
- * inline checks that used to disagree across researcher/streaming layers.
+ * provider-prefixed forms seen in selection cookies and agent model
+ * strings. Replaces the slightly different inline checks that used to
+ * disagree across researcher/streaming layers.
  */
 export function isNonThinkingModelId(
   modelId: string | null | undefined
 ): boolean {
   if (!modelId) return false
   if (NELTH_NON_THINKING_MODELS.has(modelId)) return true
-  return modelId.includes('hy3:free') || modelId.includes('minimax-m3:free')
+  return modelId.includes('minimax-m3:free')
 }
 
 const NELTH_NON_THINKING_BODY = {
@@ -184,10 +181,9 @@ const nelthFetch: typeof fetch = async (input, init) => {
       if (
         typeof parsed?.model === 'string' &&
         (NELTH_NON_THINKING_MODELS.has(parsed.model) ||
-          parsed.model.endsWith('/hy3:free') ||
           parsed.model.endsWith('/minimax-m3:free'))
       ) {
-        // Tencent/Hunyuan models served via the Kilo gateway disable thinking
+        // Minimax models served via the Kilo gateway disable thinking
         // with `enable_thinking: false` sent as a TOP-LEVEL request field (Hunyuan
         // native OpenAI-compatible contract). Some gateways instead expect it
         // nested under `chat_template_kwargs` (vLLM/Qwen style), so we send both.
