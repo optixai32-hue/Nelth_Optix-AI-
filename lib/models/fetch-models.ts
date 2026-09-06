@@ -49,16 +49,16 @@ const OPENAI_COMPATIBLE_EXCLUDED_KEYWORDS = [
 // only carries raw ids, so map the ones we want to brand explicitly.
 const OPENAI_COMPATIBLE_DISPLAY_NAMES: Record<string, string> = {
   'stepfun/step-3.7-flash:free': 'Nelth-3.5 Thinking',
-  'minimax/minimax-m3:free': 'Nelth-3.5'
+  'poolside/laguna-s-2.1:free': 'Nelth-3.5'
 }
 
 // Models served by the Kilo AI gateway rather than the default
 // openai-compatible (NVIDIA) endpoint. They are routed to the `kilo-gateway`
-// provider so Nelth-3.5 (minimax) and Nelth-3.5 Thinking
+// provider so Nelth-3.5 (laguna) and Nelth-3.5 Thinking
 // (stepfun/step-3.7-flash:free) do not hit NVIDIA.
 const KILO_GATEWAY_MODEL_IDS = new Set([
   'stepfun/step-3.7-flash:free',
-  'minimax/minimax-m3:free'
+  'poolside/laguna-s-2.1:free'
 ])
 
 let modelsCache:

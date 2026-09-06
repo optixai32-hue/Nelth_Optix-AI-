@@ -118,7 +118,7 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
   const slugs = skillCtx.activated.map(a => a.slug)
   const bodies = skillCtx.activated.map(a => a.objective)
 
-  // Nelth-3.5 (minimax-m3:free) is the weak non-thinking
+  // Nelth-3.5 (laguna-s-2.1:free) is the weak non-thinking
   // models. They tend to "apply the skills a little" — i.e. they produce a
   // structurally-valid answer that ignores the active skill's substance. We
   // therefore FORCE a reinforcement pass for them even when the first
@@ -129,7 +129,7 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
   // first pass (e.g. it emits emoji section headers / emoji-as-icon and does
   // NOT apply skills-main). So it is NO LONGER trusted and is held to the same
   // standard: it is forced through the skill-application reinforcement pass too.
-  const isWeakModel = /(minimax-m3:free|minimax\/minimax)/i.test(model)
+  const isWeakModel = /laguna-s-2\.1:free/i.test(model)
   const isThinkingModel = /(stepfun|step-3\.7-flash|nelth-3\.5 thinking|thinking)/i.test(
     model
   )

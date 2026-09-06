@@ -1,7 +1,7 @@
 /**
  * Types for the Skill Router + Progressive Disclosure layer.
  *
- * The layer wraps the main model (minimax/minimax-m3:free, served via the Kilo AI
+ * The layer wraps the main model (poolside/laguna-s-2.1:free, served via the Kilo AI
  * gateway) with an
  * on-demand, OPERATIONAL expertise layer built from the real `claude-skills`
  * repository (`lib/skills/claude-skills`). Skills are not passive documentation:
