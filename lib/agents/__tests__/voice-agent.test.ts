@@ -34,10 +34,10 @@ describe('voice agent isolation', () => {
     }
   })
 
-  it('drives NVIDIA Nemotron with a 1024-token cap', () => {
-    expect(VOICE_MODEL_ID).toBe('nvidia/nemotron-3.5-lightning-30b-a3b')
+  it('drives Laguna S 2.1 free with a 1024-token cap', () => {
+    expect(VOICE_MODEL_ID).toBe('poolside/laguna-s-2.1:free')
     expect(voiceModelString()).toBe(
-      'openai-compatible:nvidia/nemotron-3.5-lightning-30b-a3b'
+      'openai-compatible:poolside/laguna-s-2.1:free'
     )
     expect(VOICE_MAX_OUTPUT_TOKENS).toBe(1024)
   })
