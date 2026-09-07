@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { foldText, intentRe } from '@/lib/skills/text-fold'
 import { keywordTokens } from '@/lib/skills/router'
+import { foldText, intentRe } from '@/lib/skills/text-fold'
 
 describe('foldText', () => {
   it('lowercases and strips diacritics', () => {

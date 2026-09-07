@@ -1,6 +1,5 @@
 'use client'
 
-import '@/lib/polyfills'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -35,6 +34,8 @@ import { getCookie, setCookie } from '@/lib/utils/cookies'
 import { getTextFromParts } from '@/lib/utils/message-utils'
 
 import { useFileDropzone } from '@/hooks/use-file-dropzone'
+
+import '@/lib/polyfills'
 
 import { ChatMessages } from './chat-messages'
 import { ChatPanel } from './chat-panel'

@@ -9,8 +9,8 @@ import {
   type StreamdownProps
 } from 'streamdown'
 
-import { mergeStreamdownSpecRenderer } from '@/lib/render/streamdown-spec'
 import { groupMarkdownImages } from '@/lib/render/group-markdown-images'
+import { mergeStreamdownSpecRenderer } from '@/lib/render/streamdown-spec'
 import { wrapBareSpecBlocks } from '@/lib/render/wrap-bare-spec'
 import type { SearchResultItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -65,7 +65,10 @@ export function MarkdownMessage({
           {...streamdownProps}
           rehypePlugins={rehypePlugins}
           components={
-            { ...defaultComponents, ...customComponents } as unknown as StreamdownProps['components']
+            {
+              ...defaultComponents,
+              ...customComponents
+            } as unknown as StreamdownProps['components']
           }
         >
           {processedMessage}

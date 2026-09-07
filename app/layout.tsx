@@ -1,4 +1,3 @@
-import '@/lib/polyfills'
 import type { Metadata, Viewport } from 'next'
 import { Inter as FontSans } from 'next/font/google'
 import { headers } from 'next/headers'
@@ -32,6 +31,8 @@ import { PostHogProvider } from '@/components/posthog-provider'
 import SidebarModelSelector from '@/components/sidebar-model-selector'
 import { ThemeProvider } from '@/components/theme-provider'
 import UserMenu from '@/components/user-menu'
+
+import '@/lib/polyfills'
 
 import './globals.css'
 
@@ -105,55 +106,57 @@ export default async function RootLayout({
         style={{ margin: 0, padding: 0 }}
       >
         <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            WebkitOverflowScrolling: 'touch'
-          } as React.CSSProperties}
+          style={
+            {
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              WebkitOverflowScrolling: 'touch'
+            } as React.CSSProperties
+          }
         >
-        <I18nProvider initialLocale={locale}>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-          <PostHogProvider userId={user?.id ?? null}>
-            <UserProvider hasUser={!!userId}>
-                <SidebarProvider defaultOpen={false}>
-                  <LibraryProvider>
-                    {userId && <AppSidebar user={user} />}
-                    <SidebarModelSelector
-                      modelSelectorData={modelSelectorData}
-                      isCloudDeployment={isCloudDeployment}
-                      isGuest={!userId}
-                    />
-                    <KeyboardShortcutHandler />
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <Header user={user} />
-                      <main className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
-                        <ArtifactRoot>{children}</ArtifactRoot>
-                      </main>
-                    </div>
-                  </LibraryProvider>
-                  {/* Account avatar pinned to the bottom-left of the screen.
+          <I18nProvider initialLocale={locale}>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <PostHogProvider userId={user?.id ?? null}>
+                <UserProvider hasUser={!!userId}>
+                  <SidebarProvider defaultOpen={false}>
+                    <LibraryProvider>
+                      {userId && <AppSidebar user={user} />}
+                      <SidebarModelSelector
+                        modelSelectorData={modelSelectorData}
+                        isCloudDeployment={isCloudDeployment}
+                        isGuest={!userId}
+                      />
+                      <KeyboardShortcutHandler />
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <Header user={user} />
+                        <main className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+                          <ArtifactRoot>{children}</ArtifactRoot>
+                        </main>
+                      </div>
+                    </LibraryProvider>
+                    {/* Account avatar pinned to the bottom-left of the screen.
 
                       Visible only when the sidebar is closed so it doesn't
                       overlap the sidebar footer avatar. */}
-                  <FloatingAccountMenu user={user} />
-                </SidebarProvider>
-            </UserProvider>
-          </PostHogProvider>
-          <Toaster />
-          <Analytics />
-          </ThemeProvider>
-        </I18nProvider>
+                    <FloatingAccountMenu user={user} />
+                  </SidebarProvider>
+                </UserProvider>
+              </PostHogProvider>
+              <Toaster />
+              <Analytics />
+            </ThemeProvider>
+          </I18nProvider>
         </div>
       </body>
     </html>
