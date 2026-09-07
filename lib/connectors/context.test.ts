@@ -79,9 +79,9 @@ describe('shouldEngageConnectors', () => {
     expect(shouldEngageConnectors(base)).toBe(true)
   })
   it('refuses without intent, for guests, with preload, or for pure code', () => {
-    expect(
-      shouldEngageConnectors({ ...base, connectorIntent: false })
-    ).toBe(false)
+    expect(shouldEngageConnectors({ ...base, connectorIntent: false })).toBe(
+      false
+    )
     expect(shouldEngageConnectors({ ...base, userId: 'guest' })).toBe(false)
     expect(shouldEngageConnectors({ ...base, userId: undefined })).toBe(false)
     expect(
@@ -110,6 +110,11 @@ describe('isConnectorFollowUp', () => {
   it('inherits intent for short anaphoric follow-ups', () => {
     expect(isConnectorFollowUp('et demain ?', history)).toBe(true)
     expect(isConnectorFollowUp('le deuxième', history)).toBe(true)
+  })
+  it('inherits intent for bare affirmatives answering an offer', () => {
+    expect(isConnectorFollowUp('oui', history)).toBe(true)
+    expect(isConnectorFollowUp("d'accord, vas-y", history)).toBe(true)
+    expect(isConnectorFollowUp('ok continue', history)).toBe(true)
   })
   it('refuses without history evidence', () => {
     expect(isConnectorFollowUp('et demain ?', [])).toBe(false)

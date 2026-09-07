@@ -1,9 +1,6 @@
 import { UIMessage } from 'ai'
 
-import {
-  createChatWithFirstMessage,
-  upsertMessage
-} from '@/lib/actions/chat'
+import { createChatWithFirstMessage, upsertMessage } from '@/lib/actions/chat'
 import { findExistingAssistantId, updateChatTitle } from '@/lib/db/actions'
 import { SearchMode } from '@/lib/types/search'
 import { perfTime } from '@/lib/utils/perf-logging'
@@ -11,11 +8,19 @@ import { retryDatabaseOperation } from '@/lib/utils/retry'
 
 const DEFAULT_CHAT_TITLE = 'Untitled'
 
-export async function persistStreamResults(
+/**
+ * Persists the just-streamed turn (idempotent assistant upsert). AWAITED by
+ * the stream onFinish BEFORE the response closes: the composer unlocks the
+ * moment the stream closes, so a background (non-awaited) save races the
+ * user's next message — its history load would miss this turn and the model
+ * would answer "oui" with no memory of what it just did. A DB upsert costs
+ * ~100-500ms; correctness beats that latency. Title update stays
+ * best-effort background (it waits on an LLM call).
+ */
+export async function persistStreamMessages(
   responseMessage: UIMessage,
   chatId: string,
   userId: string,
-  titlePromise?: Promise<string>,
   parentTraceId?: string,
   searchMode?: SearchMode,
   modelId?: string,
@@ -48,9 +53,6 @@ export async function persistStreamResults(
       console.error('findExistingAssistantId failed:', err)
     }
   }
-
-  // Wait for title generation if it was started
-  const chatTitle = titlePromise ? await titlePromise : undefined
 
   // Ensure the initial chat/message persistence finished before saving the response
   if (initialSavePromise) {
@@ -116,14 +118,23 @@ export async function persistStreamResults(
       // Don't throw here to avoid breaking the stream
     }
   }
+}
 
-  // Update title after message is saved
-  if (chatTitle && chatTitle !== DEFAULT_CHAT_TITLE) {
-    try {
+/**
+ * Best-effort chat-title update. Runs in the BACKGROUND (it awaits an LLM
+ * call) — never blocks stream close. Errors are swallowed by design.
+ */
+export async function persistChatTitle(
+  chatId: string,
+  userId: string,
+  titlePromise?: Promise<string>
+): Promise<void> {
+  try {
+    const chatTitle = titlePromise ? await titlePromise : undefined
+    if (chatTitle && chatTitle !== DEFAULT_CHAT_TITLE) {
       await updateChatTitle(chatId, chatTitle, userId)
-    } catch (error) {
-      console.error('Error updating title:', error)
-      // Don't throw here as title update is not critical
     }
+  } catch (error) {
+    console.error('Error updating title:', error)
   }
 }

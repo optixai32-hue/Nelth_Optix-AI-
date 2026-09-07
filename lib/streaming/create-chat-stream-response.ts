@@ -64,7 +64,7 @@ import {
   shouldRetryEmptyAttempt
 } from './helpers/empty-response'
 import { normalizeConversationHistory } from './helpers/normalize-conversation'
-import { persistStreamResults } from './helpers/persist-stream-results'
+import { persistChatTitle, persistStreamMessages } from './helpers/persist-stream-results'
 import { prepareMessages } from './helpers/prepare-messages'
 import { stripSpecFromMessages } from './helpers/strip-spec-from-messages'
 import type { StreamContext } from './helpers/types'
@@ -861,13 +861,12 @@ export async function createChatStreamResponse(
               }
             }
           }
-          // Post-processing (skill enforcement, Firebase/DB persistence, tracing
-          // flush) runs in the background and does NOT block the SSE stream from
-          // closing. If any of these hang — e.g. an unreachable Firebase/Langfuse
-          // endpoint in local mode — the response body would otherwise stay open
-          // and the UI would remain stuck on "Répondre…" even though the answer
-          // is already fully displayed. The stream closes immediately after the
-          // text, and persistence continues asynchronously (best-effort).
+          // Post-processing: skill enforcement refines the answer in place
+          // (bounded, only when skills are active). Message persistence is
+          // AWAITED before the stream closes — the composer unlocks on close,
+          // so a background save would race the user's next message and its
+          // history load would miss this turn. Only the title update (which
+          // waits on an LLM call) and tracing flush stay background.
           void (async () => {
             try {
               perfTime('researchAgent.stream completed', llmStart)
@@ -906,12 +905,12 @@ export async function createChatStreamResponse(
               // leak into the final answer as raw markup.
               stripFakeToolCallXmlFromMessage(responseMessage)
 
-              // Persist stream results to database (best-effort, non-blocking)
-              await persistStreamResults(
+              // Blocking: the turn must be in the DB before this response
+              // closes (see helper doc).
+              await persistStreamMessages(
                 responseMessage,
                 chatId,
                 userId,
-                titlePromise,
                 parentTraceId,
                 searchMode,
                 context.modelId,
@@ -919,10 +918,18 @@ export async function createChatStreamResponse(
                 context.pendingInitialUserMessage,
                 context.userMessageId
               )
+              // Best-effort background: title + tracing flush must never hold
+              // the stream open (slow LLM / unreachable endpoint).
+              void persistChatTitle(chatId, userId, titlePromise).catch(
+                (err: unknown) =>
+                  console.error('onFinish title error:', err)
+              )
             } catch (err) {
               console.error('onFinish post-processing error:', err)
             } finally {
-              await endTracing()
+              void endTracing().catch((err: unknown) =>
+                console.error('onFinish tracing error:', err)
+              )
             }
           })()
         }
