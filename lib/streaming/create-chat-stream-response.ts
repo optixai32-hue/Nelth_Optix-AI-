@@ -384,9 +384,6 @@ export async function createChatStreamResponse(
       // be surfaced as synthetic tool parts below (same UX as native calls).
       const connectorPreloadCalls: ConnectorPreloadCall[] = []
 
-      // Voice mode: isolated minimal agent (tiny voice-only system prompt,
-      // zero tools, hard token cap). The researcher — long prompt, skills,
-      // tools, preloads — is never constructed for voice turns.
       // Get the researcher agent with search mode. `imageAttachment` / `needsImageEff`
       // are already resolved above, before the `trivial` gate.
       const researchAgent = await researcher({
@@ -401,11 +398,11 @@ export async function createChatStreamResponse(
         userQuery,
         userId,
         connectorCallsSink: connectorPreloadCalls,
-        // A connector follow-up ("et demain ?") looks trivial to the
-        // capability gate but needs the data path — don't let it disarm.
+        // A connector follow-up ("et demain ?") names no service itself —
+        // the orchestrator resolved it from history above.
         connectorIntentOverride: connectorFollowUp ? true : undefined,
         capabilities: {
-          trivial: trivial && !connectorFollowUp,
+          trivial,
           needsSearch: caps.needsSearch && !preloadedSearchContext,
           needsImage: needsImageEff,
           needsDocument: caps.needsDocument

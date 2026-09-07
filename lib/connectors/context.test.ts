@@ -5,7 +5,8 @@ import {
   detectConnectorIntent,
   extractConnectorKeywords,
   isConnectorFollowUp,
-  isStatusOnlyIntent
+  isStatusOnlyIntent,
+  shouldEngageConnectors
 } from './context'
 import { hasConnection } from './vault'
 
@@ -64,6 +65,31 @@ describe('isStatusOnlyIntent', () => {
   it('flags connection questions without data access', () => {
     expect(isStatusOnlyIntent('quelles apps sont connectées ?')).toBe(true)
     expect(isStatusOnlyIntent('lis mes mails')).toBe(false)
+  })
+})
+
+describe('shouldEngageConnectors', () => {
+  const base = {
+    userId: 'user-1',
+    connectorIntent: true,
+    preloadedSearchContext: undefined,
+    isCodeWithoutExternal: false
+  }
+  it('engages on plain connector intent', () => {
+    expect(shouldEngageConnectors(base)).toBe(true)
+  })
+  it('refuses without intent, for guests, with preload, or for pure code', () => {
+    expect(
+      shouldEngageConnectors({ ...base, connectorIntent: false })
+    ).toBe(false)
+    expect(shouldEngageConnectors({ ...base, userId: 'guest' })).toBe(false)
+    expect(shouldEngageConnectors({ ...base, userId: undefined })).toBe(false)
+    expect(
+      shouldEngageConnectors({ ...base, preloadedSearchContext: 'x' })
+    ).toBe(false)
+    expect(
+      shouldEngageConnectors({ ...base, isCodeWithoutExternal: true })
+    ).toBe(false)
   })
 })
 

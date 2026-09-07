@@ -7,7 +7,8 @@ import {
   buildConnectorContext,
   type ConnectorPreloadCall,
   detectConnectorIntent,
-  runConnectorPreloadStructured
+  runConnectorPreloadStructured,
+  shouldEngageConnectors
 } from '../connectors/context'
 import {
   DOCUMENT_INTENT_RE,
@@ -797,12 +798,13 @@ export async function createResearcher({
       let connectorTools: ConnectorTools | null = null
       const connectorIntent =
         connectorIntentOverride ?? detectConnectorIntent(userQuery ?? '')
-      const connectorsAllowed =
-        Boolean(userId && userId !== 'guest') &&
-        connectorIntent &&
-        !preloadedSearchContext &&
-        !capabilities?.trivial &&
-        !(artifactIntent.isCode && !artifactIntent.needsExternal)
+      const connectorsAllowed = shouldEngageConnectors({
+        userId,
+        connectorIntent,
+        preloadedSearchContext,
+        isCodeWithoutExternal:
+          artifactIntent.isCode && !artifactIntent.needsExternal
+      })
       if (connectorsAllowed && userId) {
         try {
           const ctx = await buildConnectorContext(userId)

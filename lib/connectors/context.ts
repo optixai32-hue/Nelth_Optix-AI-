@@ -59,6 +59,31 @@ export function isStatusOnlyIntent(query: string): boolean {
   return STATUS_INTENT_RE.test(folded) && !DATA_INTENT_RE.test(folded)
 }
 
+/**
+ * Single gate deciding whether a turn engages the connector data path.
+ * A connector request looks "trivial" to the capability gate (no web
+ * search, no skill, no document) yet NEEDS its data path (tools or server
+ * preload) — so triviality NEVER blocks here. Without this, trivially-
+ * classified turns like "résume mes mails" silently get no Gmail context at
+ * all and the model wrongly claims it cannot access the mailbox.
+ * Exported for unit testing.
+ */
+export function shouldEngageConnectors(args: {
+  userId?: string | null
+  connectorIntent: boolean
+  preloadedSearchContext?: string | null
+  isCodeWithoutExternal?: boolean
+}): boolean {
+  const { userId, connectorIntent, preloadedSearchContext, isCodeWithoutExternal } =
+    args
+  return (
+    Boolean(userId && userId !== 'guest') &&
+    connectorIntent &&
+    !preloadedSearchContext &&
+    !isCodeWithoutExternal
+  )
+}
+
 // Short anaphoric continuers ("et demain ?", "le deuxième", "that one").
 // Folded form. Deliberately excludes bare pronouns like "it" that would hijack
 // unrelated questions ("is it raining?") asked right after a connector turn.
