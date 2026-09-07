@@ -72,6 +72,7 @@ describe('fetch-models', () => {
           { id: 'poolside/laguna-s-2.1:free' },
           { id: 'poolside/laguna-xs-2.1:free' },
           { id: 'thinkingmachines/inkling-small:free' },
+          { id: 'dots-studio/dots-3-note-preview:free' },
           { id: 'stepfun/step-3.7-flash:free' }
         ]
       })
@@ -84,7 +85,8 @@ describe('fetch-models', () => {
       expect(ids).not.toContain('minimax/minimax-m3:free')
       expect(ids).not.toContain('poolside/laguna-s-2.1:free')
       expect(ids).not.toContain('poolside/laguna-xs-2.1:free')
-      expect(ids).toContain('thinkingmachines/inkling-small:free')
+      expect(ids).not.toContain('thinkingmachines/inkling-small:free')
+      expect(ids).toContain('dots-studio/dots-3-note-preview:free')
       expect(ids).toContain('stepfun/step-3.7-flash:free')
     } finally {
       delete process.env.OPENAI_COMPATIBLE_API_BASE_URL
@@ -97,13 +99,13 @@ describe('fetch-models', () => {
       providerId => providerId === 'openai-compatible'
     )
     process.env.OPENAI_COMPATIBLE_MODELS =
-      'minimax/minimax-m3:free, thinkingmachines/inkling-small:free'
+      'minimax/minimax-m3:free, dots-studio/dots-3-note-preview:free'
 
     try {
       const models = await fetchModels.fetchOpenAICompatibleModels()
       const ids = models.map(model => model.id)
       expect(ids).not.toContain('minimax/minimax-m3:free')
-      expect(ids).toContain('thinkingmachines/inkling-small:free')
+      expect(ids).toContain('dots-studio/dots-3-note-preview:free')
     } finally {
       delete process.env.OPENAI_COMPATIBLE_MODELS
     }
@@ -122,7 +124,7 @@ describe('fetch-models', () => {
     const ids = Object.values(grouped)
       .flat()
       .map(model => model.id)
-    expect(ids).toContain('thinkingmachines/inkling-small:free')
+    expect(ids).toContain('dots-studio/dots-3-note-preview:free')
     expect(ids).not.toContain('minimax/minimax-m3:free')
   })
 

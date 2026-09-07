@@ -154,7 +154,9 @@ describe('selectModel', () => {
 
     for (const retired of [
       'kilo-gateway:minimax/minimax-m3:free',
-      'kilo-gateway:poolside/laguna-s-2.1:free'
+      'kilo-gateway:poolside/laguna-s-2.1:free',
+      'kilo-gateway:poolside/laguna-xs-2.1:free',
+      'kilo-gateway:thinkingmachines/inkling-small:free'
     ]) {
       const result = await selectModel({
         cookieStore: createCookieStore(retired)

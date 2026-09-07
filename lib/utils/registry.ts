@@ -14,11 +14,11 @@ function normalizeOpenAICompatibleBaseURL(raw: string): string {
   return raw.replace(/\/+$/, '').replace(/\/v1$/, '') + '/v1'
 }
 
-// Nelth-3.5 (thinkingmachines/inkling-small:free) and Nelth-3.5 Thinking
+// Nelth-3.5 (dots-studio/dots-3-note-preview:free) and Nelth-3.5 Thinking
 // (stepfun/step-3.7-flash:free) are both served from the Kilo AI gateway
 // (https://api.kilo.ai/api/gateway/chat/completions). Nelth-3.5 runs with
-// thinking OFF via a minimal `enable_thinking: false` injection (see
-// nelthFetch below) — no reasoning budget, no sampling overrides.
+// provider defaults — no thinking-off injection: Dots answers cleanly
+// without it, and unverified extra fields risk HTTP 400s.
 // Nelth-3.5 Thinking stays on the gateway with thinking ON (untouched).
 //
 // NOTE: we never send a reasoning budget — with thinking disabled a reasoning
@@ -26,7 +26,7 @@ function normalizeOpenAICompatibleBaseURL(raw: string): string {
 // (researcher.ts), which instructs the model to output the COMPLETE artifact
 // directly (no separate "design brief").
 const NELTH_NON_THINKING_MODELS = new Set([
-  'thinkingmachines/inkling-small:free'
+  'dots-studio/dots-3-note-preview:free'
 ])
 
 /**
@@ -40,7 +40,7 @@ export function isNonThinkingModelId(
 ): boolean {
   if (!modelId) return false
   if (NELTH_NON_THINKING_MODELS.has(modelId)) return true
-  return modelId.includes('inkling-small:free')
+  return modelId.includes('dots-3-note-preview:free')
 }
 
 // The Kilo gateway endpoint (both Nelth-3.5 and Nelth-3.5 Thinking) shares a
@@ -172,31 +172,10 @@ async function nelthTryFetch(
 }
 
 const nelthFetch: typeof fetch = async (input, init) => {
-  if (init && typeof init.body === 'string') {
-    try {
-      const parsed = JSON.parse(init.body) as Record<string, any>
-      if (
-        typeof parsed?.model === 'string' &&
-        (NELTH_NON_THINKING_MODELS.has(parsed.model) ||
-          parsed.model.endsWith('/inkling-small:free'))
-      ) {
-        // Inkling models served via the Kilo gateway get a minimal
-        // thinking-off subset (top-level + chat_template_kwargs). This
-        // provider is unverified for the wider contract, so reasoning_effort
-        // and sampling overrides are deliberately NOT sent — a rejected
-        // field would 400 every answer. Revisit after live verification.
-        parsed.enable_thinking = false
-        parsed.chat_template_kwargs = {
-          ...(parsed.chat_template_kwargs || {}),
-          enable_thinking: false,
-          clear_thinking: true
-        }
-        init = { ...init, body: JSON.stringify(parsed) }
-      }
-    } catch {
-      /* non-JSON body — leave untouched */
-    }
-  }
+  // NOTE: no request-body rewriting here. Past engines needed a thinking-off
+  // injection, but unverified extra fields risk HTTP 400s (this blanked every
+  // answer once). The current engine answers cleanly unmodified; revisit only
+  // with a live-verified contract.
 
   let attempt = 0
   while (true) {

@@ -129,7 +129,7 @@ export async function createEphemeralChatStreamResponse(
       // authenticated chat path so guests get the same lazy architecture.
       const caps = await detectRequestCapabilities(userQuery, attachmentFormats)
 
-      // Nelth-3.5 (thinkingmachines/inkling-small:free) is a non-thinking model that cannot emit valid
+      // Nelth-3.5 (dots-studio/dots-3-note-preview:free) is a non-thinking model that cannot emit valid
       // native tool calls — it outputs fake <tool_call> XML blocks. So for this model
       // we ALWAYS preload search results for non-trivial queries.
       const isNonThinkingModel = isNonThinkingModelId(model.id)

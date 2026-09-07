@@ -35,7 +35,7 @@ function getNvidiaModel() {
  * Run live:  NVIDIA_API_KEY=... bun run vitest run lib/skills/skill-evaluation
  */
 
-const MODEL_ID = 'thinkingmachines/inkling-small:free'
+const MODEL_ID = 'dots-studio/dots-3-note-preview:free'
 const LIVE = Boolean(process.env.KILO_API_KEY)
 
 const PROMPT_REACT_TS = `Create a production-grade SaaS analytics dashboard in React + TypeScript.
