@@ -9,6 +9,15 @@ export const GLOBAL_MAX_REFS = 8
 const SCORE_THRESHOLD = 2
 
 /**
+ * Folded tokens that are cross-language homographs: a verb in one language,
+ * a noun in another (e.g. French "résume/résumer" → "resume" vs English
+ * "resume" = CV). Multi-word triggers collapsing to ONLY such a token must
+ * match as a contiguous phrase, never by token overlap. Extend with care —
+ * each entry disables overlap matching for its trigger phrases.
+ */
+const HOMOGRAPH_FOLDED_TOKENS = new Set(['resume'])
+
+/**
  * Common words that must NOT drive routing. Many SKILL.md descriptions contain
  * words like "design" or "interface", so matching on them would select unrelated
  * skills. Routing therefore relies on the curated `triggers` and skill `name`.
@@ -442,8 +451,23 @@ function scoreSkill(
         }
       }
       if (allPresent) {
-        score += trigger.includes(' ') ? 3 : 2
-        continue
+        // Homograph guard: a multi-word trigger collapsing to a single
+        // cross-language homograph token (e.g. "my resume" → {resume},
+        // where French "résume" (to summarize) folds onto English "resume"
+        // (CV)) must match as a contiguous phrase (handled by the substring
+        // branch above), never by token overlap — otherwise "résume mes
+        // mails" misfires the docx skill. Genuine multi-token overlaps
+        // (e.g. "typescript code" → {typescript}) are unaffected, and
+        // single-word triggers keep their exact-match branch below.
+        const collapsed = [...triggerTokens]
+        if (
+          !trigger.includes(' ') ||
+          collapsed.length > 1 ||
+          !HOMOGRAPH_FOLDED_TOKENS.has(collapsed[0])
+        ) {
+          score += trigger.includes(' ') ? 3 : 2
+          continue
+        }
       }
     }
     // Single-token trigger matched exactly (folded). Non-Latin single tokens

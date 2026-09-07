@@ -289,7 +289,13 @@ export const SKILLS_MAIN_ROUTING: Record<string, SkillsMainRouting> = {
       'document',
       'doc',
       'report',
-      'resume',
+      // NOTE: no bare 'resume' — French "résume/résumer" (to summarize) folds
+      // to the same token and misfires the CV skill on summarize requests
+      // ("résume mes mails"). CV intent uses the noun-context triggers below.
+      'cv',
+      'curriculum vitae',
+      'my resume',
+      'mon cv',
       'cover letter',
       'letter',
       '.docx',

@@ -26,7 +26,7 @@ import { hasConnection, markConnectorAuthFailure } from './vault'
 // against foldText(query)). Strong signals that the user wants THEIR OWN
 // data, not a web search.
 const DATA_INTENT_RE = intentRe(
-  'gmail|google\\s?mail|courriel|e-?mails?\\s?(?:recus?|envoyes?)?' +
+  'gmail|google\\s?mail|courriel|courriers?|e-?mails?\\s?(?:recus?|envoyes?)?' +
     '|drive|google\\s?(?:doc|sheet|slide|disque)|fichier\\s?(?:drive|partage|recent)' +
     '|calendar|agenda|calendrier|rendez-?vous|reunions?(?:\\s?(?:a venir|prochain|demain|cette semaine))?' +
     '|github|depot|pull\\s?request|commit' +

@@ -243,3 +243,39 @@ describe('Skill Activation — skills are ACTIVE instructions, not docs', () => 
     expect(refFiles).toContain('state-management.md')
   })
 })
+
+describe('Connector-aware routing — mailbox reads must not pull doc skills', () => {
+  const DOC_GEN_SLUGS = ['docx', 'pdf', 'xlsx', 'pptx']
+
+  it('does not route "résume mes mails" to docx (résume ≠ resume/CV)', async () => {
+    const registry = await getSkillRegistry()
+    const slugs = routeSkills(
+      'résume mes derniers mails',
+      registry
+    ).map(s => s.slug)
+    expect(slugs).not.toContain('docx')
+  })
+
+  it('routes real CV requests to docx via noun triggers', async () => {
+    const registry = await getSkillRegistry()
+    const slugs = routeSkills(
+      'mets à jour mon CV avec ce poste',
+      registry
+    ).map(s => s.slug)
+    expect(slugs).toContain('docx')
+  })
+
+  it('suppresses doc-generation skills on connector reads', async () => {
+    const result = await buildSkillContext('relève mon courrier')
+    const slugs = result.activated.map(a => a.slug)
+    for (const doc of DOC_GEN_SLUGS) {
+      expect(slugs).not.toContain(doc)
+    }
+  })
+
+  it('keeps doc skills when the user explicitly wants a file', async () => {
+    const result = await buildSkillContext('génère un docx avec mes mails')
+    const slugs = result.activated.map(a => a.slug)
+    expect(slugs).toContain('docx')
+  })
+})

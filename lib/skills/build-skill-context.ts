@@ -1,3 +1,4 @@
+import { detectConnectorIntent } from '@/lib/connectors/context'
 import { getTextFromParts } from '@/lib/utils/message-utils'
 import { perfTime } from '@/lib/utils/perf-logging'
 
@@ -336,13 +337,13 @@ export async function buildSkillContext(
       (attachmentFormats?.length ?? 0) > 0 &&
       READ_VERB_RE.test(query) &&
       !CREATE_VERB_RE.test(query)
+    const DOC_GEN_DOMAINS = new Set([
+      'documents',
+      'pdf',
+      'spreadsheets',
+      'presentations'
+    ])
     if (isReadOnlyIntent) {
-      const DOC_GEN_DOMAINS = new Set([
-        'documents',
-        'pdf',
-        'spreadsheets',
-        'presentations'
-      ])
       const filtered = selections.filter(s => {
         const meta = registry.find(r => r.slug === s.slug)
         return !DOC_GEN_DOMAINS.has((meta?.domain ?? '').toLowerCase())
@@ -351,6 +352,34 @@ export async function buildSkillContext(
         perfTime('[TTFT] read-only intent: dropped document-generation skills', tBuild)
       }
       selections = filtered
+    }
+
+    // CONNECTOR-READ GUARD (same bug class, no attachment needed): a
+    // personal-data request ("résume mes mails", "relève mon courrier")
+    // must never pull document-GENERATION skills. French verbs like "résume"
+    // fold onto English nouns ("resume" = CV) and bare nouns like "courrier"
+    // read as letter-writing — both previously injected a full docx SKILL.md
+    // into mailbox reads. Suppress doc-gen skills unless the user names an
+    // explicit file format ("en docx", ".pdf") or a create verb —
+    // "génère un docx avec mes mails" still keeps them.
+    if (
+      !isReadOnlyIntent &&
+      selections.length > 0 &&
+      detectConnectorIntent(query) &&
+      !CREATE_VERB_RE.test(query) &&
+      !/\b(pdf|docx|xlsx|pptx)\b/i.test(query)
+    ) {
+      const before = selections.length
+      selections = selections.filter(s => {
+        const meta = registry.find(r => r.slug === s.slug)
+        return !DOC_GEN_DOMAINS.has((meta?.domain ?? '').toLowerCase())
+      })
+      if (selections.length !== before) {
+        perfTime(
+          '[TTFT] connector-read: dropped document-generation skills',
+          tBuild
+        )
+      }
     }
 
     if (selections.length === 0) return empty
