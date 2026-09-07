@@ -57,6 +57,10 @@ export const DOCUMENT_INTENT_RE = intentRe(
 )
 const CURRENT_INFO_RE = intentRe(
   'search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualites?|news|prix|price|prices|meteo|weather|current|recent|recents?|recentes?|latest|dernier[es]*|dernieres?|hier|yesterday|today|aujourd.hui|demain|tomorrow|ce\\s+jour|ce\\s+matin|ce\\s+soir|cette\\s+semaine|ce\\s+mois|cette\\s+annee|en\\s+direct|live|score|match|resultats?|classement|gagnant|vainqueur|events?|evenements?|annonces?|announcements?|wwdc|qui\\s+est|who\\s+is|c.est\\s+quoi|what\\s+is|qu.est[-\\s]ce\\s+qui|2026|2025|2024' +
+    // Weather asked the French way: "quel temps fait-il ?", "temps à Paris".
+    // Bare "temps" alone is NOT matched (duration/cooking-time false
+    // positives like "combien de temps", "temps de cuisson").
+    '|quel\\s+temps|temps\\s+a|temps\\s+qu|temperature' +
     '|buscar|busca|busqueda|noticias?|precio|precios|hoy|ayer|quien\\s+es|suchen|sucht|suche|nachrichten|preis|heute|gestern|wer\\s+ist|cercare|cerca|notizie|notizia|prezzo|oggi|ieri|chi\\s+e|preco|hoje|ontem|quem\\s+e|mitady|vaovao|vidy|androany|omaly' +
     '|ابحث|بحث|أخبار|اخبار|سعر|اليوم|أمس|امس|من\\s+هو|搜索|新闻|价格|今天|昨天|是谁|искать|новости|цена|сегодня|вчера|кто\\s+такой'
 )

@@ -58,4 +58,25 @@ describe('detectRequestCapabilities — all languages', () => {
     const img = await detectRequestCapabilities('génère une image de chat')
     expect(img.needsImage).toBe(true)
   })
+
+  it('detects French weather asked with "temps" (not just "météo")', async () => {
+    for (const q of [
+      'quel temps fait-il à Paris ?',
+      'quel temps à Lyon demain ?',
+      'la température à Marseille'
+    ]) {
+      const caps = await detectRequestCapabilities(q)
+      expect(caps.needsSearch, `query: ${q}`).toBe(true)
+    }
+  })
+
+  it('does not mistake durations for weather', async () => {
+    for (const q of [
+      'combien de temps pour cuire un œuf ?',
+      'le temps de cuisson des pâtes'
+    ]) {
+      const caps = await detectRequestCapabilities(q)
+      expect(caps.needsSearch, `query: ${q}`).toBe(false)
+    }
+  })
 })

@@ -515,8 +515,11 @@ function detectQuickIntent(
   let code = artifact.isCode
   if (image || isDocFormat) code = false
 
+  // Weather asked the French way ("quel temps fait-il ?", "temps à Paris").
+  // Bare "temps" alone is NOT matched (duration/cooking-time false positives
+  // like "combien de temps", "temps de cuisson").
   const hasCurrentInfoKeyword =
-    /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualit[eé]s?|news|prix|price|m[eé]t[eé]o|weather|current|recent|r[eé]cents?|r[eé]centes?|latest|last|dernier[es]*|derni[eè]res?|hier|yesterday|today|aujourd'hui|demain|tomorrow|ce\s+jour|ce\s+matin|ce\s+soir|cette\s+semaine|ce\s+mois|cette\s+ann[eé]e|en\s+direct|live|score|match|r[eé]sultat|r[eé]sultats|classement|gagnant|vainqueur|events?|[eé]v[eé]nements?|annonces?|announcements?|wwdc|qui\s+est|who\s+is|c'est\s+quoi|what\s+is|qu'est[- ]ce\s+qui|2026|2025|2024)\b/i.test(
+    /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualit[eé]s?|news|prix|price|m[eé]t[eé]o|weather|current|recent|r[eé]cents?|r[eé]centes?|latest|last|dernier[es]*|derni[eè]res?|hier|yesterday|today|aujourd'hui|demain|tomorrow|quel\s+temps|temps\s+[aà]|temps\s+qu|temp[eé]rature|ce\s+jour|ce\s+matin|ce\s+soir|cette\s+semaine|ce\s+mois|cette\s+ann[eé]e|en\s+direct|live|score|match|r[eé]sultat|r[eé]sultats|classement|gagnant|vainqueur|events?|[eé]v[eé]nements?|annonces?|announcements?|wwdc|qui\s+est|who\s+is|c'est\s+quoi|what\s+is|qu'est[- ]ce\s+qui|2026|2025|2024)\b/i.test(
       text
     )
 
