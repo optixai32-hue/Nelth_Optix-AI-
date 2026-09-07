@@ -52,7 +52,9 @@ const HIDDEN_MODEL_IDS = new Set([
   // Replaced by Laguna XS 2.1 as Nelth-3.5 (quota-exhausted upstream).
   'minimax/minimax-m3:free',
   // Replaced by Laguna XS 2.1 (faster sibling).
-  'poolside/laguna-s-2.1:free'
+  'poolside/laguna-s-2.1:free',
+  // Replaced by Inkling Small as Nelth-3.5.
+  'poolside/laguna-xs-2.1:free'
 ])
 
 /** True for retired ids: never listed, never selectable, never honored. */
@@ -64,16 +66,16 @@ export function isRetiredModelId(id: string): boolean {
 // only carries raw ids, so map the ones we want to brand explicitly.
 const OPENAI_COMPATIBLE_DISPLAY_NAMES: Record<string, string> = {
   'stepfun/step-3.7-flash:free': 'Nelth-3.5 Thinking',
-  'poolside/laguna-xs-2.1:free': 'Nelth-3.5'
+  'thinkingmachines/inkling-small:free': 'Nelth-3.5'
 }
 
 // Models served by the Kilo AI gateway rather than the default
 // openai-compatible (NVIDIA) endpoint. They are routed to the `kilo-gateway`
-// provider so Nelth-3.5 (laguna) and Nelth-3.5 Thinking
+// provider so Nelth-3.5 (inkling) and Nelth-3.5 Thinking
 // (stepfun/step-3.7-flash:free) do not hit NVIDIA.
 const KILO_GATEWAY_MODEL_IDS = new Set([
   'stepfun/step-3.7-flash:free',
-  'poolside/laguna-xs-2.1:free'
+  'thinkingmachines/inkling-small:free'
 ])
 
 let modelsCache:

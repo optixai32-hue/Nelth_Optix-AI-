@@ -211,7 +211,7 @@ export async function createChatStreamResponse(
       // context when nothing matches so the model streams immediately.
       const caps = await detectRequestCapabilities(userQuery, attachmentFormats)
 
-      // Nelth-3.5 (poolside/laguna-xs-2.1:free) is a non-thinking model: the Kilo gateway
+      // Nelth-3.5 (thinkingmachines/inkling-small:free) is a non-thinking model: the Kilo gateway
       // ALWAYS returns a `reasoning` field (reasoning_tokens is never 0, and no
       // request param can disable it server-side). It also cannot emit valid
       // native tool calls — it outputs fake <tool_call> XML blocks. So for this

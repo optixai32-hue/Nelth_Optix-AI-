@@ -30,7 +30,7 @@ function modelKey(providerId: string, modelId: string): string {
 }
 
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
-  'poolside/laguna-xs-2.1:free': 'Nelth-3.5',
+  'thinkingmachines/inkling-small:free': 'Nelth-3.5',
   'stepfun/step-3.7-flash:free': 'Nelth-3.5 Thinking'
 }
 

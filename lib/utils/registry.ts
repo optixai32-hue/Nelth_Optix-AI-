@@ -14,19 +14,20 @@ function normalizeOpenAICompatibleBaseURL(raw: string): string {
   return raw.replace(/\/+$/, '').replace(/\/v1$/, '') + '/v1'
 }
 
-// Nelth-3.5 (poolside/laguna-xs-2.1:free) and Nelth-3.5 Thinking
+// Nelth-3.5 (thinkingmachines/inkling-small:free) and Nelth-3.5 Thinking
 // (stepfun/step-3.7-flash:free) are both served from the Kilo AI gateway
-// (https://api.kilo.ai/api/gateway/chat/completions). Nelth-3.5 must run with
-// thinking OFF — we send `enable_thinking: false` plus
-// `reasoning_effort: "none"` in `extra_body`, matching the gateway's expected
-// request shape.
+// (https://api.kilo.ai/api/gateway/chat/completions). Nelth-3.5 runs with
+// thinking OFF via a minimal `enable_thinking: false` injection (see
+// nelthFetch below) — no reasoning budget, no sampling overrides.
 // Nelth-3.5 Thinking stays on the gateway with thinking ON (untouched).
 //
 // NOTE: we never send a reasoning budget — with thinking disabled a reasoning
 // budget is contradictory. Skills are applied via the prompt layer
 // (researcher.ts), which instructs the model to output the COMPLETE artifact
 // directly (no separate "design brief").
-const NELTH_NON_THINKING_MODELS = new Set(['poolside/laguna-xs-2.1:free'])
+const NELTH_NON_THINKING_MODELS = new Set([
+  'thinkingmachines/inkling-small:free'
+])
 
 /**
  * Single shared weak-model gate. Accepts exact ids as well as
@@ -39,12 +40,7 @@ export function isNonThinkingModelId(
 ): boolean {
   if (!modelId) return false
   if (NELTH_NON_THINKING_MODELS.has(modelId)) return true
-  return modelId.includes('laguna-xs-2.1:free')
-}
-
-const NELTH_NON_THINKING_BODY = {
-  temperature: 0.9,
-  top_p: 1.0
+  return modelId.includes('inkling-small:free')
 }
 
 // The Kilo gateway endpoint (both Nelth-3.5 and Nelth-3.5 Thinking) shares a
@@ -182,39 +178,18 @@ const nelthFetch: typeof fetch = async (input, init) => {
       if (
         typeof parsed?.model === 'string' &&
         (NELTH_NON_THINKING_MODELS.has(parsed.model) ||
-          parsed.model.endsWith('/laguna-xs-2.1:free'))
+          parsed.model.endsWith('/inkling-small:free'))
       ) {
-        // Laguna models served via the Kilo gateway disable thinking
-        // with `enable_thinking: false` sent as a TOP-LEVEL request field.
-        // Some gateways instead expect it nested under `chat_template_kwargs`
-        // (vLLM/Qwen style), so we send both. NOTE: `reasoning_effort` MUST
-        // be "none" — the provider rejects anything else (e.g. "no_think")
-        // with HTTP 400, which used to blank every Nelth-3.5 answer.
-        // The SDK flattens `extra_body` into the root before fetch, so a bare
-        // `extra_body` key is ignored by the gateway — we mirror the params there
-        // too for the Kilo gateway convention, but the root fields are what work.
-        const nelthThinkingOff = {
-          enable_thinking: false,
-          clear_thinking: true,
-          reasoning_effort: 'none'
-        }
+        // Inkling models served via the Kilo gateway get a minimal
+        // thinking-off subset (top-level + chat_template_kwargs). This
+        // provider is unverified for the wider contract, so reasoning_effort
+        // and sampling overrides are deliberately NOT sent — a rejected
+        // field would 400 every answer. Revisit after live verification.
         parsed.enable_thinking = false
         parsed.chat_template_kwargs = {
           ...(parsed.chat_template_kwargs || {}),
-          ...nelthThinkingOff
-        }
-        parsed.extra_body = {
-          ...(parsed.extra_body || {}),
           enable_thinking: false,
-          chat_template_kwargs: {
-            ...(parsed.extra_body?.chat_template_kwargs || {}),
-            ...nelthThinkingOff
-          }
-        }
-        for (const [key, value] of Object.entries(NELTH_NON_THINKING_BODY)) {
-          // Defaults only: an explicit caller value (e.g. voice sampling
-          // temperature/top_p) always wins over these.
-          if (parsed[key] === undefined) parsed[key] = value
+          clear_thinking: true
         }
         init = { ...init, body: JSON.stringify(parsed) }
       }

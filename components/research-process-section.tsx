@@ -102,12 +102,12 @@ export function ResearchProcessSection({
 }: Props) {
   const baseParts = (partsOverride ?? (message.parts || [])) as MessagePart[]
 
-  // Nelth-3.5 (laguna, served from the Kilo gateway) runs with thinking
-  // OFF (reasoning_effort: "none"), but we keep this guard so the final
-  // answer is shown cleanly if any reasoning block ever leaks through.
+  // Nelth-3.5 (inkling, served from the Kilo gateway) runs with thinking
+  // OFF, but we keep this guard so the final answer is shown cleanly if any
+  // reasoning block ever leaks through.
   const modelId = (message.metadata as UIMessageMetadata | undefined)?.modelId
   const hideReasoning =
-    typeof modelId === 'string' && modelId.includes('laguna-xs-2.1:free')
+    typeof modelId === 'string' && modelId.includes('inkling-small:free')
 
   const allParts = hideReasoning
     ? baseParts.filter(p => !isReasoningPart(p))
