@@ -494,6 +494,17 @@ export class StreamTextSanitizer {
       }
     }
 
+    // 4. Partial JSON fake tool call: buffer starts with { and has "name" key
+    // but no closing } yet — hold until the JSON completes so it can be
+    // stripped in one shot on the next delta.
+    if (
+      this.buffer.trimStart().startsWith('{') &&
+      /"name"\s*:/.test(this.buffer) &&
+      !this.buffer.includes('}')
+    ) {
+      return ''
+    }
+
     const output = this.buffer
     this.buffer = ''
     return output
@@ -512,6 +523,7 @@ export class StreamTextSanitizer {
       this.head = ''
       this.introChecked = true
     }
+    // Flush also runs stripFakeToolCallXml which handles JSON fake tool calls
     const remaining = stripFakeToolCallXml(tail)
     return remaining
   }
