@@ -31,6 +31,7 @@ import {
   enforceSkillOutput,
   stripEmojiFromCodeInMessage
 } from '@/lib/skills/enforce-stream'
+import { isAffirmativeContinuation } from '@/lib/agents/researcher'
 import { resolveConversationLanguage } from '@/lib/skills/language-memory'
 import { isNonThinkingModelId } from '@/lib/utils/registry'
 import { isTracingEnabled } from '@/lib/utils/telemetry'
@@ -382,6 +383,31 @@ export async function createChatStreamResponse(
         userQuery
       )
 
+      // Affirmative continuation hint ("oui" after "Je peux te donner le
+      // parcours…"): the model must continue the exact previous topic instead
+      // of greeting-restarting. Injected near the top of the instructions so
+      // even the weak model cannot miss it.
+      let affirmativeHint: string | undefined
+      if (
+        isAffirmativeContinuation(userQuery) &&
+        messagesToModel.some(m => m.role === 'assistant')
+      ) {
+        const lastAssistant = [...messagesToModel]
+          .reverse()
+          .find(m => m.role === 'assistant')
+        let lastText = ''
+        try {
+          lastText = lastAssistant
+            ? getTextFromParts((lastAssistant as any).parts).slice(0, 180)
+            : ''
+        } catch {
+          lastText = ''
+        }
+        affirmativeHint = lastText
+          ? `The user just replied "${userQuery.trim()}" confirming your previous message "${lastText}". Continue THAT exact topic immediately. Provide the content you offered.`
+          : `The user just replied "${userQuery.trim()}" as a short affirmative continuation. Resolve it against the immediately preceding assistant message and continue that exact topic.`
+      }
+
       // Connector preload sink: for the weak model the researcher fetches
       // Gmail/Drive/… server-side; the structured calls land here so they can
       // be surfaced as synthetic tool parts below (same UX as native calls).
@@ -397,6 +423,7 @@ export async function createChatStreamResponse(
         preloadedSearchContext,
         preloadedSearchQuery,
         conversationLanguage,
+        affirmativeHint,
         imageAttachment,
         userQuery,
         userId,

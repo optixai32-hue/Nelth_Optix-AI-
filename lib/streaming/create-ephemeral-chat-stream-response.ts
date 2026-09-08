@@ -24,6 +24,7 @@ import {
   extractAttachmentFormats
 } from '@/lib/skills/document-runtime'
 import { stripEmojiFromCodeInMessage } from '@/lib/skills/enforce-stream'
+import { isAffirmativeContinuation } from '@/lib/agents/researcher'
 import { resolveConversationLanguage } from '@/lib/skills/language-memory'
 import { search as runWebSearch } from '@/lib/tools/search'
 import {
@@ -266,6 +267,27 @@ export async function createEphemeralChatStreamResponse(
         userQuery
       )
 
+      let ephemeralAffirmativeHint: string | undefined
+      if (
+        isAffirmativeContinuation(userQuery) &&
+        historyMessages.some(m => m.role === 'assistant')
+      ) {
+        const lastAssistant = [...historyMessages]
+          .reverse()
+          .find(m => m.role === 'assistant')
+        let lastText = ''
+        try {
+          lastText = lastAssistant
+            ? getTextFromParts((lastAssistant as any).parts).slice(0, 180)
+            : ''
+        } catch {
+          lastText = ''
+        }
+        ephemeralAffirmativeHint = lastText
+          ? `The user just replied "${userQuery.trim()}" confirming your previous message "${lastText}". Continue THAT exact topic immediately.`
+          : `The user just replied "${userQuery.trim()}" as a short affirmative continuation. Resolve it against the immediately preceding assistant message.`
+      }
+
       // Get the researcher agent with search mode. `imageAttachment` / `needsImageEff`
       // are already resolved above, before the `trivial` gate.
       const researchAgent = await researcher({
@@ -276,6 +298,7 @@ export async function createEphemeralChatStreamResponse(
         preloadedSearchContext,
         preloadedSearchQuery,
         conversationLanguage,
+        affirmativeHint: ephemeralAffirmativeHint,
         imageAttachment,
         userQuery,
         capabilities: {
