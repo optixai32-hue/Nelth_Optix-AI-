@@ -561,13 +561,10 @@ export async function createChatStreamResponse(
       let wroteContent = false
       let wroteToolPart = false
       let writtenPartCount = 0
-      // For "lire mon dernier mail" fallback: keep the last Gmail read/search
-      // so an empty model answer can be replaced with the actual mail content
-      // instead of a generic "Désolé...".
-      let lastGmailRead: { subject?: string; from?: string; body?: string } | null =
-        null
-      let lastGmailSearch: { items?: Array<{ subject?: string; from?: string; snippet?: string }> } | null =
-        null
+      // Connector data captured from native tool parts. For the weak model
+      // (Nelth-3.5), native tools are stripped — only preload synthetic parts
+      // are emitted — so these stay null. The fallback below reads directly
+      // from `connectorPreloadCalls` instead.
 
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
@@ -732,7 +729,9 @@ export async function createChatStreamResponse(
                 if (
                   part &&
                   typeof part.type === 'string' &&
-                  part.type === 'text'
+                  part.type === 'text' &&
+                  typeof (part as any).text === 'string' &&
+                  (part as any).text.trim()
                 ) {
                   markContent()
                 }
@@ -742,32 +741,6 @@ export async function createChatStreamResponse(
                   part.type.startsWith('tool-')
                 ) {
                   markTools()
-                  // Capture Gmail data for empty-answer fallback.
-                  if (
-                    part.type === 'tool-gmail' &&
-                    (part as any).state === 'output-available'
-                  ) {
-                    const out = (part as any).output as {
-                      body?: string
-                      subject?: string
-                      from?: string
-                      items?: Array<{
-                        subject?: string
-                        from?: string
-                        snippet?: string
-                      }>
-                    } | undefined
-                    if (out?.body) {
-                      lastGmailRead = {
-                        subject: out.subject,
-                        from: out.from,
-                        body: out.body
-                      }
-                    }
-                    if (Array.isArray(out?.items) && out.items.length > 0) {
-                      lastGmailSearch = { items: out.items }
-                    }
-                  }
                 }
               }
             }
@@ -812,7 +785,7 @@ export async function createChatStreamResponse(
             // line instead (localized, counted as content so a trailing
             // stream error stays suppressed).
             // For "lire mon dernier mail" we have the actual mail body from
-            // the tool/preload — show that instead of a generic apology.
+            // the preload — show that instead of a generic apology.
             if (
               shouldInjectEmptyFallback({
                 wroteContent,
@@ -821,64 +794,158 @@ export async function createChatStreamResponse(
               })
             ) {
               console.error(
-                '[Stream] silent-empty response — injecting fallback text'
+                '[Stream] silent-empty response — injecting fallback text',
+                'connectorPreloadCalls.length=',
+                connectorPreloadCalls.length
               )
               let fallbackDelta: string | null = null
-              if (lastGmailRead?.body) {
-                const subj = lastGmailRead.subject || 'Mail'
-                const from = lastGmailRead.from
-                  ? `*De : ${lastGmailRead.from}*\n\n`
-                  : ''
-                fallbackDelta = `**${subj}**\n${from}${lastGmailRead.body}`
-              } else if (lastGmailSearch?.items?.length) {
-                const lines = lastGmailSearch.items
-                  .slice(0, 3)
-                  .map(
-                    (m, i) =>
-                      `${i + 1}. **${m.subject || 'Sans objet'}** — ${m.from || ''}\n   ${m.snippet || ''}`
-                  )
-                  .join('\n\n')
-                fallbackDelta = `Voici vos derniers mails :\n\n${lines}`
-              } else {
-                const preloadGmailRead = connectorPreloadCalls.find(
+
+              // 1) Gmail read (body available) from preload
+              const gmailReadCall = connectorPreloadCalls.find(
+                c =>
+                  c.service === 'gmail' &&
+                  c.output.state === 'complete' &&
+                  typeof (c.output as any).body === 'string' &&
+                  (c.output as any).body.trim()
+              )
+              if (gmailReadCall) {
+                const out = gmailReadCall.output as any
+                const subj = out.subject || 'Mail'
+                const from = out.from ? `*De : ${out.from}*\n\n` : ''
+                fallbackDelta = `**${subj}**\n${from}${out.body}`
+              }
+
+              // 2) Gmail search results from preload
+              if (!fallbackDelta) {
+                const gmailSearchCall = connectorPreloadCalls.find(
                   c =>
                     c.service === 'gmail' &&
-                    typeof (c.output as any)?.body === 'string' &&
-                    (c.output as any).body.trim()
+                    c.output.state === 'complete' &&
+                    Array.isArray((c.output as any).items) &&
+                    (c.output as any).items.length > 0
                 )
-                if (preloadGmailRead) {
-                  const out = preloadGmailRead.output as {
+                if (gmailSearchCall) {
+                  const items = (gmailSearchCall.output as any).items as Array<{
                     subject?: string
                     from?: string
-                    body?: string
-                  }
-                  const subj = out.subject || 'Mail'
-                  const from = out.from ? `*De : ${out.from}*\n\n` : ''
-                  fallbackDelta = `**${subj}**\n${from}${out.body}`
-                } else {
-                  const gmailSearchCall = connectorPreloadCalls.find(
-                    c =>
-                      c.service === 'gmail' &&
-                      Array.isArray((c.output as any)?.items) &&
-                      (c.output as any).items.length > 0
-                  )
-                  if (gmailSearchCall) {
-                    const items = (gmailSearchCall.output as any).items as Array<{
-                      subject?: string
-                      from?: string
-                      snippet?: string
-                    }>
-                    const lines = items
-                      .slice(0, 3)
-                      .map(
-                        (m, i) =>
-                          `${i + 1}. **${m.subject || 'Sans objet'}** — ${m.from || ''}\n   ${m.snippet || ''}`
-                      )
-                      .join('\n\n')
-                    fallbackDelta = `Voici vos derniers mails :\n\n${lines}`
-                  }
+                    snippet?: string
+                  }>
+                  const lines = items
+                    .slice(0, 3)
+                    .map(
+                      (m, i) =>
+                        `${i + 1}. **${m.subject || 'Sans objet'}** — ${m.from || ''}\n   ${m.snippet || ''}`
+                    )
+                    .join('\n\n')
+                  fallbackDelta = `Voici vos derniers mails :\n\n${lines}`
                 }
               }
+
+              // 3) Drive results from preload
+              if (!fallbackDelta) {
+                const driveCall = connectorPreloadCalls.find(
+                  c =>
+                    c.service === 'drive' &&
+                    c.output.state === 'complete' &&
+                    Array.isArray((c.output as any).items) &&
+                    (c.output as any).items.length > 0
+                )
+                if (driveCall) {
+                  const items = (driveCall.output as any).items as Array<{
+                    name?: string
+                    mimeType?: string
+                  }>
+                  const lines = items
+                    .slice(0, 5)
+                    .map(m => `- **${m.name || 'Sans nom'}**`)
+                    .join('\n')
+                  fallbackDelta = `Voici vos fichiers récents :\n\n${lines}`
+                }
+              }
+
+              // 4) Calendar results from preload
+              if (!fallbackDelta) {
+                const calCall = connectorPreloadCalls.find(
+                  c =>
+                    c.service === 'calendar' &&
+                    c.output.state === 'complete' &&
+                    Array.isArray((c.output as any).items) &&
+                    (c.output as any).items.length > 0
+                )
+                if (calCall) {
+                  const items = (calCall.output as any).items as Array<{
+                    summary?: string
+                    start?: string
+                  }>
+                  const lines = items
+                    .slice(0, 5)
+                    .map(m => `- **${m.summary || 'Sans titre'}** — ${m.start || ''}`)
+                    .join('\n')
+                  fallbackDelta = `Voici vos prochains événements :\n\n${lines}`
+                }
+              }
+
+              // 5) GitHub results from preload
+              if (!fallbackDelta) {
+                const ghCall = connectorPreloadCalls.find(
+                  c =>
+                    c.service === 'github' &&
+                    c.output.state === 'complete' &&
+                    Array.isArray((c.output as any).items) &&
+                    (c.output as any).items.length > 0
+                )
+                if (ghCall) {
+                  const items = (ghCall.output as any).items as Array<{
+                    title?: string
+                    url?: string
+                  }>
+                  const lines = items
+                    .slice(0, 5)
+                    .map(m => `- **${m.title || 'Sans titre'}**`)
+                    .join('\n')
+                  fallbackDelta = `Voici vos dépôts récents :\n\n${lines}`
+                }
+              }
+
+              // 6) Notion results from preload
+              if (!fallbackDelta) {
+                const notionCall = connectorPreloadCalls.find(
+                  c =>
+                    c.service === 'notion' &&
+                    c.output.state === 'complete' &&
+                    Array.isArray((c.output as any).items) &&
+                    (c.output as any).items.length > 0
+                )
+                if (notionCall) {
+                  const items = (notionCall.output as any).items as Array<{
+                    title?: string
+                  }>
+                  const lines = items
+                    .slice(0, 5)
+                    .map(m => `- **${m.title || 'Sans titre'}**`)
+                    .join('\n')
+                  fallbackDelta = `Voici vos pages Notion :\n\n${lines}`
+                }
+              }
+
+              // 7) Any connector call with auth-required
+              if (!fallbackDelta) {
+                const authCall = connectorPreloadCalls.find(
+                  c => c.output.state === 'auth-required'
+                )
+                if (authCall) {
+                  fallbackDelta = `La connexion ${authCall.service} a expiré. Veuillez la reconnecter via la carte "Connecter une application" sous le champ de saisie, puis réessayez.`
+                }
+              }
+
+              // 8) Generic: at least we know connectors ran
+              if (!fallbackDelta && connectorPreloadCalls.length > 0) {
+                const services = [
+                  ...new Set(connectorPreloadCalls.map(c => c.service))
+                ].join(', ')
+                fallbackDelta = `J'ai consulté vos données ${services} mais n'ai pas pu générer le résumé. Pourriez-vous reformuler votre demande ?`
+              }
+
               writer.write({
                 type: 'text-delta',
                 id: 'txt-0',

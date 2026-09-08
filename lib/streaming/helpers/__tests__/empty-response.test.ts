@@ -25,14 +25,16 @@ describe('empty response guard', () => {
         aborted: false
       })
     ).toBe(false)
-    // Tool/image sections rendered: the turn is NOT empty.
+    // Tool/image sections rendered but NO text: the model produced tool
+    // output but no conversational answer — this IS an empty response for
+    // connector turns (gmail read, drive, etc.) and needs the fallback.
     expect(
       shouldInjectEmptyFallback({
         wroteContent: false,
         wroteToolPart: true,
         aborted: false
       })
-    ).toBe(false)
+    ).toBe(true)
     // Aborted by the user: stay silent.
     expect(
       shouldInjectEmptyFallback({
