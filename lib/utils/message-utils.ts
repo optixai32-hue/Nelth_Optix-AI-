@@ -232,7 +232,11 @@ const FAKE_TOOL_PATTERNS = [
   // are legitimate prose far more often than tool calls, so they are left
   // alone here (closed/attribute-carrying blocks are handled above).
   /<\/?(?:tool_calls?|tool-search)\b[^>]*\/?>/gi,
-  /<\/?tool_calls?(?::[a-zA-Z0-9_-]+)?[^>]*>/gi
+  /<\/?tool_calls?(?::[a-zA-Z0-9_-]+)?[^>]*>/gi,
+  // JSON-style fake tool calls the Dots model emits as text:
+  // {"name":"gmail","parameters":{"operation":"list",...}}
+  // Match a JSON object with "name" + ("parameters"|"input"|"args") keys.
+  /\{"name"\s*:\s*"[^"]+"\s*,\s*"(?:parameters|input|args)"\s*:\s*\{[\s\S]*?\}\s*\}/g
 ]
 
 export function stripFakeToolCallXml(text: string): string {
@@ -428,7 +432,13 @@ export class StreamTextSanitizer {
       this.buffer.includes('<tool-search>') ||
       this.buffer.includes('/>')
 
-    if (hasClosedFakeTag) {
+    // JSON-style fake tool call: {"name":"gmail","parameters":{...}}
+    const hasJsonFakeTool =
+      /"name"\s*:\s*"[^"]+"\s*,\s*"(?:parameters|input|args)"\s*:\s*\{/.test(
+        this.buffer
+      ) && this.buffer.includes('}')
+
+    if (hasClosedFakeTag || hasJsonFakeTool) {
       const cleaned = stripFakeToolCallXml(this.buffer)
       this.buffer = ''
       return cleaned
