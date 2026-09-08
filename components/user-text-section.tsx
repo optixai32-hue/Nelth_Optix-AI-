@@ -246,10 +246,7 @@ export const UserTextSection: React.FC<UserTextSectionProps> = ({
           </div>
         ) : (
           <div className="relative">
-            <div
-              ref={contentRef}
-              className={cn(!isExpanded && 'line-clamp-3')}
-            >
+            <div ref={contentRef} className={cn(!isExpanded && 'line-clamp-3')}>
               <MarkdownMessage message={rest} />
             </div>
             {(isClamped || isExpanded) && (
@@ -259,16 +256,16 @@ export const UserTextSection: React.FC<UserTextSectionProps> = ({
                   className="text-xs text-muted-foreground hover:text-foreground -ml-0.5"
                   onClick={() => setIsExpanded(prev => !prev)}
                 >
-                {isExpanded ? (
-                  <span className="inline-flex items-center gap-0.5">
-                    Show less <ChevronUp className="size-3" />
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-0.5">
-                    Show more <ChevronDown className="size-3" />
-                  </span>
-                )}
-              </button>
+                  {isExpanded ? (
+                    <span className="inline-flex items-center gap-0.5">
+                      Show less <ChevronUp className="size-3" />
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-0.5">
+                      Show more <ChevronDown className="size-3" />
+                    </span>
+                  )}
+                </button>
               </div>
             )}
             {attachments}

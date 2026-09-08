@@ -12,7 +12,9 @@ describe('validate.ts — real programmatic validation', () => {
     const content = '```css\n.hero {\n  padding:block:var(--s8);\n}\n```'
     const r = validateGeneratedOutput(content)
     expect(r.passed).toBe(false)
-    expect(r.violations.some(v => v.rule === 'css.invalid-property-colon')).toBe(true)
+    expect(
+      r.violations.some(v => v.rule === 'css.invalid-property-colon')
+    ).toBe(true)
   })
 
   it('PASSES on the corrected CSS: padding-block:var(--s8)', () => {
@@ -25,14 +27,20 @@ describe('validate.ts — real programmatic validation', () => {
   it('FAILS when a var() references an undefined custom property', () => {
     const content = '```css\n.hero { color: var(--missing); }\n```'
     const r = validateGeneratedOutput(content)
-    expect(r.violations.some(v => v.rule === 'css.undefined-variable')).toBe(true)
+    expect(r.violations.some(v => v.rule === 'css.undefined-variable')).toBe(
+      true
+    )
     expect(r.passed).toBe(false)
   })
 
   it('FAILS on broken HTML (mismatched / unclosed tags)', () => {
     const content = '```html\n<div><p>hello</div></p>\n```'
     const r = validateGeneratedOutput(content)
-    expect(r.violations.some(v => v.rule === 'html.mismatched-tag' || v.rule === 'html.unclosed-tag')).toBe(true)
+    expect(
+      r.violations.some(
+        v => v.rule === 'html.mismatched-tag' || v.rule === 'html.unclosed-tag'
+      )
+    ).toBe(true)
     expect(r.passed).toBe(false)
   })
 
@@ -54,7 +62,9 @@ describe('validate.ts — real programmatic validation', () => {
     const content =
       '```html\n<section class="hero"></section>\n<section class="features"></section>\n<section class="testimonial"></section>\n<section class="cta"></section>\n<footer></footer>\n```'
     const r = validateGeneratedOutput(content)
-    expect(r.violations.some(v => v.rule === 'design.generic-template')).toBe(true)
+    expect(r.violations.some(v => v.rule === 'design.generic-template')).toBe(
+      true
+    )
     expect(r.passed).toBe(false)
   })
 
@@ -62,15 +72,25 @@ describe('validate.ts — real programmatic validation', () => {
     const content =
       '```html\n<section class="hero" style="background:#0b1f3a"></section>\n<section class="features"></section>\n<section class="testimonial"></section>\n<section class="cta"></section>\n<footer></footer>\n```'
     const r = validateGeneratedOutput(content)
-    expect(r.violations.some(v => v.rule === 'design.generic-template')).toBe(false)
+    expect(r.violations.some(v => v.rule === 'design.generic-template')).toBe(
+      false
+    )
   })
 
   it('validateCss directly flags a stray colon in a property', () => {
-    expect(validateCss('.a { margin:top:1rem; }').some(v => v.rule === 'css.invalid-property-colon')).toBe(true)
+    expect(
+      validateCss('.a { margin:top:1rem; }').some(
+        v => v.rule === 'css.invalid-property-colon'
+      )
+    ).toBe(true)
   })
 
   it('validateHtml flags a missing alt on img', () => {
-    expect(validateHtml('<img src="x.png">').some(v => v.rule === 'html.img-missing-alt')).toBe(true)
+    expect(
+      validateHtml('<img src="x.png">').some(
+        v => v.rule === 'html.img-missing-alt'
+      )
+    ).toBe(true)
   })
 })
 
@@ -85,7 +105,9 @@ describe('validate.ts — follow-up intent rules (spec §3/§4/§7)', () => {
       intent: 'VARIATION_REQUEST',
       previousDesignSummary: 'font(s): Inter; color(s): #3366ff'
     })
-    expect(r.violations.some(v => v.rule === 'design.variation-copied-font')).toBe(true)
+    expect(
+      r.violations.some(v => v.rule === 'design.variation-copied-font')
+    ).toBe(true)
   })
 
   it('VARIATION does NOT warn when a different font is chosen', () => {
@@ -98,7 +120,9 @@ describe('validate.ts — follow-up intent rules (spec §3/§4/§7)', () => {
       intent: 'VARIATION_REQUEST',
       previousDesignSummary: 'font(s): Inter; color(s): #3366ff'
     })
-    expect(r.violations.some(v => v.rule === 'design.variation-copied-font')).toBe(false)
+    expect(
+      r.violations.some(v => v.rule === 'design.variation-copied-font')
+    ).toBe(false)
   })
 
   it('MODIFY warns when the output is a fresh generic template instead of an edit', () => {
@@ -110,7 +134,9 @@ describe('validate.ts — follow-up intent rules (spec §3/§4/§7)', () => {
       intent: 'MODIFY_EXISTING',
       query: 'Make it dark'
     })
-    expect(r.violations.some(v => v.rule === 'design.modify-became-rebuild')).toBe(true)
+    expect(
+      r.violations.some(v => v.rule === 'design.modify-became-rebuild')
+    ).toBe(true)
   })
 
   it('MODIFY does NOT warn on a designed, non-generic edit', () => {
@@ -123,7 +149,9 @@ describe('validate.ts — follow-up intent rules (spec §3/§4/§7)', () => {
       intent: 'MODIFY_EXISTING',
       query: 'Make it dark'
     })
-    expect(r.violations.some(v => v.rule === 'design.modify-became-rebuild')).toBe(false)
+    expect(
+      r.violations.some(v => v.rule === 'design.modify-became-rebuild')
+    ).toBe(false)
   })
 
   describe('RESPONSIVE VALIDATION (FINAL QUALITY GATE)', () => {
@@ -148,7 +176,9 @@ describe('validate.ts — follow-up intent rules (spec §3/§4/§7)', () => {
       const css =
         '.container { width: 1200px; } .sidebar { width: 300px; } .main { width: 900px; }'
       const violations = validateResponsive(html, css)
-      expect(violations.some(v => v.rule === 'design.not-responsive')).toBe(true)
+      expect(violations.some(v => v.rule === 'design.not-responsive')).toBe(
+        true
+      )
       expect(violations[0].severity).toBe('error')
     })
 
@@ -158,7 +188,9 @@ describe('validate.ts — follow-up intent rules (spec §3/§4/§7)', () => {
         '```css\n.container { width: 1200px; } .a { width: 300px; } .b { width: 900px; }\n```'
       const r = validateGeneratedOutput(content, { slugs: ['frontend-design'] })
       expect(r.passed).toBe(false)
-      expect(r.violations.some(v => v.rule === 'design.not-responsive')).toBe(true)
+      expect(r.violations.some(v => v.rule === 'design.not-responsive')).toBe(
+        true
+      )
     })
   })
 
@@ -177,9 +209,9 @@ describe('validate.ts — follow-up intent rules (spec §3/§4/§7)', () => {
         slugs: ['game-developer'],
         query: 'crée un jeu snake'
       })
-      expect(
-        r.violations.filter(v => v.rule.startsWith('game.'))
-      ).toHaveLength(0)
+      expect(r.violations.filter(v => v.rule.startsWith('game.'))).toHaveLength(
+        0
+      )
     })
 
     it('FAILS a game without canvas and without loop', () => {
@@ -206,7 +238,9 @@ describe('validate.ts — follow-up intent rules (spec §3/§4/§7)', () => {
         query: 'jeu'
       })
       expect(r.violations.some(v => v.rule === 'game.no-input')).toBe(true)
-      expect(r.violations.some(v => v.rule === 'game.external-asset')).toBe(true)
+      expect(r.violations.some(v => v.rule === 'game.external-asset')).toBe(
+        true
+      )
       // Warnings only → still passes.
       expect(r.passed).toBe(true)
     })

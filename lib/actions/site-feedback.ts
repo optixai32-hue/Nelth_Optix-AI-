@@ -32,15 +32,18 @@ export async function submitFeedback(data: {
 
     // Save to Firestore
     const id = generateId()
-    await firestore().collection('feedback').doc(id).set({
-      id,
-      userId: userId ?? null,
-      sentiment: data.sentiment,
-      message: data.message,
-      pageUrl: data.pageUrl,
-      userAgent: userAgent ?? null,
-      createdAt: new Date()
-    })
+    await firestore()
+      .collection('feedback')
+      .doc(id)
+      .set({
+        id,
+        userId: userId ?? null,
+        sentiment: data.sentiment,
+        message: data.message,
+        pageUrl: data.pageUrl,
+        userAgent: userAgent ?? null,
+        createdAt: new Date()
+      })
 
     // Send to Slack if webhook URL is configured
     const slackWebhookUrl = process.env.SLACK_WEBHOOK_URL
@@ -120,4 +123,3 @@ export async function submitFeedback(data: {
     return { success: false, error: 'Failed to save feedback' }
   }
 }
-

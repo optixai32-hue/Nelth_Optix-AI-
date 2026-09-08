@@ -14,21 +14,23 @@
 
 /** Lowercase + strip diacritics + expand special ligatures. */
 export function foldText(value: string): string {
-  return (value ?? '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u0305\u0307-\u036f\u064b-\u065f\u0670]/g, '')
-    .replace(/\u00DF/g, 'ss')
-    .replace(/\u00E6/g, 'ae')
-    .replace(/\u0153/g, 'oe')
-    .replace(/\u0142/g, 'l')
-    .replace(/\u0111/g, 'd')
-    .replace(/\u00F8/g, 'o')
-    .replace(/\u0451/g, '\u0435')
-    .replace(/\u0131/g, 'i')
-    // Recompose (NFC) so protected letters (Cyrillic short-I) return to
-    // their canonical precomposed form for matching.
-    .normalize('NFC')
+  return (
+    (value ?? '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u0305\u0307-\u036f\u064b-\u065f\u0670]/g, '')
+      .replace(/\u00DF/g, 'ss')
+      .replace(/\u00E6/g, 'ae')
+      .replace(/\u0153/g, 'oe')
+      .replace(/\u0142/g, 'l')
+      .replace(/\u0111/g, 'd')
+      .replace(/\u00F8/g, 'o')
+      .replace(/\u0451/g, '\u0435')
+      .replace(/\u0131/g, 'i')
+      // Recompose (NFC) so protected letters (Cyrillic short-I) return to
+      // their canonical precomposed form for matching.
+      .normalize('NFC')
+  )
 }
 
 /**

@@ -102,7 +102,9 @@ export function stripThinking(text: string): string {
     .split(THINK_OPEN)
     .map(chunk => {
       const closeIndex = chunk.indexOf(THINK_CLOSE)
-      return closeIndex === -1 ? chunk : chunk.slice(closeIndex + THINK_CLOSE.length)
+      return closeIndex === -1
+        ? chunk
+        : chunk.slice(closeIndex + THINK_CLOSE.length)
     })
     .join('')
 }

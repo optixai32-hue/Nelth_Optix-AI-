@@ -7,10 +7,7 @@ import { capture } from '@/lib/analytics/dispatch'
 import { getCurrentUserId } from '@/lib/auth/get-current-user'
 import { ALLOWED_UPLOAD_MIME_TYPES } from '@/lib/constants'
 import * as dbActions from '@/lib/db/actions'
-import {
-  getLocalFileUrl,
-  saveLocalFile
-} from '@/lib/storage/local-file-store'
+import { getLocalFileUrl, saveLocalFile } from '@/lib/storage/local-file-store'
 import {
   getR2Client,
   getSignedFileUrl,
@@ -160,7 +157,10 @@ async function uploadFileToR2(
         type: 'file'
       }
     } catch (error: any) {
-      console.warn('[upload] ImageKit upload failed; trying object storage:', error)
+      console.warn(
+        '[upload] ImageKit upload failed; trying object storage:',
+        error
+      )
     }
   }
 

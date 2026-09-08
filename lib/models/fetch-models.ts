@@ -229,16 +229,16 @@ export async function fetchOpenAIModels(): Promise<Model[]> {
           .map(item => String(item?.id ?? ''))
           .filter(Boolean)
           .filter(id => !HIDDEN_MODEL_IDS.has(id))
-        .filter(passesOpenAIFilters)
-      .map(id => {
-        const isKilo = KILO_GATEWAY_MODEL_IDS.has(id)
-        return {
-          id,
-          name: OPENAI_COMPATIBLE_DISPLAY_NAMES[id] ?? id,
-          provider: isKilo ? 'Kilo' : providerName,
-          providerId: isKilo ? 'kilo-gateway' : 'openai-compatible'
-        }
-      })
+          .filter(passesOpenAIFilters)
+          .map(id => {
+            const isKilo = KILO_GATEWAY_MODEL_IDS.has(id)
+            return {
+              id,
+              name: OPENAI_COMPATIBLE_DISPLAY_NAMES[id] ?? id,
+              provider: isKilo ? 'Kilo' : providerName,
+              providerId: isKilo ? 'kilo-gateway' : 'openai-compatible'
+            }
+          })
       )
     )
   } catch (error) {

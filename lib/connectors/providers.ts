@@ -25,9 +25,7 @@ export const CONNECTOR_SERVICES: ConnectorServiceDef[] = [
 export function providerForService(
   serviceId: string
 ): ConnectorProviderId | null {
-  return (
-    CONNECTOR_SERVICES.find(s => s.id === serviceId)?.provider ?? null
-  )
+  return CONNECTOR_SERVICES.find(s => s.id === serviceId)?.provider ?? null
 }
 
 export function servicesForProvider(
@@ -130,7 +128,10 @@ async function postForm(
   const body = new URLSearchParams(params)
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...headers },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...headers
+    },
     body: body.toString()
   })
   const data = (await res.json().catch(() => null)) as Record<
@@ -229,7 +230,9 @@ export async function exchangeCodeForTokens(args: {
   if (typeof data.access_token !== 'string' || !data.access_token) {
     throw new Error('Notion did not return an access token')
   }
-  const owner = data.owner as { user?: { id?: unknown; name?: unknown } } | undefined
+  const owner = data.owner as
+    | { user?: { id?: unknown; name?: unknown } }
+    | undefined
   return {
     accessToken: data.access_token,
     refreshToken: null,

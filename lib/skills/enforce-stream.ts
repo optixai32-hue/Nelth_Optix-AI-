@@ -60,7 +60,9 @@ function setTextInMessage(message: { parts?: unknown[] }, text: string): void {
  * keeps re-inserting emoji-as-UI-icons even when no visual skill is active, so
  * the cleanup must run on EVERY artifact response, not only for visual skills.
  */
-export function stripEmojiFromCodeInMessage(message: { parts?: unknown[] }): boolean {
+export function stripEmojiFromCodeInMessage(message: {
+  parts?: unknown[]
+}): boolean {
   const text = getTextFromParts(message.parts as never)
   if (!text) return false
   const cleaned = stripEmojisFromCodeBlocks(text)
@@ -107,8 +109,15 @@ Return ONLY the improved final result that demonstrably reflects every bullet ab
  * refinement itself errors.
  */
 export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
-  const { responseMessage, userQuery, skillCtx, model, modelConfig, searchMode, modelMessages } =
-    opts
+  const {
+    responseMessage,
+    userQuery,
+    skillCtx,
+    model,
+    modelConfig,
+    searchMode,
+    modelMessages
+  } = opts
 
   if (!skillCtx.activated.length) return
 
@@ -130,9 +139,8 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
   // NOT apply skills-main). So it is NO LONGER trusted and is held to the same
   // standard: it is forced through the skill-application reinforcement pass too.
   const isWeakModel = /dots-3-note-preview:free/i.test(model)
-  const isThinkingModel = /(stepfun|step-3\.7-flash|nelth-3\.5 thinking|thinking)/i.test(
-    model
-  )
+  const isThinkingModel =
+    /(stepfun|step-3\.7-flash|nelth-3\.5 thinking|thinking)/i.test(model)
 
   // Visual/frontend artifacts must never contain emoji used as UI icons.
   const VISUAL_SKILLS = new Set([
@@ -178,7 +186,9 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
 
   if (first.passed && !isWeakModel && !isThinkingModel) {
     if (process.env.SKILL_ROUTER_DEBUG === 'true') {
-      console.log('[SkillRouter] enforcement: first generation validation PASSED')
+      console.log(
+        '[SkillRouter] enforcement: first generation validation PASSED'
+      )
     }
     return
   }
@@ -204,7 +214,10 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
       modelConfig,
       searchMode,
       skillContext,
-      conversationLanguage: resolveConversationLanguage(modelMessages, userQuery)
+      conversationLanguage: resolveConversationLanguage(
+        modelMessages,
+        userQuery
+      )
     })
 
     const generate = async (prompt: string): Promise<string> => {
@@ -235,7 +248,11 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
       maxIterations: forceApply ? 2 : undefined
     })
 
-    if (out.finalContent && out.finalContent.trim() && out.finalContent !== draft) {
+    if (
+      out.finalContent &&
+      out.finalContent.trim() &&
+      out.finalContent !== draft
+    ) {
       let finalContent = out.finalContent
       if (isVisualSkill) finalContent = stripEmojisFromCodeBlocks(finalContent)
       setTextInMessage(responseMessage, finalContent)
@@ -247,7 +264,10 @@ export async function enforceSkillOutput(opts: EnforceOptions): Promise<void> {
     }
   } catch (e) {
     if (process.env.SKILL_ROUTER_DEBUG === 'true') {
-      console.log('[SkillRouter] enforcement refinement error:', String(e).slice(0, 200))
+      console.log(
+        '[SkillRouter] enforcement refinement error:',
+        String(e).slice(0, 200)
+      )
     }
   }
 }

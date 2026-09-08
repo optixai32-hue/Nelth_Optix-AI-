@@ -36,7 +36,10 @@ function textHeight(text: string, fontSize: number, width = CONTENT_W): number {
   return Math.ceil(lines * fontSize * 1.25) / 72
 }
 
-export async function renderPptx(ast: DocumentAST, opts: RenderOptions = {}): Promise<Buffer> {
+export async function renderPptx(
+  ast: DocumentAST,
+  opts: RenderOptions = {}
+): Promise<Buffer> {
   const pptx = new PptxGen()
   pptx.layout = 'LAYOUT_WIDE'
   pptx.author = ast.metadata?.author ?? 'Morphic'
@@ -49,16 +52,32 @@ export async function renderPptx(ast: DocumentAST, opts: RenderOptions = {}): Pr
   const titleSlide = state.slide
   titleSlide.background = { color: 'FFFFFF' }
   titleSlide.addShape(pptx.ShapeType.rect, {
-    x: 0, y: 0, w: 0.28, h: LAYOUT_H, fill: { color: accent }
+    x: 0,
+    y: 0,
+    w: 0.28,
+    h: LAYOUT_H,
+    fill: { color: accent }
   })
   titleSlide.addText(ast.metadata?.title ?? 'Document', {
-    x: MARGIN_X, y: LAYOUT_H / 2 - 1.2, w: CONTENT_W, h: 1.6,
-    fontSize: 44, bold: true, color: BODY_COLOR, align: 'left', valign: 'middle'
+    x: MARGIN_X,
+    y: LAYOUT_H / 2 - 1.2,
+    w: CONTENT_W,
+    h: 1.6,
+    fontSize: 44,
+    bold: true,
+    color: BODY_COLOR,
+    align: 'left',
+    valign: 'middle'
   })
   if (ast.metadata?.author) {
     titleSlide.addText(ast.metadata.author, {
-      x: MARGIN_X, y: LAYOUT_H / 2 + 0.7, w: CONTENT_W, h: 0.5,
-      fontSize: 18, color: MUTED_COLOR, align: 'left'
+      x: MARGIN_X,
+      y: LAYOUT_H / 2 + 0.7,
+      w: CONTENT_W,
+      h: 0.5,
+      fontSize: 18,
+      color: MUTED_COLOR,
+      align: 'left'
     })
   }
 
@@ -77,17 +96,36 @@ export async function renderPptx(ast: DocumentAST, opts: RenderOptions = {}): Pr
   return Buffer.from(data as never)
 }
 
-function newContentSlide(pptx: PptxGen, state: { slide: Slide; y: number }, title: string, accent: string): void {
+function newContentSlide(
+  pptx: PptxGen,
+  state: { slide: Slide; y: number },
+  title: string,
+  accent: string
+): void {
   state.slide = pptx.addSlide()
   state.slide.addShape(pptx.ShapeType.rect, {
-    x: 0, y: 0, w: LAYOUT_W, h: 1.2, fill: { color: 'F7F8FA' }
+    x: 0,
+    y: 0,
+    w: LAYOUT_W,
+    h: 1.2,
+    fill: { color: 'F7F8FA' }
   })
   state.slide.addShape(pptx.ShapeType.rect, {
-    x: 0, y: 0, w: 0.28, h: 1.2, fill: { color: accent }
+    x: 0,
+    y: 0,
+    w: 0.28,
+    h: 1.2,
+    fill: { color: accent }
   })
   state.slide.addText(title, {
-    x: MARGIN_X, y: 0.18, w: CONTENT_W, h: 0.85,
-    fontSize: 28, bold: true, color: BODY_COLOR, valign: 'middle'
+    x: MARGIN_X,
+    y: 0.18,
+    w: CONTENT_W,
+    h: 0.85,
+    fontSize: 28,
+    bold: true,
+    color: BODY_COLOR,
+    valign: 'middle'
   })
   state.y = CONTENT_Y
 }
@@ -95,7 +133,13 @@ function newContentSlide(pptx: PptxGen, state: { slide: Slide; y: number }, titl
 function placeText(
   state: { slide: Slide; y: number },
   text: string,
-  opts: { fontSize?: number; bold?: boolean; italic?: boolean; color?: string; box?: boolean } = {}
+  opts: {
+    fontSize?: number
+    bold?: boolean
+    italic?: boolean
+    color?: string
+    box?: boolean
+  } = {}
 ): void {
   const fontSize = opts.fontSize ?? 18
   const h = textHeight(text, fontSize) + 0.12
@@ -119,7 +163,12 @@ function placeText(
   state.y += h + 0.18
 }
 
-async function blockToPptx(pptx: PptxGen, state: { slide: Slide; y: number }, b: DocumentBlock, accent: string): Promise<void> {
+async function blockToPptx(
+  pptx: PptxGen,
+  state: { slide: Slide; y: number },
+  b: DocumentBlock,
+  accent: string
+): Promise<void> {
   switch (b.type) {
     case 'heading': {
       const level = clamp(b.level, 1, 6)
@@ -137,11 +186,20 @@ async function blockToPptx(pptx: PptxGen, state: { slide: Slide; y: number }, b:
     case 'list': {
       const items = b.items.map(t => ({
         text: t,
-        options: { bullet: b.ordered ? { type: 'number' as const } : { code: '2022' }, color: BODY_COLOR }
+        options: {
+          bullet: b.ordered ? { type: 'number' as const } : { code: '2022' },
+          color: BODY_COLOR
+        }
       }))
       const h = textHeight(b.items.join('\n'), 18) + b.items.length * 0.12
       state.slide.addText(items, {
-        x: MARGIN_X + 0.2, y: state.y, w: CONTENT_W, h, fontSize: 18, color: BODY_COLOR, valign: 'top'
+        x: MARGIN_X + 0.2,
+        y: state.y,
+        w: CONTENT_W,
+        h,
+        fontSize: 18,
+        color: BODY_COLOR,
+        valign: 'top'
       })
       state.y += h + 0.2
       return
@@ -150,14 +208,25 @@ async function blockToPptx(pptx: PptxGen, state: { slide: Slide; y: number }, b:
       placeTable(state, b.headers, b.rows, accent)
       return
     case 'quote':
-      placeText(state, b.text, { fontSize: 18, italic: true, color: MUTED_COLOR })
+      placeText(state, b.text, {
+        fontSize: 18,
+        italic: true,
+        color: MUTED_COLOR
+      })
       return
     case 'code': {
       const h = textHeight(b.code, 14) + 0.24
       state.slide.addText(b.code, {
-        x: MARGIN_X, y: state.y, w: CONTENT_W, h,
-        fontSize: 14, fontFace: 'Consolas', fill: { color: 'F4F4F7' },
-        line: { color: 'D4D4DC', width: 1 }, color: BODY_COLOR, valign: 'top'
+        x: MARGIN_X,
+        y: state.y,
+        w: CONTENT_W,
+        h,
+        fontSize: 14,
+        fontFace: 'Consolas',
+        fill: { color: 'F4F4F7' },
+        line: { color: 'D4D4DC', width: 1 },
+        color: BODY_COLOR,
+        valign: 'top'
       })
       state.y += h + 0.2
       return
@@ -165,7 +234,11 @@ async function blockToPptx(pptx: PptxGen, state: { slide: Slide; y: number }, b:
     case 'image': {
       const img = imageSource(b.url)
       if (!img) {
-        placeText(state, `[image: ${b.alt ?? b.url}]`, { fontSize: 16, italic: true, color: MUTED_COLOR })
+        placeText(state, `[image: ${b.alt ?? b.url}]`, {
+          fontSize: 16,
+          italic: true,
+          color: MUTED_COLOR
+        })
         return
       }
       const w = 6.2
@@ -181,16 +254,28 @@ async function blockToPptx(pptx: PptxGen, state: { slide: Slide; y: number }, b:
   }
 }
 
-function placeTable(state: { slide: Slide; y: number }, headers: string[], rows: string[][], accent: string): void {
+function placeTable(
+  state: { slide: Slide; y: number },
+  headers: string[],
+  rows: string[][],
+  accent: string
+): void {
   const body: any[] = [
-    headers.map(h => ({ text: h, options: { bold: true, fill: { color: accent }, color: 'FFFFFF' } })),
+    headers.map(h => ({
+      text: h,
+      options: { bold: true, fill: { color: accent }, color: 'FFFFFF' }
+    })),
     ...rows.map(r => r.map(c => ({ text: c, options: { color: BODY_COLOR } })))
   ]
   const h = Math.max(1, headers.length + rows.length) * 0.45 + 0.2
   state.slide.addTable(body, {
-    x: MARGIN_X, y: state.y, w: CONTENT_W, fontSize: 14,
+    x: MARGIN_X,
+    y: state.y,
+    w: CONTENT_W,
+    fontSize: 14,
     border: { type: 'solid', color: 'D4D4DC', pt: 1 },
-    color: BODY_COLOR, valign: 'middle'
+    color: BODY_COLOR,
+    valign: 'middle'
   })
   state.y += h + 0.25
 }

@@ -15,7 +15,11 @@ const AST: DocumentAST = {
   blocks: [
     { type: 'heading', level: 1, text: 'Architecture Maturity' },
     { type: 'paragraph', text: 'The AST is now format-agnostic.' },
-    { type: 'list', ordered: false, items: ['Decoupled', 'Stable', 'Extensible'] },
+    {
+      type: 'list',
+      ordered: false,
+      items: ['Decoupled', 'Stable', 'Extensible']
+    },
     { type: 'list', ordered: true, items: ['First', 'Second'] },
     {
       type: 'table',

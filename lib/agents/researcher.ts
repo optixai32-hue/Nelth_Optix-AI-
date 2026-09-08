@@ -22,7 +22,8 @@ import { foldText, intentRe } from '../skills/text-fold'
 import {
   CONNECTOR_TOOL_NAMES,
   type ConnectorTools,
-  createConnectorTools} from '../tools/connectors'
+  createConnectorTools
+} from '../tools/connectors'
 import { documentTool } from '../tools/document'
 import { fetchTool } from '../tools/fetch'
 import { createImageGenerationTool } from '../tools/image-generation'
@@ -702,166 +703,162 @@ export async function createResearcher({
         break
     }
 
-      // RUNTIME ENFORCEMENT of the no-search-for-code rule. Some reasoning models
-      // (e.g. thinkingmachines/inkling) ignore the equivalent prompt instruction
-      // and still call search/fetch for "create a landing page" requests. When the
-      // query is a from-scratch code/artifact creation (no external reference),
-      // physically remove search/fetch from the active toolset. Keep them when the
-      // user references a URL, asks to clone a site, or wants a real asset. Also
-      // drop the document tool unless the user explicitly wants a downloadable file.
-      const artifactIntent = detectArtifactIntent(userQuery ?? '')
-      if (artifactIntent.isCode) {
-        if (!artifactIntent.needsExternal) {
-          activeToolsList = activeToolsList.filter(
-            t => t !== 'search' && t !== 'fetch'
-          )
-        }
-        if (!artifactIntent.wantsDownload) {
-          activeToolsList = activeToolsList.filter(t => t !== 'document')
-        }
-        // RUNTIME ENFORCEMENT of the no-image-generation-for-code rule: a code/
-        // artifact creation request (e.g. "create a landing page") must never
-        // trigger the generateImage tool. Drop it from the active toolset so the
-        // model generates the code directly instead of calling image generation.
-        activeToolsList = activeToolsList.filter(t => t !== 'generateImage')
-        console.log(
-          `[Researcher] Code/artifact request detected — tools=[${activeToolsList.join(', ')}] (external=${artifactIntent.needsExternal}, download=${artifactIntent.wantsDownload})`
-        )
-      }
-
-      // WEB IMAGE SEARCH: when the user wants to FIND existing images on the web
-      // (a search/find/show verb + an image noun, and no generation verb), drop
-      // generateImage so the model searches via the search tool (content_types:
-      // ["image"]) instead of generating a brand-new image. "cherche des images
-      // de musique" must NOT trigger image generation.
-      if (isWebImageSearch(userQuery ?? '')) {
-        activeToolsList = activeToolsList.filter(t => t !== 'generateImage')
-        if (!activeToolsList.includes('search')) activeToolsList.push('search')
-        console.log(
-          `[Researcher] Web image search detected — generateImage disarmed, tools=[${activeToolsList.join(', ')}]`
-        )
-      }
-
-      // IMAGE TASKS: the weak model (Nelth-3.5) sometimes emits a spurious
-      // `tool-search` fake-XML call before the real image tool, which the runtime
-      // executes as a garbage web search ("Searching for 'tool-search'"). When the
-      // request is an image task that does NOT genuinely need web search, drop
-      // search/fetch so generateImage is the only generative tool — the model goes
-      // straight to the image without a bogus search round-trip. (If a real search
-      // is needed, caps.needsSearch is true and we keep the tools.)
-      if (capabilities?.needsImage && !capabilities?.needsSearch) {
-        const before = activeToolsList.join(',')
+    // RUNTIME ENFORCEMENT of the no-search-for-code rule. Some reasoning models
+    // (e.g. thinkingmachines/inkling) ignore the equivalent prompt instruction
+    // and still call search/fetch for "create a landing page" requests. When the
+    // query is a from-scratch code/artifact creation (no external reference),
+    // physically remove search/fetch from the active toolset. Keep them when the
+    // user references a URL, asks to clone a site, or wants a real asset. Also
+    // drop the document tool unless the user explicitly wants a downloadable file.
+    const artifactIntent = detectArtifactIntent(userQuery ?? '')
+    if (artifactIntent.isCode) {
+      if (!artifactIntent.needsExternal) {
         activeToolsList = activeToolsList.filter(
           t => t !== 'search' && t !== 'fetch'
         )
-        if (before !== activeToolsList.join(',')) {
-          console.log(
-            `[Researcher] Image task — dropped search/fetch to avoid spurious tool-search, tools=[${activeToolsList.join(', ')}]`
-          )
-        }
       }
-
-      // INTERNAL KNOWLEDGE & FOUNDER PHOTO: answer directly from internal knowledge.
-      // Do NOT run web search and do NOT invoke generateImage.
-      if (
-        capabilities?.founderPhoto ||
-        INTERNAL_KNOWLEDGE_SUBJECT_RE.test(userQuery ?? '')
-      ) {
-        activeToolsList = []
+      if (!artifactIntent.wantsDownload) {
+        activeToolsList = activeToolsList.filter(t => t !== 'document')
       }
+      // RUNTIME ENFORCEMENT of the no-image-generation-for-code rule: a code/
+      // artifact creation request (e.g. "create a landing page") must never
+      // trigger the generateImage tool. Drop it from the active toolset so the
+      // model generates the code directly instead of calling image generation.
+      activeToolsList = activeToolsList.filter(t => t !== 'generateImage')
+      console.log(
+        `[Researcher] Code/artifact request detected — tools=[${activeToolsList.join(', ')}] (external=${artifactIntent.needsExternal}, download=${artifactIntent.wantsDownload})`
+      )
+    }
 
-      const isNonThinking =
-        isNonThinkingModelId(modelConfig?.id) || isNonThinkingModelId(model)
+    // WEB IMAGE SEARCH: when the user wants to FIND existing images on the web
+    // (a search/find/show verb + an image noun, and no generation verb), drop
+    // generateImage so the model searches via the search tool (content_types:
+    // ["image"]) instead of generating a brand-new image. "cherche des images
+    // de musique" must NOT trigger image generation.
+    if (isWebImageSearch(userQuery ?? '')) {
+      activeToolsList = activeToolsList.filter(t => t !== 'generateImage')
+      if (!activeToolsList.includes('search')) activeToolsList.push('search')
+      console.log(
+        `[Researcher] Web image search detected — generateImage disarmed, tools=[${activeToolsList.join(', ')}]`
+      )
+    }
 
-      // LAZY TOOL ARMING: for non-thinking models, a trivial request arms no tools.
-      // For thinking models (reasoning models), NEVER wipe out tools because the
-      // thinking model dynamically decides in its chain-of-thought whether to call
-      // tools (search, fetch, etc.). Wiping out tools causes the thinking model
-      // to fail to call the tool it decided to use.
-      if (capabilities?.trivial && isNonThinking) {
-        activeToolsList = []
-      }
-
-      if (preloadedSearchContext || isNonThinking) {
-        activeToolsList = activeToolsList.filter(
-          toolName => toolName !== 'search' && toolName !== 'fetch'
+    // IMAGE TASKS: the weak model (Nelth-3.5) sometimes emits a spurious
+    // `tool-search` fake-XML call before the real image tool, which the runtime
+    // executes as a garbage web search ("Searching for 'tool-search'"). When the
+    // request is an image task that does NOT genuinely need web search, drop
+    // search/fetch so generateImage is the only generative tool — the model goes
+    // straight to the image without a bogus search round-trip. (If a real search
+    // is needed, caps.needsSearch is true and we keep the tools.)
+    if (capabilities?.needsImage && !capabilities?.needsSearch) {
+      const before = activeToolsList.join(',')
+      activeToolsList = activeToolsList.filter(
+        t => t !== 'search' && t !== 'fetch'
+      )
+      if (before !== activeToolsList.join(',')) {
+        console.log(
+          `[Researcher] Image task — dropped search/fetch to avoid spurious tool-search, tools=[${activeToolsList.join(', ')}]`
         )
       }
+    }
 
-      // CONNECTORS (user-owned apps: Gmail, Drive, Calendar, GitHub, Notion).
-      // Armed ONLY when the turn targets the user's own data — never for
-      // greetings, code artifacts, or plain web research — so the 5 tool
-      // definitions don't bloat every prompt. Tool-capable models get native
-      // tools; the weak non-thinking model (tools stripped above) gets a
-      // server-side preload layer with the same data as injected text.
-      let connectorLayer = ''
-      let connectorTools: ConnectorTools | null = null
-      const connectorIntent =
-        connectorIntentOverride ?? detectConnectorIntent(userQuery ?? '')
-      const connectorsAllowed = shouldEngageConnectors({
-        userId,
-        connectorIntent,
-        preloadedSearchContext,
-        isCodeWithoutExternal:
-          artifactIntent.isCode && !artifactIntent.needsExternal
-      })
-      if (connectorsAllowed && userId) {
-        try {
-          const ctx = await buildConnectorContext(userId)
-          connectorLayer = ctx.text
-          if (ctx.anyConnected) {
-            let connectorPreloadAdded = false
-            if (!isNonThinking) {
-              connectorTools = createConnectorTools(userId)
-              activeToolsList.push(...CONNECTOR_TOOL_NAMES)
-            } else {
-              const preload = await runConnectorPreloadStructured(
-                userId,
-                userQuery ?? '',
-                ctx.status
-              )
-              if (preload.layer) {
-                connectorLayer += preload.layer
-                connectorPreloadAdded = true
-              }
-              if (connectorCallsSink && preload.calls.length > 0) {
-                connectorCallsSink.push(...preload.calls)
-              }
+    // INTERNAL KNOWLEDGE & FOUNDER PHOTO: answer directly from internal knowledge.
+    // Do NOT run web search and do NOT invoke generateImage.
+    if (
+      capabilities?.founderPhoto ||
+      INTERNAL_KNOWLEDGE_SUBJECT_RE.test(userQuery ?? '')
+    ) {
+      activeToolsList = []
+    }
+
+    const isNonThinking =
+      isNonThinkingModelId(modelConfig?.id) || isNonThinkingModelId(model)
+
+    // LAZY TOOL ARMING: for non-thinking models, a trivial request arms no tools.
+    // For thinking models (reasoning models), NEVER wipe out tools because the
+    // thinking model dynamically decides in its chain-of-thought whether to call
+    // tools (search, fetch, etc.). Wiping out tools causes the thinking model
+    // to fail to call the tool it decided to use.
+    if (capabilities?.trivial && isNonThinking) {
+      activeToolsList = []
+    }
+
+    if (preloadedSearchContext || isNonThinking) {
+      activeToolsList = activeToolsList.filter(
+        toolName => toolName !== 'search' && toolName !== 'fetch'
+      )
+    }
+
+    // CONNECTORS (user-owned apps: Gmail, Drive, Calendar, GitHub, Notion).
+    // Armed ONLY when the turn targets the user's own data — never for
+    // greetings, code artifacts, or plain web research — so the 5 tool
+    // definitions don't bloat every prompt. Tool-capable models get native
+    // tools; the weak non-thinking model (tools stripped above) gets a
+    // server-side preload layer with the same data as injected text.
+    let connectorLayer = ''
+    let connectorTools: ConnectorTools | null = null
+    const connectorIntent =
+      connectorIntentOverride ?? detectConnectorIntent(userQuery ?? '')
+    const connectorsAllowed = shouldEngageConnectors({
+      userId,
+      connectorIntent,
+      preloadedSearchContext,
+      isCodeWithoutExternal:
+        artifactIntent.isCode && !artifactIntent.needsExternal
+    })
+    if (connectorsAllowed && userId) {
+      try {
+        const ctx = await buildConnectorContext(userId)
+        connectorLayer = ctx.text
+        if (ctx.anyConnected) {
+          let connectorPreloadAdded = false
+          if (!isNonThinking) {
+            connectorTools = createConnectorTools(userId)
+            activeToolsList.push(...CONNECTOR_TOOL_NAMES)
+          } else {
+            const preload = await runConnectorPreloadStructured(
+              userId,
+              userQuery ?? '',
+              ctx.status
+            )
+            if (preload.layer) {
+              connectorLayer += preload.layer
+              connectorPreloadAdded = true
             }
-            // RUNTIME ENFORCEMENT of the no-image-generation-for-connector
-            // rule. Observed failure: "résume mes derniers mails" → the
-            // model announces the Gmail lookup, then mis-fires the
-            // generateImage tool (an image can never answer a personal-data
-            // request) and the loop stops on the generated image with the
-            // mailbox never read. Physically remove generateImage while a
-            // connector request is engaged — unless the query explicitly
-            // asks for an image too (capabilities.needsImage).
-            if (!capabilities?.needsImage) {
-              const before = activeToolsList.join(',')
-              activeToolsList = activeToolsList.filter(
-                t => t !== 'generateImage'
-              )
-              if (before !== activeToolsList.join(',')) {
-                console.log(
-                  `[Researcher] Connector request engaged — generateImage disarmed, tools=[${activeToolsList.join(',')}]`
-                )
-              }
+            if (connectorCallsSink && preload.calls.length > 0) {
+              connectorCallsSink.push(...preload.calls)
             }
-            // Same enforcement for the weak model holding preloaded connector
-            // data: it must ANSWER from the provided results, not flee into
-            // the document tool (observed: "résume mes mails" → generated a
-            // .docx template + claimed Gmail was unreadable). Keep document
-            // only when explicitly requested (".docx", "pdf", …).
-            if (connectorPreloadAdded && !capabilities?.needsDocument) {
-              activeToolsList = activeToolsList.filter(
-                t => t !== 'document'
+          }
+          // RUNTIME ENFORCEMENT of the no-image-generation-for-connector
+          // rule. Observed failure: "résume mes derniers mails" → the
+          // model announces the Gmail lookup, then mis-fires the
+          // generateImage tool (an image can never answer a personal-data
+          // request) and the loop stops on the generated image with the
+          // mailbox never read. Physically remove generateImage while a
+          // connector request is engaged — unless the query explicitly
+          // asks for an image too (capabilities.needsImage).
+          if (!capabilities?.needsImage) {
+            const before = activeToolsList.join(',')
+            activeToolsList = activeToolsList.filter(t => t !== 'generateImage')
+            if (before !== activeToolsList.join(',')) {
+              console.log(
+                `[Researcher] Connector request engaged — generateImage disarmed, tools=[${activeToolsList.join(',')}]`
               )
             }
           }
-        } catch (e) {
-          console.error('[Researcher] Connector context failed:', e)
+          // Same enforcement for the weak model holding preloaded connector
+          // data: it must ANSWER from the provided results, not flee into
+          // the document tool (observed: "résume mes mails" → generated a
+          // .docx template + claimed Gmail was unreadable). Keep document
+          // only when explicitly requested (".docx", "pdf", …).
+          if (connectorPreloadAdded && !capabilities?.needsDocument) {
+            activeToolsList = activeToolsList.filter(t => t !== 'document')
+          }
         }
+      } catch (e) {
+        console.error('[Researcher] Connector context failed:', e)
       }
+    }
 
     // Build tools object with proper typing
     const tools: ResearcherTools = {
@@ -869,7 +866,9 @@ export async function createResearcher({
       fetch: fetchTool,
       askQuestion: askQuestionTool,
       document: documentTool,
-      generateImage: createImageGenerationTool({ runtimeImage: imageAttachment }),
+      generateImage: createImageGenerationTool({
+        runtimeImage: imageAttachment
+      }),
       ...todoTools,
       ...(connectorTools ?? {})
     } as ResearcherTools
@@ -881,7 +880,7 @@ export async function createResearcher({
     // and answered generically. Quality first: full instructions for all.
     const CORE_DIRECTIVE = FULL_CORE_DIRECTIVE
 
-  const TOOL_CALL_PROTOCOL = `TOOL CALL PROTOCOL — NON-NEGOTIABLE:
+    const TOOL_CALL_PROTOCOL = `TOOL CALL PROTOCOL — NON-NEGOTIABLE:
 - When current or external information is needed, invoke the native \`search\` tool immediately.
 - ONE search per question: run a single well-formed search, then ANSWER from its results. A second search is allowed ONLY if results came back empty or completely off-topic. NEVER fire parallel, repeat, or reformulated searches.
 - Never output <tool_call>, <function=search>, or a JSON object pretending to be a tool call in the assistant text.
@@ -965,9 +964,7 @@ Requirements for the artifact:
     // Create ToolLoopAgent with all configuration
     const hasCompletedSearch = (steps: any[]) =>
       steps.some(step =>
-        (step.toolCalls ?? []).some(
-          (call: any) => call.toolName === 'search'
-        )
+        (step.toolCalls ?? []).some((call: any) => call.toolName === 'search')
       )
 
     const repairLegacyToolCall = async ({ toolCall, error }: any) => {
@@ -1010,12 +1007,16 @@ Requirements for the artifact:
         : capabilities?.needsSearch &&
             activeToolsList.includes('search') &&
             !connectorTools
-          ? { toolChoice: { type: 'tool' as const, toolName: 'search' as const } }
+          ? {
+              toolChoice: { type: 'tool' as const, toolName: 'search' as const }
+            }
           : {}),
       prepareStep: ({ steps }) => {
         if (!hasCompletedSearch(steps)) return {}
         return {
-          activeTools: activeToolsList.filter(toolName => toolName !== 'search'),
+          activeTools: activeToolsList.filter(
+            toolName => toolName !== 'search'
+          ),
           toolChoice: 'auto' as const
         }
       },
@@ -1023,10 +1024,7 @@ Requirements for the artifact:
       // Stop the loop as soon as an image has been generated so the model does
       // not start a second reasoning pass or keep elaborating. The image is
       // already shown by its own UI component.
-      stopWhen: [
-        stepCountIs(maxSteps),
-        hasToolCall('generateImage')
-      ],
+      stopWhen: [stepCountIs(maxSteps), hasToolCall('generateImage')],
       ...(modelConfig?.providerOptions && {
         providerOptions: modelConfig.providerOptions
       }),

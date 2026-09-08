@@ -27,8 +27,7 @@ const fakeLoaded: LoadedSkill[] = [
     slug: 'frontend-design',
     name: 'Frontend Design',
     objective: 'distinctive visual design',
-    body:
-      'Approach this as the design lead. Spend your boldness in one place. Do not produce templated defaults. Critique your own work as you build. Choose a concrete aesthetic direction specific to this brief.',
+    body: 'Approach this as the design lead. Spend your boldness in one place. Do not produce templated defaults. Critique your own work as you build. Choose a concrete aesthetic direction specific to this brief.',
     references: [],
     meta: { domain: 'frontend' } as never
   }
@@ -40,12 +39,22 @@ const fakeCtx: SkillContextResult = {
   selected: [],
   validationRules: ['Layout is responsive.'],
   states: { 'frontend-design': 'active' },
-  debug: { detected: ['frontend-design'], loaded: ['frontend-design'], skillMdLoaded: true, instructionsInjected: true, execution: true, validation: true }
+  debug: {
+    detected: ['frontend-design'],
+    loaded: ['frontend-design'],
+    skillMdLoaded: true,
+    instructionsInjected: true,
+    execution: true,
+    validation: true
+  }
 }
 
 describe('enforce.ts — operational prompt + lifecycle engine', () => {
   it('buildOperationalSkillPrompt extracts concrete constraints from the SKILL.md body', () => {
-    const p = buildOperationalSkillPrompt(fakeLoaded, 'Crée une landing page moderne')
+    const p = buildOperationalSkillPrompt(
+      fakeLoaded,
+      'Crée une landing page moderne'
+    )
     expect(p).toContain('ACTIVE SKILL: Frontend Design (frontend-design)')
     expect(p).toContain('MANDATORY DESIGN CONSTRAINTS')
     expect(p).toContain('QUALITY CRITERIA')
@@ -87,7 +96,9 @@ describe('enforce.ts — operational prompt + lifecycle engine', () => {
     const generate = async (): Promise<string> =>
       '```css\n.hero { padding:block:var(--s8); }\n```'
     const engine = new SkillEnforcementEngine(fakeActivated)
-    const out = await engine.run(generate, 'task', { slugs: ['frontend-design'] })
+    const out = await engine.run(generate, 'task', {
+      slugs: ['frontend-design']
+    })
     expect(out.iterations).toBe(MAX_SKILL_REFINEMENT_ITERATIONS)
     expect(out.passed).toBe(false)
     expect(out.state).toBe('completed')
@@ -105,7 +116,9 @@ describe('enforce.ts — operational prompt + lifecycle engine', () => {
   })
 
   it('buildRefinementPrompt lists the concrete violations', () => {
-    const r = validateGeneratedOutput('```css\n.hero { padding:block:var(--s8); }\n```')
+    const r = validateGeneratedOutput(
+      '```css\n.hero { padding:block:var(--s8); }\n```'
+    )
     const p = buildRefinementPrompt('draft', r, 'TASK: x')
     expect(p).toContain('css.invalid-property-colon')
     expect(p).toContain('FAILED VALIDATION')

@@ -40,9 +40,7 @@ describe('wrapSearchToolForQuickMode single-search cap', () => {
     const chunks = await collect(
       (wrapped.execute as Function)({ query: 'elon musk' }, {})
     )
-    const complete = chunks.find(
-      (c: any) => c?.state === 'complete'
-    ) as any
+    const complete = chunks.find((c: any) => c?.state === 'complete') as any
     expect(complete.number_of_results).toBe(1)
     expect(complete.results).toHaveLength(1)
     expect(complete.note).toBeUndefined()
@@ -53,9 +51,7 @@ describe('wrapSearchToolForQuickMode single-search cap', () => {
     const exec = wrapped.execute as Function
     await collect(exec({ query: 'elon musk' }, {}))
     const chunks = await collect(exec({ query: 'elon musk age' }, {}))
-    const complete = chunks.find(
-      (c: any) => c?.state === 'complete'
-    ) as any
+    const complete = chunks.find((c: any) => c?.state === 'complete') as any
     // Same results as the first search — never empty (empty caused retry loops).
     expect(complete.number_of_results).toBe(1)
     expect(complete.results).toHaveLength(1)

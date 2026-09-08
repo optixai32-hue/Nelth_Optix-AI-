@@ -89,13 +89,13 @@ export function LoginForm({
       {...props}
     >
       <Card className="w-full max-w-sm">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl flex flex-col items-center justify-center gap-4">
-              <IconLogo className="size-16" />
-              {t('auth.welcomeBack')}
-            </CardTitle>
-            <CardDescription>{t('auth.signInToAccount')}</CardDescription>
-          </CardHeader>
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl flex flex-col items-center justify-center gap-4">
+            <IconLogo className="size-16" />
+            {t('auth.welcomeBack')}
+          </CardTitle>
+          <CardDescription>{t('auth.signInToAccount')}</CardDescription>
+        </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
             <Button
@@ -136,7 +136,9 @@ export function LoginForm({
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-muted px-2 text-muted-foreground">{t('common.or')}</span>
+                <span className="bg-muted px-2 text-muted-foreground">
+                  {t('common.or')}
+                </span>
               </div>
             </div>
 

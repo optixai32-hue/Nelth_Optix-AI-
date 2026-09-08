@@ -84,10 +84,16 @@ export function ChatMessages({
   // Recomputed only when sections change (not on every render tick).
   const hasFirstToken = useMemo(() => {
     const latestSection = sections[sections.length - 1]
-    const latestMsg = latestSection?.assistantMessages[latestSection.assistantMessages.length - 1]
+    const latestMsg =
+      latestSection?.assistantMessages[
+        latestSection.assistantMessages.length - 1
+      ]
     return Boolean(
       latestMsg?.parts?.some(
-        (p: any) => p.type === 'text' && typeof p.text === 'string' && p.text.trim().length > 0
+        (p: any) =>
+          p.type === 'text' &&
+          typeof p.text === 'string' &&
+          p.text.trim().length > 0
       )
     )
   }, [sections])
@@ -399,7 +405,12 @@ export function ChatMessages({
                         messageId={section.userMessage.id}
                         hideUserFileList
                         getIsOpen={(id, partType, hasNextPart) =>
-                          getIsOpen(id, partType, hasNextPart, section.userMessage)
+                          getIsOpen(
+                            id,
+                            partType,
+                            hasNextPart,
+                            section.userMessage
+                          )
                         }
                         onOpenChange={handleOpenChange}
                         chatId={chatId}
@@ -471,7 +482,7 @@ export function ChatMessages({
                     maxHeight: showNelthLabel ? '2rem' : '0',
                     overflow: 'hidden',
                     transition: 'opacity 350ms ease, max-height 350ms ease',
-                    display: 'block',
+                    display: 'block'
                   }}
                 >
                   {<NelthLoadingLabel activity={currentActivity} />}
@@ -480,18 +491,20 @@ export function ChatMessages({
                 {!showNelthLabel && <ChatFooterMessage isLoading={isLoading} />}
               </div>
             )}
-            {sectionIndex === sections.length - 1 && error && (() => {
-              const hasDeliveredAssistantContent = section.assistantMessages.some(
-                m =>
-                  m.parts?.some(
-                    (p: any) =>
-                      p.type === 'text' && p.text && p.text.trim().length > 0
+            {sectionIndex === sections.length - 1 &&
+              error &&
+              (() => {
+                const hasDeliveredAssistantContent =
+                  section.assistantMessages.some(m =>
+                    m.parts?.some(
+                      (p: any) =>
+                        p.type === 'text' && p.text && p.text.trim().length > 0
+                    )
                   )
-              )
-              return !hasDeliveredAssistantContent ? (
-                <ChatError error={error} />
-              ) : null
-            })()}
+                return !hasDeliveredAssistantContent ? (
+                  <ChatError error={error} />
+                ) : null
+              })()}
           </div>
         ))}
       </div>

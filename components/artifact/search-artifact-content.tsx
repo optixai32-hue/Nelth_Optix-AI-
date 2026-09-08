@@ -45,12 +45,12 @@ export function SearchArtifactContent({ tool }: { tool: ToolPart<'search'> }) {
       {searchResults.images &&
         searchResults.images.length > 0 &&
         searchResults.images.length <= 3 && (
-        <SearchResultsImageSection
-          images={searchResults.images}
-          query={query}
-          displayMode="full"
-        />
-      )}
+          <SearchResultsImageSection
+            images={searchResults.images}
+            query={query}
+            displayMode="full"
+          />
+        )}
 
       {searchResults.videos && searchResults.videos.length > 0 && (
         <Section title="Videos">

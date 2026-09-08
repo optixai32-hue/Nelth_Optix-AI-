@@ -178,7 +178,7 @@ Entries correspond to cited sources in order. Their URLs remain in the preceding
  * generation with no prose), dropping it entirely would erase the fact that
  * an artifact was produced — follow-ups like "make it bigger" could no longer
  * resolve "it". Keep a one-line factual marker instead (URLs only, no prose).
- */function artifactMarkerText(message: UIMessage): string | null {
+ */ function artifactMarkerText(message: UIMessage): string | null {
   const markers: string[] = []
   for (const part of message.parts) {
     const output = (part as { output?: unknown }).output
@@ -188,7 +188,9 @@ Entries correspond to cited sources in order. Their URLs remain in the preceding
       artifact?: { downloadUrl?: unknown; fileName?: unknown }
     }
     if (typeof out.imageUrl === 'string' && out.imageUrl) {
-      markers.push(`[previous assistant turn generated an image: ${out.imageUrl}]`)
+      markers.push(
+        `[previous assistant turn generated an image: ${out.imageUrl}]`
+      )
     } else if (
       out.artifact &&
       typeof out.artifact === 'object' &&
@@ -295,10 +297,7 @@ function connectorContextText(message: UIMessage): string | null {
     } else if (typeof p.output.content === 'string' && p.output.content) {
       lines.push(`${service} (contenu lu):`)
       lines.push(truncateConnectorText(p.output.content, 600))
-    } else if (
-      Array.isArray(p.output.entries) &&
-      p.output.entries.length > 0
-    ) {
+    } else if (Array.isArray(p.output.entries) && p.output.entries.length > 0) {
       const names = p.output.entries
         .slice(0, 12)
         .map(e =>
@@ -307,7 +306,8 @@ function connectorContextText(message: UIMessage): string | null {
             : ''
         )
         .filter(Boolean)
-      if (names.length > 0) lines.push(`${service} (dossier): ${names.join(', ')}`)
+      if (names.length > 0)
+        lines.push(`${service} (dossier): ${names.join(', ')}`)
     }
   }
   if (lines.length === 0) return null

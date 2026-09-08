@@ -2,10 +2,7 @@
 
 import React from 'react'
 
-import {
-  IconLoader2 as Loader2,
-  IconX as X
-} from '@tabler/icons-react'
+import { IconLoader2 as Loader2, IconX as X } from '@tabler/icons-react'
 
 import { UploadedFile } from '@/lib/types'
 
@@ -80,11 +77,7 @@ const UploadedFilePill = React.memo(function UploadedFilePill({
       <span className="relative size-7 shrink-0 overflow-hidden rounded-md bg-muted/30">
         {isImage && imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageSrc}
-            alt=""
-            className="size-full object-cover"
-          />
+          <img src={imageSrc} alt="" className="size-full object-cover" />
         ) : (
           <span className="flex size-full items-center justify-center text-[9px] font-semibold text-muted-foreground">
             {ext}

@@ -14,7 +14,12 @@ export interface RenderOptions {
 // pageBreak opens a fresh sheet. No Excel-specific concept leaks into the AST.
 const MERGE_COLS = 8
 
-type XlsxState = { wb: ExcelJS.Workbook; ws: ExcelJS.Worksheet; row: number; tableIndex: number }
+type XlsxState = {
+  wb: ExcelJS.Workbook
+  ws: ExcelJS.Worksheet
+  row: number
+  tableIndex: number
+}
 
 function hexToArgb(hex: string): string {
   const clean = hex.replace(/^#/, '').toUpperCase()
@@ -32,7 +37,10 @@ function colLetter(n: number): string {
 }
 
 function safeSheetName(title: string | undefined): string {
-  const base = (title ?? 'Document').slice(0, 28).replace(/[\\/*?:[\]]/g, ' ').trim()
+  const base = (title ?? 'Document')
+    .slice(0, 28)
+    .replace(/[\\/*?:[\]]/g, ' ')
+    .trim()
   return base || 'Document'
 }
 
@@ -54,7 +62,10 @@ function safeSheetName(title: string | undefined): string {
  *                       ▼
  *                     .xlsx
  */
-export async function renderXlsx(ast: DocumentAST, opts: RenderOptions = {}): Promise<Buffer> {
+export async function renderXlsx(
+  ast: DocumentAST,
+  opts: RenderOptions = {}
+): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
   const state: XlsxState = {
     wb,
@@ -86,7 +97,11 @@ export async function renderXlsx(ast: DocumentAST, opts: RenderOptions = {}): Pr
   return Buffer.from(buf)
 }
 
-async function blockToXlsx(state: XlsxState, b: DocumentBlock, accent: string): Promise<void> {
+async function blockToXlsx(
+  state: XlsxState,
+  b: DocumentBlock,
+  accent: string
+): Promise<void> {
   const { ws } = state
   switch (b.type) {
     case 'heading': {
@@ -95,7 +110,11 @@ async function blockToXlsx(state: XlsxState, b: DocumentBlock, accent: string): 
       ws.mergeCells(range)
       const cell = ws.getCell(`A${state.row}`)
       cell.value = b.text
-      cell.font = { bold: true, size: level === 1 ? 16 : 13, color: { argb: accent } }
+      cell.font = {
+        bold: true,
+        size: level === 1 ? 16 : 13,
+        color: { argb: accent }
+      }
       state.row += 1
       return
     }
@@ -112,7 +131,9 @@ async function blockToXlsx(state: XlsxState, b: DocumentBlock, accent: string): 
       b.items.forEach((item, i) => {
         const range = `A${state.row}:${colLetter(MERGE_COLS)}${state.row}`
         ws.mergeCells(range)
-        ws.getCell(`A${state.row}`).value = b.ordered ? `${i + 1}. ${item}` : `• ${item}`
+        ws.getCell(`A${state.row}`).value = b.ordered
+          ? `${i + 1}. ${item}`
+          : `• ${item}`
         state.row += 1
       })
       return
@@ -147,7 +168,11 @@ async function blockToXlsx(state: XlsxState, b: DocumentBlock, accent: string): 
       const cell = ws.getCell(`A${state.row}`)
       cell.value = b.code
       cell.font = { name: 'Courier New', color: { argb: 'FF1A1A1E' } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F4F7' } }
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF4F4F7' }
+      }
       cell.alignment = { wrapText: true, vertical: 'top' }
       state.row += 1
       return
@@ -170,7 +195,9 @@ async function blockToXlsx(state: XlsxState, b: DocumentBlock, accent: string): 
       return
     }
     case 'pageBreak': {
-      state.ws = state.wb.addWorksheet(`Sheet ${state.wb.worksheets.length + 1}`)
+      state.ws = state.wb.addWorksheet(
+        `Sheet ${state.wb.worksheets.length + 1}`
+      )
       state.row = 1
       return
     }
@@ -186,7 +213,12 @@ async function blockToXlsx(state: XlsxState, b: DocumentBlock, accent: string): 
 async function imageSource(url: string): Promise<ExcelJS.Image | null> {
   const dataMatch = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(url)
   if (dataMatch) {
-    const ext = dataMatch[1] === 'image/png' ? 'png' : dataMatch[1] === 'image/gif' ? 'gif' : 'jpeg'
+    const ext =
+      dataMatch[1] === 'image/png'
+        ? 'png'
+        : dataMatch[1] === 'image/gif'
+          ? 'gif'
+          : 'jpeg'
     return { extension: ext, base64: dataMatch[2] }
   }
   if (/^https?:\/\//i.test(url)) {
@@ -194,7 +226,11 @@ async function imageSource(url: string): Promise<ExcelJS.Image | null> {
       const res = await fetch(url)
       if (!res.ok) return null
       const mime = res.headers.get('content-type') ?? ''
-      const ext = mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : 'jpeg'
+      const ext = mime.includes('png')
+        ? 'png'
+        : mime.includes('gif')
+          ? 'gif'
+          : 'jpeg'
       const buf = Buffer.from(await res.arrayBuffer())
       return { extension: ext, base64: buf.toString('base64') }
     } catch {

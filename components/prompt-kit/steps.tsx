@@ -8,8 +8,7 @@ import {
   CollapsibleTrigger
 } from '@/components/ui/collapsible'
 
-interface StepsRootProps
-  extends React.ComponentProps<typeof Collapsible> {
+interface StepsRootProps extends React.ComponentProps<typeof Collapsible> {
   children: React.ReactNode
   className?: string
   defaultOpen?: boolean
@@ -96,9 +95,7 @@ export function StepsContent({
     >
       <div className="flex border-t">
         {bar}
-        <div className="min-w-0 flex-1 space-y-1 px-3 py-2">
-          {children}
-        </div>
+        <div className="min-w-0 flex-1 space-y-1 px-3 py-2">{children}</div>
       </div>
     </CollapsibleContent>
   )
@@ -110,10 +107,7 @@ interface StepsBarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function StepsBar({ className }: StepsBarProps) {
   return (
-    <div
-      className={cn('bg-muted h-full w-[2px]', className)}
-      aria-hidden
-    />
+    <div className={cn('bg-muted h-full w-[2px]', className)} aria-hidden />
   )
 }
 

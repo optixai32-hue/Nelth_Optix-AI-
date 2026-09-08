@@ -10,12 +10,7 @@ import {
   NotionIcon
 } from './connector-icons'
 
-export type ConnectorId =
-  | 'drive'
-  | 'gmail'
-  | 'calendar'
-  | 'github'
-  | 'notion'
+export type ConnectorId = 'drive' | 'gmail' | 'calendar' | 'github' | 'notion'
 
 export type ConnectorProviderId = 'google' | 'github' | 'notion'
 
@@ -185,9 +180,9 @@ function waitForPopupResult(
 export function useConnectors(options: UseConnectorsOptions = {}) {
   const { connectImpl, popupTimeoutMs = 120000 } = options
   const [connectedIds, setConnectedIds] = useState<ConnectorId[]>([])
-  const [statuses, setStatuses] = useState<Record<ConnectorId, ConnectorStatus>>(
-    () => ({ ...EMPTY_STATUSES })
-  )
+  const [statuses, setStatuses] = useState<
+    Record<ConnectorId, ConnectorStatus>
+  >(() => ({ ...EMPTY_STATUSES }))
   const [configured, setConfigured] = useState<
     Record<ConnectorProviderId, boolean>
   >(() => ({ google: true, github: true, notion: true }))
@@ -198,7 +193,9 @@ export function useConnectors(options: UseConnectorsOptions = {}) {
   const [dismissed, setDismissed] = useState<boolean>(false)
 
   const setStatus = useCallback((id: ConnectorId, status: ConnectorStatus) => {
-    setStatuses(prev => (prev[id] === status ? prev : { ...prev, [id]: status }))
+    setStatuses(prev =>
+      prev[id] === status ? prev : { ...prev, [id]: status }
+    )
   }, [])
 
   const applyServerState = useCallback((state: ConnectorServerState) => {

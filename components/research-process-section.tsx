@@ -5,7 +5,10 @@ import Image from 'next/image'
 import type { ReasoningPart } from '@ai-sdk/provider-utils'
 import { UseChatHelpers } from '@ai-sdk/react'
 import { IconSearch as SearchIcon } from '@tabler/icons-react'
-import { PanelRightOpen as PanelRightIcon, Search as LucideSearchIcon } from 'lucide-react'
+import {
+  PanelRightOpen as PanelRightIcon,
+  Search as LucideSearchIcon
+} from 'lucide-react'
 
 import type {
   ToolPart,
@@ -121,7 +124,10 @@ export function ResearchProcessSection({
   // merged into a single block so the timeline stays step-by-step
   // (thinking, web search, thinking, ...) instead of grouping all
   // reasonings above all tools.
-  const items: Array<{ kind: 'reasoning'; parts: ReasoningPart[] } | { kind: 'tool'; part: MessagePart }> = []
+  const items: Array<
+    | { kind: 'reasoning'; parts: ReasoningPart[] }
+    | { kind: 'tool'; part: MessagePart }
+  > = []
   let currentReasoning: ReasoningPart[] = []
 
   const flushReasoning = () => {
@@ -164,7 +170,9 @@ export function ResearchProcessSection({
       const pos = filteredParts.indexOf(lastPart)
       const hasFollowingContent =
         pos >= 0 &&
-        filteredParts.slice(pos + 1).some(p => isToolPart(p) || isNonEmptyTextPart(p))
+        filteredParts
+          .slice(pos + 1)
+          .some(p => isToolPart(p) || isNonEmptyTextPart(p))
       if (!hasFollowingContent) {
         lastStreamingReasoningKey = `${messageId}-reasoning-${i}`
         break
@@ -237,7 +245,10 @@ function ReasoningStep({
   }
 
   return (
-    <div data-testid="reasoning-section" className="group/reasoning flex items-start gap-1">
+    <div
+      data-testid="reasoning-section"
+      className="group/reasoning flex items-start gap-1"
+    >
       <div className="min-w-0 flex-1">
         <Reasoning
           isStreaming={isStreaming && isActive}
@@ -288,11 +299,12 @@ function ToolStep({
     const output =
       part.state === 'output-available' ? (part.output as any) : undefined
     const generating = !output || output.state === 'generating'
-    const errorText =
-      output?.state === 'error' ? output?.errorText : undefined
+    const errorText = output?.state === 'error' ? output?.errorText : undefined
     const prompt =
-      output?.revisedPrompt || output?.originalPrompt ||
-      (part.input as any)?.prompt || ''
+      output?.revisedPrompt ||
+      output?.originalPrompt ||
+      (part.input as any)?.prompt ||
+      ''
 
     return (
       <ImageGeneration
@@ -362,9 +374,7 @@ function ToolStep({
           onOpenChange={onOpenChange}
           className="not-prose"
         >
-          <ChainOfThoughtHeader>
-            {`Web search: ${query}`}
-          </ChainOfThoughtHeader>
+          <ChainOfThoughtHeader>{`Web search: ${query}`}</ChainOfThoughtHeader>
           <ChainOfThoughtContent>
             <ChainOfThoughtStep
               icon={LucideSearchIcon}
@@ -403,7 +413,8 @@ function ToolStep({
       (part.state === 'output-available' &&
         (part.output as any)?.state === 'fetching')
 
-    const fetchOutput = part.state === 'output-available' ? (part.output as any) : undefined
+    const fetchOutput =
+      part.state === 'output-available' ? (part.output as any) : undefined
     const fetchItem =
       fetchOutput?.results?.[0] ??
       (fetchOutput?.result ? fetchOutput : undefined)
@@ -431,9 +442,7 @@ function ToolStep({
           <ChainOfThoughtStep
             icon={LucideSearchIcon}
             label={
-              isFetching
-                ? `Fetching ${fetchDomain}`
-                : `Fetched ${fetchDomain}`
+              isFetching ? `Fetching ${fetchDomain}` : `Fetched ${fetchDomain}`
             }
             status={part.state === 'output-available' ? 'complete' : 'active'}
           >

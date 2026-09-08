@@ -1,11 +1,6 @@
-import {
-  cert,
-  getApp,
-  getApps,
-  initializeApp
-} from 'firebase-admin/app'
-import { type Auth,getAuth as getFirebaseAuth } from 'firebase-admin/auth'
-import { type Firestore,getFirestore } from 'firebase-admin/firestore'
+import { cert, getApp, getApps, initializeApp } from 'firebase-admin/app'
+import { type Auth, getAuth as getFirebaseAuth } from 'firebase-admin/auth'
+import { type Firestore, getFirestore } from 'firebase-admin/firestore'
 
 type AdminApp = ReturnType<typeof getApp>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { type Locale,locales } from '@/lib/i18n/config'
+import { type Locale, locales } from '@/lib/i18n/config'
 import { cn } from '@/lib/utils'
 
 import { useI18n } from './i18n-provider'

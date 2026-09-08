@@ -64,7 +64,10 @@ import {
   shouldRetryEmptyAttempt
 } from './helpers/empty-response'
 import { normalizeConversationHistory } from './helpers/normalize-conversation'
-import { persistChatTitle, persistStreamMessages } from './helpers/persist-stream-results'
+import {
+  persistChatTitle,
+  persistStreamMessages
+} from './helpers/persist-stream-results'
 import { prepareMessages } from './helpers/prepare-messages'
 import { stripSpecFromMessages } from './helpers/strip-spec-from-messages'
 import type { StreamContext } from './helpers/types'
@@ -921,8 +924,7 @@ export async function createChatStreamResponse(
               // Best-effort background: title + tracing flush must never hold
               // the stream open (slow LLM / unreachable endpoint).
               void persistChatTitle(chatId, userId, titlePromise).catch(
-                (err: unknown) =>
-                  console.error('onFinish title error:', err)
+                (err: unknown) => console.error('onFinish title error:', err)
               )
             } catch (err) {
               console.error('onFinish post-processing error:', err)

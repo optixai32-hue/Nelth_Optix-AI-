@@ -103,7 +103,7 @@ export function ConnectorPanel({
       if (closeTimer.current) window.clearTimeout(closeTimer.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open ])
+  }, [open])
 
   useEffect(() => {
     if (!rendered || closing) return
@@ -112,7 +112,7 @@ export function ConnectorPanel({
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [rendered, closing, onClose ])
+  }, [rendered, closing, onClose])
 
   const handleConnect = useCallback(
     async (id: ConnectorId) => {
@@ -155,7 +155,9 @@ export function ConnectorPanel({
       <div
         className={cn(
           'relative w-full max-w-[420px] rounded-2xl border border-neutral-200 bg-white p-5 shadow-[0_24px_64px_-16px_rgba(0,0,0,0.35)]',
-          closing ? 'nelth-connector-panel-leave' : 'nelth-connector-panel-enter'
+          closing
+            ? 'nelth-connector-panel-leave'
+            : 'nelth-connector-panel-enter'
         )}
       >
         <div className="mb-1 flex items-start justify-between gap-3">
@@ -228,11 +230,7 @@ export function ConnectorPanel({
                         EASE
                       )}
                     >
-                      {busy ? (
-                        <RowSpinner />
-                      ) : (
-                        t('connector.reconnect')
-                      )}
+                      {busy ? <RowSpinner /> : t('connector.reconnect')}
                     </button>
                     <button
                       type="button"
@@ -287,9 +285,7 @@ export function ConnectorPanel({
                         void (async () => {
                           setBusyId(service.id)
                           try {
-                            await onDisconnect(
-                              providerForService(service.id)
-                            )
+                            await onDisconnect(providerForService(service.id))
                           } finally {
                             setBusyId(null)
                           }

@@ -49,7 +49,10 @@ export interface InvoiceModel {
 const EMOJI_RE =
   /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{2700}-\u{27BF}]/gu
 function stripEmoji(s: string): string {
-  return s.replace(EMOJI_RE, '').replace(/\s{2,}/g, ' ').trim()
+  return s
+    .replace(EMOJI_RE, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 }
 
 const AMOUNT_RE = /[\d\s]*[.,]\d{2}\s*€?|€\s*[\d\s,.]+/g
@@ -108,7 +111,8 @@ export function buildInvoiceModel(spec: Record<string, unknown>): InvoiceModel {
   model.invoiceNumber = take('invoiceNumber', 'number', 'invoiceNo', 'ref')
   model.issueDate = take('issueDate', 'date', 'created')
   model.dueDate = take('dueDate', 'due')
-  if (typeof src.currency === 'string' && src.currency.trim()) model.currency = src.currency.trim()
+  if (typeof src.currency === 'string' && src.currency.trim())
+    model.currency = src.currency.trim()
 
   // 2) Otherwise parse the Markdown body (the common path).
   const md = buildMarkdownSource(spec)
@@ -123,7 +127,8 @@ export function buildInvoiceModel(spec: Record<string, unknown>): InvoiceModel {
     const numMatch = h.match(/n[°o]?\s*[:#]?\s*([A-Za-z0-9\-/_]+)/i)
     if (numMatch && !model.invoiceNumber) model.invoiceNumber = numMatch[1]
     if (!model.title || model.title === 'FACTURE') {
-      model.title = h.replace(/n[°o]?\s*[:#]?\s*[A-Za-z0-9\-/_]+/i, '').trim() || 'FACTURE'
+      model.title =
+        h.replace(/n[°o]?\s*[:#]?\s*[A-Za-z0-9\-/_]+/i, '').trim() || 'FACTURE'
     }
   }
 
@@ -132,7 +137,11 @@ export function buildInvoiceModel(spec: Record<string, unknown>): InvoiceModel {
     for (const l of lines) {
       const s = stripEmoji(l).trim()
       if (!s) continue
-      if (/—|–|-/.test(s) && /[a-z]{2,}/i.test(s) && !/factur|invoice|condition|paiement|échéance/i.test(s)) {
+      if (
+        /—|–|-/.test(s) &&
+        /[a-z]{2,}/i.test(s) &&
+        !/factur|invoice|condition|paiement|échéance/i.test(s)
+      ) {
         const [name, ...rest] = s.split(/—|–|-/)
         model.brand = name.trim()
         if (!model.tagline && rest.length) model.tagline = rest.join(' ').trim()
@@ -159,14 +168,12 @@ export function buildInvoiceModel(spec: Record<string, unknown>): InvoiceModel {
     const s = stripEmoji(raw).trim()
     const low = s.toLowerCase()
     const isCustomerMarker =
-      /^[👤]/u.test(raw) ||
-      /^(factur[ée]\s*[àa]|client|bill\s*to)\b/i.test(low)
+      /^[👤]/u.test(raw) || /^(factur[ée]\s*[àa]|client|bill\s*to)\b/i.test(low)
     const isItemsMarker =
       /^[📋]/u.test(raw) ||
       /^(d[ée]tails|ligne|article|description)\b/i.test(low)
     const isTermsMarker =
-      /^[📝]/u.test(raw) ||
-      /^(condition|paiement|payment)\b/i.test(low)
+      /^[📝]/u.test(raw) || /^(condition|paiement|payment)\b/i.test(low)
 
     if (isCustomerMarker) {
       customerStarted = true
@@ -189,10 +196,14 @@ export function buildInvoiceModel(spec: Record<string, unknown>): InvoiceModel {
     const s = stripEmoji(raw).trim()
     const low = s.toLowerCase()
     const isSellerMarker =
-      /^(émetteur|emetteur|société|societe|seller|from|issuer|company)\b/i.test(low)
+      /^(émetteur|emetteur|société|societe|seller|from|issuer|company)\b/i.test(
+        low
+      )
     const isOtherMarker =
       /^[👤📋📝]/u.test(raw) ||
-      /^(factur|client|d[ée]tail|ligne|article|description|condition|paiement|payment)\b/i.test(low)
+      /^(factur|client|d[ée]tail|ligne|article|description|condition|paiement|payment)\b/i.test(
+        low
+      )
     if (isSellerMarker) {
       sellerStarted = true
       continue
@@ -227,7 +238,13 @@ export function buildInvoiceModel(spec: Record<string, unknown>): InvoiceModel {
       if (sep < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[sep])) {
         const colOf = (...keys: string[]) =>
           header.findIndex(h => keys.some(k => h.includes(k)))
-        const iDesc = colOf('description', 'libellé', 'article', 'prestation', 'désignation')
+        const iDesc = colOf(
+          'description',
+          'libellé',
+          'article',
+          'prestation',
+          'désignation'
+        )
         const iQty = colOf('qté', 'quant', 'qty', 'units')
         const iPrice = colOf('pu', 'prix', 'unit', 'ht')
         const iTotal = colOf('total', 'montant', 'ttc', 'tht')
@@ -277,15 +294,24 @@ export function buildInvoiceModel(spec: Record<string, unknown>): InvoiceModel {
       else if (rate && computedSubtotal != null) {
         model.tax = formatEUR(computedSubtotal * (parseInt(rate[1], 10) / 100))
       }
-    } else if (/total\s*ttc|grand\s*total|total\s*à\s*payer|net\s*à\s*payer/i.test(low)) {
+    } else if (
+      /total\s*ttc|grand\s*total|total\s*à\s*payer|net\s*à\s*payer/i.test(low)
+    ) {
       if (amt != null) model.total = formatEUR(amt)
     }
   }
   // Fallbacks from computed values.
-  if (computedSubtotal != null && !model.subtotal) model.subtotal = formatEUR(computedSubtotal)
-  if (model.subtotal && model.taxLabel && !model.tax && computedSubtotal != null) {
+  if (computedSubtotal != null && !model.subtotal)
+    model.subtotal = formatEUR(computedSubtotal)
+  if (
+    model.subtotal &&
+    model.taxLabel &&
+    !model.tax &&
+    computedSubtotal != null
+  ) {
     const rate = /(\d{1,2})/.exec(model.taxLabel)
-    if (rate) model.tax = formatEUR(computedSubtotal * (parseInt(rate[1], 10) / 100))
+    if (rate)
+      model.tax = formatEUR(computedSubtotal * (parseInt(rate[1], 10) / 100))
   }
   if (model.subtotal && model.tax && !model.total) {
     const a = parseAmount(model.subtotal)
@@ -300,14 +326,17 @@ export function buildInvoiceModel(spec: Record<string, unknown>): InvoiceModel {
     const m = DATE_RE.exec(raw)
     if (m) {
       const date = m[0].trim()
-      if (/émis|émet|date|créé|created|issued/.test(low)) dateCandidates.push({ date, kind: 'issue' })
-      else if (/échéance|due|paiement\s*avant/.test(low)) dateCandidates.push({ date, kind: 'due' })
+      if (/émis|émet|date|créé|created|issued/.test(low))
+        dateCandidates.push({ date, kind: 'issue' })
+      else if (/échéance|due|paiement\s*avant/.test(low))
+        dateCandidates.push({ date, kind: 'due' })
       else dateCandidates.push({ date, kind: 'other' })
     }
   }
   if (!model.issueDate) {
     const i = dateCandidates.find(d => d.kind === 'issue')
-    model.issueDate = i?.date ?? dateCandidates.find(d => d.kind === 'other')?.date
+    model.issueDate =
+      i?.date ?? dateCandidates.find(d => d.kind === 'other')?.date
   }
   if (!model.dueDate) {
     const d = dateCandidates.find(c => c.kind === 'due')
@@ -321,7 +350,9 @@ export function buildInvoiceModel(spec: Record<string, unknown>): InvoiceModel {
     const s = stripEmoji(raw).trim()
     const low = s.toLowerCase()
     const isTermsMarker = /^[📝]/u.test(raw) || /^conditions?\b/i.test(low)
-    const isOtherMarker = /^[👤📋]/u.test(raw) || /^(factur|client|d[ée]tail|ligne|article|description)\b/i.test(low)
+    const isOtherMarker =
+      /^[👤📋]/u.test(raw) ||
+      /^(factur|client|d[ée]tail|ligne|article|description)\b/i.test(low)
     if (isTermsMarker) {
       inTerms = true
       continue
@@ -336,7 +367,8 @@ export function buildInvoiceModel(spec: Record<string, unknown>): InvoiceModel {
         inTerms = false
         continue
       }
-      if (/iban|bic|swift|virement|compte|bancaire/i.test(low)) model.bank.push(s)
+      if (/iban|bic|swift|virement|compte|bancaire/i.test(low))
+        model.bank.push(s)
       else model.paymentTerms.push(s)
     }
   }
@@ -366,7 +398,8 @@ function esc(s: string): string {
 }
 
 function rowHtml(it: InvoiceItem): string {
-  const num = (v?: string) => (v ? `<td class="num">${esc(v)}</td>` : '<td class="num">—</td>')
+  const num = (v?: string) =>
+    v ? `<td class="num">${esc(v)}</td>` : '<td class="num">—</td>'
   return `<tr>
     <td>${esc(it.description)}</td>
     ${num(it.qty)}
@@ -389,7 +422,9 @@ function rowHtml(it: InvoiceItem): string {
 /** Brand / logo lockup + document title, number and key dates. */
 function InvoiceHeader(model: InvoiceModel): string {
   const brand = esc(model.brand ?? 'Votre entreprise')
-  const tagline = model.tagline ? `<div class="tagline">${esc(model.tagline)}</div>` : ''
+  const tagline = model.tagline
+    ? `<div class="tagline">${esc(model.tagline)}</div>`
+    : ''
   const title = esc(model.title ?? 'FACTURE')
   const number = model.invoiceNumber ? esc(model.invoiceNumber) : '—'
   const dates: string[] = []
@@ -413,8 +448,13 @@ function InvoiceHeader(model: InvoiceModel): string {
 function SellerCard(model: InvoiceModel): string {
   const lines = model.seller.length
     ? model.seller
-    : [model.brand ?? 'Votre entreprise', ...(model.tagline ? [model.tagline] : [])]
-  const body = lines.map(l => `<div class="party-line">${esc(l)}</div>`).join('')
+    : [
+        model.brand ?? 'Votre entreprise',
+        ...(model.tagline ? [model.tagline] : [])
+      ]
+  const body = lines
+    .map(l => `<div class="party-line">${esc(l)}</div>`)
+    .join('')
   return `<div class="party-card invoice-section">
     <div class="party-label">Émetteur</div>
     ${body}
@@ -424,7 +464,9 @@ function SellerCard(model: InvoiceModel): string {
 /** Customer card ("Facturé à"). */
 function CustomerCard(model: InvoiceModel): string {
   if (!model.customer.length) return ''
-  const body = model.customer.map(l => `<div class="party-line">${esc(l)}</div>`).join('')
+  const body = model.customer
+    .map(l => `<div class="party-line">${esc(l)}</div>`)
+    .join('')
   return `<div class="party-card invoice-section">
     <div class="party-label">Facturé à</div>
     ${body}
@@ -448,7 +490,9 @@ function LineItemsTable(model: InvoiceModel): string {
 function TotalsPanel(model: InvoiceModel): string {
   const rows: string[] = []
   if (model.subtotal)
-    rows.push(`<div class="tot-row"><span>Sous-total HT</span><span class="num">${esc(model.subtotal)}</span></div>`)
+    rows.push(
+      `<div class="tot-row"><span>Sous-total HT</span><span class="num">${esc(model.subtotal)}</span></div>`
+    )
   if (model.tax || model.taxLabel)
     rows.push(
       `<div class="tot-row"><span>${esc(model.taxLabel ?? 'TVA')}</span><span class="num">${esc(model.tax ?? '—')}</span></div>`
@@ -466,7 +510,9 @@ function TotalsPanel(model: InvoiceModel): string {
 /** Payment terms / conditions. */
 function Notes(model: InvoiceModel): string {
   if (!model.paymentTerms.length) return ''
-  const body = model.paymentTerms.map(t => `<div class="note-line">${esc(t)}</div>`).join('')
+  const body = model.paymentTerms
+    .map(t => `<div class="note-line">${esc(t)}</div>`)
+    .join('')
   return `<section class="invoice-section">
     <div class="section-title">Conditions de paiement</div>
     ${body}
@@ -476,7 +522,9 @@ function Notes(model: InvoiceModel): string {
 /** Bank / payment details card. */
 function PaymentCard(model: InvoiceModel): string {
   if (!model.bank.length) return ''
-  const body = model.bank.map(b => `<div class="bank-line">${esc(b)}</div>`).join('')
+  const body = model.bank
+    .map(b => `<div class="bank-line">${esc(b)}</div>`)
+    .join('')
   return `<div class="payment-card invoice-section">
     <div class="payment-title">Coordonnées bancaires</div>
     ${body}
@@ -491,7 +539,10 @@ function InvoiceFooter(model: InvoiceModel): string {
 }
 
 /** Render a structured invoice model into a complete, print-safe HTML doc. */
-export function renderInvoiceHtml(model: InvoiceModel, accent = '#2563eb'): string {
+export function renderInvoiceHtml(
+  model: InvoiceModel,
+  accent = '#2563eb'
+): string {
   const title = esc(model.title ?? 'FACTURE')
   const number = model.invoiceNumber ? esc(model.invoiceNumber) : '—'
 

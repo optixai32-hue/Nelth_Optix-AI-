@@ -14,9 +14,7 @@ interface ChainOfThoughtProps {
 }
 
 export function ChainOfThought({ children, className }: ChainOfThoughtProps) {
-  return (
-    <div className={cn('flex flex-col gap-2', className)}>{children}</div>
-  )
+  return <div className={cn('flex flex-col gap-2', className)}>{children}</div>
 }
 
 interface ChainOfThoughtStepProps

@@ -50,7 +50,8 @@ export function SpecBlock({ result }: SpecBlockProps) {
     () => ({
       submitQuery: (params: Record<string, unknown>) => {
         const rawQuery = (params as { query?: string }).query
-        const query = typeof rawQuery === 'string' ? stripMarkdownLinks(rawQuery) : ''
+        const query =
+          typeof rawQuery === 'string' ? stripMarkdownLinks(rawQuery) : ''
         if (!query.trim()) return
 
         // Reject clicks while a response is in flight. Firing a second

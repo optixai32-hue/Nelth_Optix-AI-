@@ -25,7 +25,11 @@ function Base({
   )
 }
 
-export function GoogleDriveIcon({ className = 'size-12' }: { className?: string }) {
+export function GoogleDriveIcon({
+  className = 'size-12'
+}: {
+  className?: string
+}) {
   return (
     <Base className={className}>
       <path

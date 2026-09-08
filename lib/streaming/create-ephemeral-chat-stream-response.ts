@@ -21,7 +21,8 @@ import {
 import { detectRequestCapabilities } from '@/lib/skills/capability-detection'
 import {
   type AttachmentLike,
-  extractAttachmentFormats} from '@/lib/skills/document-runtime'
+  extractAttachmentFormats
+} from '@/lib/skills/document-runtime'
 import { stripEmojiFromCodeInMessage } from '@/lib/skills/enforce-stream'
 import { resolveConversationLanguage } from '@/lib/skills/language-memory'
 import { search as runWebSearch } from '@/lib/tools/search'
@@ -92,9 +93,8 @@ export async function createEphemeralChatStreamResponse(
       const historyMessages = normalizeConversationHistory(messages).messages
       const messagesWithoutSpec = stripSpecFromMessages(historyMessages)
       const messagesToConvert = compactHistoricalMessages(messagesWithoutSpec)
-      const messagesWithoutFileParts = mapFilePartsToDataParts(
-        messagesToConvert
-      )
+      const messagesWithoutFileParts =
+        mapFilePartsToDataParts(messagesToConvert)
 
       let modelMessages = await convertToModelMessages(
         messagesWithoutFileParts,
@@ -175,7 +175,9 @@ export async function createEphemeralChatStreamResponse(
       const shouldPreloadSearch = Boolean(caps.needsSearch)
       let preloadedSearchContext: string | undefined
       let preloadedSearchQuery: string | undefined
-      let searchResultsForCitation: Awaited<ReturnType<typeof runWebSearch>> | undefined
+      let searchResultsForCitation:
+        | Awaited<ReturnType<typeof runWebSearch>>
+        | undefined
       if (shouldPreloadSearch) {
         const effectiveSearchQuery = resolveContextualSearchQuery(
           userQuery,
@@ -253,10 +255,9 @@ export async function createEphemeralChatStreamResponse(
 
       // Assemble the skill context string only when a skill was loaded
       // (LEVEL 2 full SKILL.md). Empty otherwise → the model streams immediately.
-      const skillContext =
-        skillCtx?.operationalPrompt
-          ? `${skillCtx.context}\n\n${skillCtx.operationalPrompt}`
-          : skillCtx?.context ?? ''
+      const skillContext = skillCtx?.operationalPrompt
+        ? `${skillCtx.context}\n\n${skillCtx.operationalPrompt}`
+        : (skillCtx?.context ?? '')
 
       // Active conversation language (persisted preference from history or
       // current request) — same rule as the main chat path.

@@ -49,9 +49,7 @@ export async function deleteAccount(): Promise<{
       }
     }
 
-    const deleteFilesResult = await dbActions.deleteUserLibraryFiles(
-      user.uid
-    )
+    const deleteFilesResult = await dbActions.deleteUserLibraryFiles(user.uid)
     if (!deleteFilesResult.success) {
       return {
         success: false,

@@ -38,3 +38,8 @@ temp/
 
 # Database
 lib/db/migrations/
+# Vendored third-party skill packs (Anthropic Agent Skills). Their exact
+# file contents matter at runtime (frontmatter triggers, SKILL.md bodies
+# asserted by tests) — never reformat them.
+skills-main/
+lib/skills/claude-skills/

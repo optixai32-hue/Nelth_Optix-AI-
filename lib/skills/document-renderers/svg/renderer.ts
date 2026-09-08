@@ -82,14 +82,19 @@ function textBlock(
  *                       ▼
  *                      <svg>
  */
-export async function renderSvg(ast: DocumentAST, opts: RenderOptions = {}): Promise<Buffer> {
+export async function renderSvg(
+  ast: DocumentAST,
+  opts: RenderOptions = {}
+): Promise<Buffer> {
   const accent = opts.accent?.replace(/^#/, '') ?? '2563EB'
   const parts: string[] = []
   let y = MARGIN
 
   if (ast.metadata?.title && ast.blocks[0]?.type !== 'heading') {
     const lines = wrap(ast.metadata.title, 28)
-    parts.push(textBlock(lines, MARGIN, y, 28, { weight: 'bold', color: `#${accent}` }))
+    parts.push(
+      textBlock(lines, MARGIN, y, 28, { weight: 'bold', color: `#${accent}` })
+    )
     y += lines.length * 28 * 1.3 + 12
   }
 
@@ -105,13 +110,23 @@ export async function renderSvg(ast: DocumentAST, opts: RenderOptions = {}): Pro
   return Buffer.from(svg, 'utf-8')
 }
 
-function blockToSvg(parts: string[], y: number, b: DocumentBlock, accent: string): number {
+function blockToSvg(
+  parts: string[],
+  y: number,
+  b: DocumentBlock,
+  accent: string
+): number {
   switch (b.type) {
     case 'heading': {
       const level = Math.min(Math.max(b.level, 1), 6)
       const size = level === 1 ? 28 : level === 2 ? 22 : level === 3 ? 18 : 16
       const lines = wrap(b.text, size)
-      parts.push(textBlock(lines, MARGIN, y, size, { weight: 'bold', color: `#${accent}` }))
+      parts.push(
+        textBlock(lines, MARGIN, y, size, {
+          weight: 'bold',
+          color: `#${accent}`
+        })
+      )
       return y + lines.length * size * 1.3 + 10
     }
     case 'paragraph': {
@@ -120,7 +135,8 @@ function blockToSvg(parts: string[], y: number, b: DocumentBlock, accent: string
       return y + lines.length * 14 * 1.3 + 8
     }
     case 'list': {
-      const render = (item: string, i: number) => (b.ordered ? `${i + 1}. ${item}` : `• ${item}`)
+      const render = (item: string, i: number) =>
+        b.ordered ? `${i + 1}. ${item}` : `• ${item}`
       const lines: string[] = []
       b.items.forEach((item, i) => {
         wrap(render(item, i), 14).forEach(l => lines.push(l))
@@ -129,13 +145,20 @@ function blockToSvg(parts: string[], y: number, b: DocumentBlock, accent: string
       return y + lines.length * 14 * 1.3 + 8
     }
     case 'table': {
-      const colCount = Math.max(b.headers.length, ...b.rows.map(r => r.length), 1)
+      const colCount = Math.max(
+        b.headers.length,
+        ...b.rows.map(r => r.length),
+        1
+      )
       const cellW = CONTENT_W / colCount
       const lh = 16
       let rowTop = y
       const rows = [b.headers, ...b.rows]
       rows.forEach((row, ri) => {
-        const textLines = Math.max(1, ...row.map(c => wrap(String(c ?? ''), 12).length))
+        const textLines = Math.max(
+          1,
+          ...row.map(c => wrap(String(c ?? ''), 12).length)
+        )
         const rowH = textLines * lh + 10
         const fill = ri === 0 ? '#EEEEF2' : ri % 2 === 0 ? '#F7F7F9' : '#FFFFFF'
         parts.push(
@@ -169,7 +192,12 @@ function blockToSvg(parts: string[], y: number, b: DocumentBlock, accent: string
       parts.push(
         `<rect x="${MARGIN}" y="${y.toFixed(1)}" width="${CONTENT_W}" height="${boxH.toFixed(1)}" fill="#F4F4F7" stroke="#${accent}" stroke-width="1"/>`
       )
-      parts.push(textBlock(lines, MARGIN + 10, y + 6, 14, { style: 'italic', color: '#55555C' }))
+      parts.push(
+        textBlock(lines, MARGIN + 10, y + 6, 14, {
+          style: 'italic',
+          color: '#55555C'
+        })
+      )
       return y + boxH + 8
     }
     case 'code': {
@@ -178,7 +206,9 @@ function blockToSvg(parts: string[], y: number, b: DocumentBlock, accent: string
       parts.push(
         `<rect x="${MARGIN}" y="${y.toFixed(1)}" width="${CONTENT_W}" height="${boxH.toFixed(1)}" fill="#F4F4F7" stroke="#CCCCCC" stroke-width="1"/>`
       )
-      const codeText = textBlock(lines, MARGIN + 8, y + 6, 12, { color: '#1A1A1E' })
+      const codeText = textBlock(lines, MARGIN + 8, y + 6, 12, {
+        color: '#1A1A1E'
+      })
       parts.push(codeText.replace('<text ', '<text font-family="monospace" '))
       return y + boxH + 8
     }

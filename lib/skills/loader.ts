@@ -131,7 +131,12 @@ export async function loadSelectedSkillContent(
       const refNames = [...selection.references]
       if (queryTokens && queryTokens.size > 0) {
         refNames.push(
-          ...selectBodySignaledReferences(meta, skillBody, queryTokens, refNames)
+          ...selectBodySignaledReferences(
+            meta,
+            skillBody,
+            queryTokens,
+            refNames
+          )
         )
       }
 

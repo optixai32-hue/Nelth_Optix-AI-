@@ -5,7 +5,11 @@ import type { ToolPart } from '@/lib/types/ai'
 import { ShimmerLabel } from '@/components/elements/surfaces'
 
 type DocInput = { operation?: string; format?: string; fileName?: string }
-type DocArtifact = { fileName?: string; downloadUrl?: string; mimeType?: string }
+type DocArtifact = {
+  fileName?: string
+  downloadUrl?: string
+  mimeType?: string
+}
 type DocOutput = {
   artifact?: DocArtifact
   success?: boolean
@@ -29,7 +33,9 @@ export function DocumentToolContent({ part }: { part: ToolPart<'document'> }) {
   const artifact = output?.artifact
   const format = deriveFormat(input)
   const fileName =
-    input?.fileName || artifact?.fileName || `document.${input?.format ?? 'pdf'}`
+    input?.fileName ||
+    artifact?.fileName ||
+    `document.${input?.format ?? 'pdf'}`
 
   const isGenerating =
     part.state === 'input-streaming' ||

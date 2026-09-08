@@ -21,9 +21,7 @@ import type {
   SkillContextResult,
   SkillExecutionState
 } from './types'
-import {
-  validateGeneratedOutput,
-  type ValidationResult} from './validate'
+import { validateGeneratedOutput, type ValidationResult } from './validate'
 
 /** Bounded refinement iterations (user requested 2–3). */
 export const MAX_SKILL_REFINEMENT_ITERATIONS = 2
@@ -35,7 +33,10 @@ const IMPERATIVE_RE =
 export function extractImperativeLines(body: string, limit = 18): string[] {
   const out: string[] = []
   for (const raw of body.split('\n')) {
-    const line = raw.trim().replace(/^[-*]\s+/, '').replace(/^#+\s*/, '')
+    const line = raw
+      .trim()
+      .replace(/^[-*]\s+/, '')
+      .replace(/^#+\s*/, '')
     if (!line) continue
     if (IMPERATIVE_RE.test(line) && line.length > 12) {
       out.push(line)
@@ -74,11 +75,15 @@ export function buildOperationalSkillPrompt(
     blocks.push('MANDATORY DESIGN CONSTRAINTS (apply directly to the output):')
     const imperative = extractImperativeLines(item.body, 16)
     if (imperative.length === 0) {
-      blocks.push(`- Apply the established best practices for the ${item.meta.domain || 'requested'} domain.`)
+      blocks.push(
+        `- Apply the established best practices for the ${item.meta.domain || 'requested'} domain.`
+      )
     } else {
       for (const line of imperative) blocks.push(`- ${line}`)
     }
-    blocks.push(`- Do NOT produce a generic template. Choose a concrete aesthetic direction specific to this brief.`)
+    blocks.push(
+      `- Do NOT produce a generic template. Choose a concrete aesthetic direction specific to this brief.`
+    )
 
     const vRules = getSkillValidationRules(item.meta, isVisualQuery(query))
     blocks.push('\nQUALITY CRITERIA (the output MUST satisfy):')
@@ -86,17 +91,33 @@ export function buildOperationalSkillPrompt(
       blocks.push(`- ${r}`)
     }
 
-    blocks.push('\nSELF-CRITIQUE (must actually be performed before finalizing):')
-    blocks.push('- Generate a first draft, then critique it against the constraints above.')
-    blocks.push('- Identify concrete weaknesses (generic sections, weak hierarchy, invalid CSS/HTML, missing responsiveness/accessibility).')
-    blocks.push('- Improve the draft using that critique. Only then return the final result.')
+    blocks.push(
+      '\nSELF-CRITIQUE (must actually be performed before finalizing):'
+    )
+    blocks.push(
+      '- Generate a first draft, then critique it against the constraints above.'
+    )
+    blocks.push(
+      '- Identify concrete weaknesses (generic sections, weak hierarchy, invalid CSS/HTML, missing responsiveness/accessibility).'
+    )
+    blocks.push(
+      '- Improve the draft using that critique. Only then return the final result.'
+    )
 
     blocks.push('\nVALIDATION (the output is rejected until ALL pass):')
-    blocks.push('- HTML is valid and well-formed (tags closed, semantic, alt text, lang).')
-    blocks.push('- CSS is valid: NO malformed declarations such as `padding:block:var(--x)` (use `padding-block:`); every `var(--x)` is defined; responsive breakpoints present.')
+    blocks.push(
+      '- HTML is valid and well-formed (tags closed, semantic, alt text, lang).'
+    )
+    blocks.push(
+      '- CSS is valid: NO malformed declarations such as `padding:block:var(--x)` (use `padding-block:`); every `var(--x)` is defined; responsive breakpoints present.'
+    )
     blocks.push('- JS is syntactically valid and wired to real elements.')
-    blocks.push('- Layout is responsive and accessible; interactive states handled.')
-    blocks.push('- Design is not a generic hero→features→testimonial→CTA→footer default; it reflects a deliberate direction.')
+    blocks.push(
+      '- Layout is responsive and accessible; interactive states handled.'
+    )
+    blocks.push(
+      '- Design is not a generic hero→features→testimonial→CTA→footer default; it reflects a deliberate direction.'
+    )
   }
 
   return blocks.join('\n')
@@ -109,7 +130,10 @@ export function buildRefinementPrompt(
   basePrompt: string
 ): string {
   const issues = result.violations
-    .map(v => `- [${v.severity}] ${v.rule}: ${v.detail}${v.snippet ? ` (${v.snippet})` : ''}`)
+    .map(
+      v =>
+        `- [${v.severity}] ${v.rule}: ${v.detail}${v.snippet ? ` (${v.snippet})` : ''}`
+    )
     .join('\n')
   return `${basePrompt}
 
@@ -141,7 +165,12 @@ export class SkillEnforcementEngine {
   async run(
     generate: (prompt: string) => Promise<string>,
     basePrompt: string,
-    opts: { maxIterations?: number; query?: string; slugs?: string[]; bodies?: string[] } = {}
+    opts: {
+      maxIterations?: number
+      query?: string
+      slugs?: string[]
+      bodies?: string[]
+    } = {}
   ): Promise<{
     finalContent: string
     result: ValidationResult
@@ -210,7 +239,9 @@ export function formatSkillDebug(
     `Validation:\n  ✓ ${validation ? (validation.passed ? 'passed' : 'failed') : 'n/a'}`
   )
   if (engine) {
-    lines.push(`Refinement:\n  ${engine.iterations} / ${MAX_SKILL_REFINEMENT_ITERATIONS}`)
+    lines.push(
+      `Refinement:\n  ${engine.iterations} / ${MAX_SKILL_REFINEMENT_ITERATIONS}`
+    )
   }
   lines.push(`Final:\n  ✓ completed`)
   return lines.join('\n')

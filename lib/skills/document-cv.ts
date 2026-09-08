@@ -56,7 +56,13 @@ export interface CvModel {
   footer?: string
 }
 
-type SectionKind = 'about' | 'experience' | 'skills' | 'education' | 'projects' | 'languages'
+type SectionKind =
+  | 'about'
+  | 'experience'
+  | 'skills'
+  | 'education'
+  | 'projects'
+  | 'languages'
 
 const SECTIONS: [RegExp, SectionKind][] = [
   [/profil|about|pr.?sentation|r.?sum.?|propos/i, 'about'],
@@ -80,7 +86,14 @@ function isSection(s: string): boolean {
 function splitPair(s: string, sep?: string): [string, string?] {
   const re = sep ? new RegExp(`\\s*${sep}\\s*`) : /\s*[—–-]\s+/
   const parts = s.split(re)
-  if (parts.length >= 2) return [parts[0].trim(), parts.slice(1).join(sep ?? ' - ').trim()]
+  if (parts.length >= 2)
+    return [
+      parts[0].trim(),
+      parts
+        .slice(1)
+        .join(sep ?? ' - ')
+        .trim()
+    ]
   return [s.trim()]
 }
 
@@ -213,7 +226,8 @@ function parseCvInto(md: string, model: CvModel): void {
   }
 
   const titleH2 = els.find(e => e.t === 'h2' && !isSection(e.s))
-  if (titleH2) model.title = [model.title, titleH2.s].filter(Boolean).join(' · ')
+  if (titleH2)
+    model.title = [model.title, titleH2.s].filter(Boolean).join(' · ')
 
   let section: SectionKind | null = null
   let curExp: CvExperience | null = null
@@ -260,14 +274,21 @@ function parseCvInto(md: string, model: CvModel): void {
       continue
     }
     if (e.t === 'bullet') {
-      const items = e.s.split('\n').map(x => x.trim()).filter(Boolean)
+      const items = e.s
+        .split('\n')
+        .map(x => x.trim())
+        .filter(Boolean)
       if (section === 'experience' && curExp) curExp.highlights.push(...items)
       else if (section === 'skills' && curSkill) curSkill.skills.push(...items)
       else if (section === 'projects' && curProject)
-        curProject.description = [curProject.description, ...items].filter(Boolean).join(' ')
-      else if (section === 'projects') items.forEach(n => model.projects.push({ name: n }))
+        curProject.description = [curProject.description, ...items]
+          .filter(Boolean)
+          .join(' ')
+      else if (section === 'projects')
+        items.forEach(n => model.projects.push({ name: n }))
       else if (section === 'languages') model.languages.push(...items)
-      else if (section === 'about') model.about = [model.about, items.join(' ')].filter(Boolean).join(' ')
+      else if (section === 'about')
+        model.about = [model.about, items.join(' ')].filter(Boolean).join(' ')
       continue
     }
     if (e.t === 'text') {
@@ -290,7 +311,9 @@ function parseCvInto(md: string, model: CvModel): void {
         if (b) curEdu.meta = b.trim()
         else if (a && !curEdu.meta) curEdu.meta = a.trim()
       } else if (section === 'projects' && curProject) {
-        curProject.description = [curProject.description, e.s].filter(Boolean).join(' ')
+        curProject.description = [curProject.description, e.s]
+          .filter(Boolean)
+          .join(' ')
       } else if (section === 'projects') {
         splitSkills(e.s).forEach(n => model.projects.push({ name: n }))
       } else if (section === 'languages') {
@@ -311,7 +334,9 @@ function parseCvInto(md: string, model: CvModel): void {
 /** Identity block: imposing name + professional label. */
 function IdentityHeader(model: CvModel): string {
   const name = model.name ? esc(model.name) : 'Votre Nom'
-  const title = model.title ? `<div class="cv-title">${esc(model.title)}</div>` : ''
+  const title = model.title
+    ? `<div class="cv-title">${esc(model.title)}</div>`
+    : ''
   return `<header class="cv-header">
     <div class="cv-name">${name}</div>
     ${title}
@@ -322,7 +347,9 @@ function IdentityHeader(model: CvModel): string {
 /** Sidebar: contact details, stacked. */
 function ContactSection(model: CvModel): string {
   if (!model.contact.length) return ''
-  const rows = model.contact.map(c => `<div class="cv-contact-line">${esc(c)}</div>`).join('')
+  const rows = model.contact
+    .map(c => `<div class="cv-contact-line">${esc(c)}</div>`)
+    .join('')
   return `<section class="cv-side-block">
     <div class="cv-side-label">Contact</div>
     <div class="cv-contact">${rows}</div>
@@ -334,7 +361,9 @@ function SkillsSection(model: CvModel): string {
   if (!model.skills.length) return ''
   const groups = model.skills
     .map(g => {
-      const val = g.skills.length ? g.skills.map(esc).join(' · ') : esc(g.category)
+      const val = g.skills.length
+        ? g.skills.map(esc).join(' · ')
+        : esc(g.category)
       return `<div class="cv-skill">
         <div class="cv-skill-cat">${esc(g.category)}</div>
         <div class="cv-skill-val">${val}</div>
@@ -352,7 +381,9 @@ function EducationSection(model: CvModel): string {
   if (!model.education.length) return ''
   const items = model.education
     .map(e => {
-      const inst = e.institution ? `<div class="cv-edu-inst">${esc(e.institution)}</div>` : ''
+      const inst = e.institution
+        ? `<div class="cv-edu-inst">${esc(e.institution)}</div>`
+        : ''
       const meta = e.meta ? `<div class="cv-edu-meta">${esc(e.meta)}</div>` : ''
       return `<div class="cv-edu">
         <div class="cv-edu-prog">${esc(e.program ?? '')}</div>
@@ -400,7 +431,10 @@ function ExperienceItem(exp: CvExperience, index: number): string {
   }
   const statsHtml = stats.length
     ? `<div class="cv-stats">${stats
-        .map(s => `<div class="cv-stat"><span class="cv-stat-val">${esc(s.value)}</span><span class="cv-stat-label">${esc(s.label)}</span></div>`)
+        .map(
+          s =>
+            `<div class="cv-stat"><span class="cv-stat-val">${esc(s.value)}</span><span class="cv-stat-label">${esc(s.label)}</span></div>`
+        )
         .join('')}</div>`
     : ''
   const bulletsHtml = bullets.length
@@ -436,10 +470,18 @@ function ProjectsGrid(model: CvModel): string {
   const cards = model.projects
     .map(p => {
       const hasDetail = p.role || p.description || p.metric || p.tech
-      const role = p.role ? `<div class="cv-proj-role">${esc(p.role)}</div>` : ''
-      const desc = p.description ? `<div class="cv-proj-desc">${esc(p.description)}</div>` : ''
-      const metric = p.metric ? `<div class="cv-proj-metric">${esc(p.metric)}</div>` : ''
-      const tech = p.tech ? `<div class="cv-proj-tech">${esc(p.tech)}</div>` : ''
+      const role = p.role
+        ? `<div class="cv-proj-role">${esc(p.role)}</div>`
+        : ''
+      const desc = p.description
+        ? `<div class="cv-proj-desc">${esc(p.description)}</div>`
+        : ''
+      const metric = p.metric
+        ? `<div class="cv-proj-metric">${esc(p.metric)}</div>`
+        : ''
+      const tech = p.tech
+        ? `<div class="cv-proj-tech">${esc(p.tech)}</div>`
+        : ''
       const rule = !hasDetail ? `<div class="cv-proj-rule"></div>` : ''
       return `<div class="cv-proj">
         <div class="cv-proj-name">${esc(p.name)}</div>

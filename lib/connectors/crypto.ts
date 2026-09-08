@@ -52,8 +52,6 @@ export function decryptSecret(payload: string): string {
       decipher.final('utf8')
     )
   } catch {
-    throw new Error(
-      'Failed to decrypt payload (wrong key or tampered data)'
-    )
+    throw new Error('Failed to decrypt payload (wrong key or tampered data)')
   }
 }

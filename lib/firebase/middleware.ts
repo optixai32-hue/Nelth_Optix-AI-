@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 
-import { hasFirebaseConfig,SESSION_COOKIE } from './config'
+import { hasFirebaseConfig, SESSION_COOKIE } from './config'
 
 /**
  * Middleware session guard. Firebase Auth session verification happens in
@@ -17,13 +17,7 @@ export async function updateSession(request: NextRequest) {
 
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value)
 
-  const publicPaths = [
-    '/',
-    '/auth',
-    '/share',
-    '/api',
-    '/relay'
-  ]
+  const publicPaths = ['/', '/auth', '/share', '/api', '/relay']
 
   const pathname = request.nextUrl.pathname
 

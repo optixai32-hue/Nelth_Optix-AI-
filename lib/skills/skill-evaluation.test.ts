@@ -138,7 +138,11 @@ async function generateWithSkills(
 ): Promise<{ text: string; tokens?: number }> {
   const { text, usage } = await generateText({
     model: getNvidiaModel(),
-    system: await buildInstructions(userPrompt, opts.withSkills ?? true, opts.mode ?? 'minimal'),
+    system: await buildInstructions(
+      userPrompt,
+      opts.withSkills ?? true,
+      opts.mode ?? 'minimal'
+    ),
     prompt: userPrompt,
     maxOutputTokens: 12000,
     abortSignal: AbortSignal.timeout(240_000)
@@ -188,7 +192,11 @@ type Check = { name: string; pass: boolean }
 
 function runChecks(out: string, checks: Check[]) {
   const pass = checks.filter(c => c.pass).length
-  return { pass, total: checks.length, fails: checks.filter(c => !c.pass).map(c => c.name) }
+  return {
+    pass,
+    total: checks.length,
+    fails: checks.filter(c => !c.pass).map(c => c.name)
+  }
 }
 
 /** A generation is considered truncated if it used near the token cap AND its
@@ -207,13 +215,29 @@ function isTruncated(out: string, tokens?: number): boolean {
 function checkReact(out: string): Check[] {
   const low = out.toLowerCase()
   return [
-    { name: 'html-structure', pass: /<(div|section|aside|nav|table|button)/i.test(out) },
+    {
+      name: 'html-structure',
+      pass: /<(div|section|aside|nav|table|button)/i.test(out)
+    },
     { name: 'table', pass: /<(table|thead|tbody|th|tr|td)/i.test(out) },
-    { name: 'typescript', pass: /interface\s+\w+|type\s+\w+\s*=|:\s*react\.|usestate|usereducer/.test(low) },
+    {
+      name: 'typescript',
+      pass: /interface\s+\w+|type\s+\w+\s*=|:\s*react\.|usestate|usereducer/.test(
+        low
+      )
+    },
     { name: 'aria', pass: /aria-/i.test(out) },
     { name: 'responsive', pass: /@media|viewport/.test(low) },
-    { name: 'no-any', pass: !/\bas any\b|<\s*any\s*>|useState<\s*any\s*>|:\s*any\[\]/i.test(out) },
-    { name: 'no-placeholder', pass: !/lorem ipsum|todo: implement|not implemented|coming soon|FIXME|\/\/\s*TODO/i.test(out) },
+    {
+      name: 'no-any',
+      pass: !/\bas any\b|<\s*any\s*>|useState<\s*any\s*>|:\s*any\[\]/i.test(out)
+    },
+    {
+      name: 'no-placeholder',
+      pass: !/lorem ipsum|todo: implement|not implemented|coming soon|FIXME|\/\/\s*TODO/i.test(
+        out
+      )
+    },
     { name: 'no-leak', pass: !hasLeak(out) }
   ]
 }
@@ -224,7 +248,10 @@ function checkSvg(out: string): Check[] {
     { name: 'svg', pass: /<svg[\s\S]*<\/svg>/i.test(out) },
     { name: 'gradient', pass: /<(linear|radial)Gradient/i.test(out) },
     { name: 'viewBox', pass: /viewBox/i.test(out) },
-    { name: 'no-placeholder', pass: !/placeholder|lorem ipsum|basic icon|beginner/.test(low) },
+    {
+      name: 'no-placeholder',
+      pass: !/placeholder|lorem ipsum|basic icon|beginner/.test(low)
+    },
     { name: 'no-leak', pass: !hasLeak(out) }
   ]
 }
@@ -234,7 +261,12 @@ function checkVanilla(out: string): Check[] {
   return [
     { name: 'doctype', pass: /<!doctype html/i.test(out) },
     { name: 'script', pass: /<script/i.test(out) },
-    { name: 'no-react', pass: !/import\s+(.+\s+)?from\s+['"]react|reactdom|createroot|\.tsx|from\s+['"]react-dom/.test(low) },
+    {
+      name: 'no-react',
+      pass: !/import\s+(.+\s+)?from\s+['"]react|reactdom|createroot|\.tsx|from\s+['"]react-dom/.test(
+        low
+      )
+    },
     { name: 'no-react-slug', pass: !low.includes('react-expert') },
     { name: 'no-ts-slug', pass: !low.includes('typescript-pro') },
     { name: 'no-leak', pass: !hasLeak(out) }
@@ -291,7 +323,9 @@ describe('Behavioral evaluation — Skill → model output (live, requires NVIDI
       // No UNSAFE / clearly-avoidable `any` (unsafe assertions, any-typed
       // generics). A benign `e: any` event param is not failed here; the
       // typescript-pro skill says "avoid any unless absolutely unavoidable".
-      expect(out).not.toMatch(/\bas any\b|<\s*any\s*>|useState<\s*any\s*>|:\s*any\[\]/i)
+      expect(out).not.toMatch(
+        /\bas any\b|<\s*any\s*>|useState<\s*any\s*>|:\s*any\[\]/i
+      )
       expect(out).not.toMatch(
         /lorem ipsum|todo: implement|not implemented|coming soon|FIXME|\/\/\s*TODO/i
       )
@@ -344,8 +378,17 @@ describe('Behavioral evaluation — Skill → model output (live, requires NVIDI
       for (const [label, prompt, check] of cases) {
         const variants = [
           ['baseline', await generateWithSkills(prompt, { withSkills: false })],
-          ['minimal', await generateWithSkills(prompt, { withSkills: true, mode: 'minimal' })],
-          ['full', await generateWithSkills(prompt, { withSkills: true, mode: 'full' })]
+          [
+            'minimal',
+            await generateWithSkills(prompt, {
+              withSkills: true,
+              mode: 'minimal'
+            })
+          ],
+          [
+            'full',
+            await generateWithSkills(prompt, { withSkills: true, mode: 'full' })
+          ]
         ] as const
         console.log(`\n=== ${label} ===`)
         console.log('variant | checks | tokens | truncated | leak')

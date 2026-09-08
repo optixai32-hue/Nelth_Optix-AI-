@@ -1,10 +1,7 @@
 'use client'
 
 import { createMathPlugin } from '@streamdown/math'
-import {
-  defaultRehypePlugins,
-  Streamdown
-} from 'streamdown'
+import { defaultRehypePlugins, Streamdown } from 'streamdown'
 
 import { mergeStreamdownSpecRenderer } from '@/lib/render/streamdown-spec'
 import { cn } from '@/lib/utils'

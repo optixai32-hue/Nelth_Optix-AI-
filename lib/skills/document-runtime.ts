@@ -19,7 +19,13 @@
 
 import { TEMPLATES } from './document-templates'
 
-export type DocumentFormat = 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'html' | 'markdown'
+export type DocumentFormat =
+  | 'pdf'
+  | 'docx'
+  | 'xlsx'
+  | 'pptx'
+  | 'html'
+  | 'markdown'
 
 const MIME: Record<DocumentFormat, string> = {
   pdf: 'application/pdf',
@@ -145,14 +151,20 @@ async function readXlsx(buffer: Buffer): Promise<DocumentReadResult> {
     })
     sheets[ws.name] = rows
   })
-  return { format: 'xlsx', text: text.trim(), sheets: wb.worksheets.length, structure: sheets }
+  return {
+    format: 'xlsx',
+    text: text.trim(),
+    sheets: wb.worksheets.length,
+    structure: sheets
+  }
 }
 
 async function readDocx(buffer: Buffer): Promise<DocumentReadResult> {
   const JSZip = (await import('jszip')).default
   const zip = await JSZip.loadAsync(buffer)
   const docXml = await zip.file('word/document.xml')?.async('string')
-  if (!docXml) return { format: 'docx', text: '', error: 'word/document.xml missing' }
+  if (!docXml)
+    return { format: 'docx', text: '', error: 'word/document.xml missing' }
   const text = extractXmlText(docXml, /<w:t[^>]*>([\s\S]*?)<\/w:t>/g)
   return { format: 'docx', text: text.trim() }
 }
@@ -213,9 +225,7 @@ async function readPdf(buffer: Buffer): Promise<DocumentReadResult> {
   }
 }
 
-async function getPageText(
-  page: import('pdf-lib').PDFPage
-): Promise<string> {
+async function getPageText(page: import('pdf-lib').PDFPage): Promise<string> {
   try {
     // pdf-lib exposes the page node; pull raw content streams and decode
     // FlateDecode streams with fflate (best-effort text recovery).
@@ -226,7 +236,10 @@ async function getPageText(
     const { inflateSync } = (await import('fflate')) as any
     let raw = ''
     for (const stream of streams) {
-      const anyStream = stream as unknown as { contents?: Uint8Array; dict?: Map<string, unknown> }
+      const anyStream = stream as unknown as {
+        contents?: Uint8Array
+        dict?: Map<string, unknown>
+      }
       let data = anyStream.contents
       const filter = anyStream.dict?.get?.('Filter')
       if (data && filter === 'FlateDecode') {
@@ -337,7 +350,8 @@ function normalizeSpec(spec: unknown): Record<string, unknown> {
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       try {
         const parsed = JSON.parse(trimmed)
-        if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
+        if (parsed && typeof parsed === 'object')
+          return parsed as Record<string, unknown>
       } catch {
         /* fall through to plain-text handling */
       }
@@ -352,14 +366,21 @@ function normalizeSpec(spec: unknown): Record<string, unknown> {
 }
 
 async function createDocx(spec: CreateDocxSpec): Promise<Buffer> {
-  const { Document, Packer, Paragraph, HeadingLevel, TextRun } = await import('docx')
+  const { Document, Packer, Paragraph, HeadingLevel, TextRun } = await import(
+    'docx'
+  )
   const sections = spec.sections ?? [
     { paragraphs: spec.paragraphs ?? ['Document created with the docx skill.'] }
   ]
   const children: unknown[] = []
   for (const section of sections) {
     if (section.heading) {
-      children.push(new Paragraph({ text: section.heading, heading: HeadingLevel.HEADING_1 }))
+      children.push(
+        new Paragraph({
+          text: section.heading,
+          heading: HeadingLevel.HEADING_1
+        })
+      )
     }
     for (const p of section.paragraphs ?? []) {
       children.push(new Paragraph({ children: [new TextRun(p)] }))
@@ -374,7 +395,9 @@ async function createDocx(spec: CreateDocxSpec): Promise<Buffer> {
 async function createXlsx(spec: CreateXlsxSpec): Promise<Buffer> {
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
-  const sheets = spec.sheets?.length ? spec.sheets : [{ name: 'Sheet1', rows: [['Column A', 'Column B']] }]
+  const sheets = spec.sheets?.length
+    ? spec.sheets
+    : [{ name: 'Sheet1', rows: [['Column A', 'Column B']] }]
   for (const sheet of sheets) {
     const ws = wb.addWorksheet(sheet.name ?? 'Sheet1')
     for (const row of sheet.rows) {
@@ -390,11 +413,20 @@ async function createPptx(spec: CreatePptxSpec): Promise<Buffer> {
   const pptx = new PptxGen()
   const slides = spec.slides?.length
     ? spec.slides
-    : [{ title: spec.title ?? 'Presentation', bullets: ['Slide created with the pptx skill.'] }]
+    : [
+        {
+          title: spec.title ?? 'Presentation',
+          bullets: ['Slide created with the pptx skill.']
+        }
+      ]
   for (const slide of slides) {
     const s = pptx.addSlide()
     if (slide.title) s.addText(slide.title, { fontSize: 28, bold: true })
-    if (slide.bullets?.length) s.addText(slide.bullets.map(b => ({ text: b, options: { bullet: true } })), { fontSize: 18 })
+    if (slide.bullets?.length)
+      s.addText(
+        slide.bullets.map(b => ({ text: b, options: { bullet: true } })),
+        { fontSize: 18 }
+      )
     if (slide.notes) s.addNotes(slide.notes)
   }
   const data = await pptx.write({ outputType: 'nodebuffer' })
@@ -459,7 +491,11 @@ function collectDocText(spec: Record<string, unknown>): string {
       } else if (typeof s.content === 'string') parts.push(s.content)
     }
   }
-  if (Array.isArray(spec.data) || Array.isArray(spec.story) || Array.isArray(spec.items)) {
+  if (
+    Array.isArray(spec.data) ||
+    Array.isArray(spec.story) ||
+    Array.isArray(spec.items)
+  ) {
     const arr = (spec.data ?? spec.story ?? spec.items) as unknown[]
     for (const it of arr) {
       if (typeof it === 'string') parts.push(it)
@@ -470,7 +506,9 @@ function collectDocText(spec: Record<string, unknown>): string {
   return parts.join(' ').toLowerCase()
 }
 
-function scoreIntent(spec: Record<string, unknown>): { template: string; score: number } | null {
+function scoreIntent(
+  spec: Record<string, unknown>
+): { template: string; score: number } | null {
   const hay = collectDocText(spec)
   const scores: Record<string, number> = {}
   for (const [term, template, weight] of INTENTS) {
@@ -489,7 +527,9 @@ function scoreIntent(spec: Record<string, unknown>): { template: string; score: 
 
 /** Normalize a requested template name to one that exists in the registry. */
 function asTemplateName(value: unknown): string {
-  return typeof value === 'string' && value.trim() !== '' && value.trim() in TEMPLATES
+  return typeof value === 'string' &&
+    value.trim() !== '' &&
+    value.trim() in TEMPLATES
     ? value.trim()
     : 'default'
 }
@@ -500,14 +540,18 @@ function asTemplateName(value: unknown): string {
  *  - otherwise intent scoring picks a design template only when its score clears
  *    AUTO_THRESHOLD; below that we stay on the lightweight pdf-lib engine
  */
-function resolvePdfPlan(spec: Record<string, unknown>): { premium: boolean; template: string } {
+function resolvePdfPlan(spec: Record<string, unknown>): {
+  premium: boolean
+  template: string
+} {
   if (spec.premium === true) {
     return { premium: true, template: asTemplateName(spec.template) }
   }
   if (spec.premium === false) {
     return { premium: false, template: 'default' }
   }
-  const requested = typeof spec.template === 'string' ? spec.template.trim() : ''
+  const requested =
+    typeof spec.template === 'string' ? spec.template.trim() : ''
   if (requested) {
     return { premium: true, template: asTemplateName(requested) }
   }
@@ -533,7 +577,9 @@ async function createPdf(spec: CreatePdfSpec): Promise<Buffer> {
   const anySpec = spec as Record<string, unknown>
   const plan = resolvePdfPlan(anySpec)
   if (plan.premium) {
-    const { createPremiumPdf, chromiumPremiumAvailable } = await import('./document-pdf-html')
+    const { createPremiumPdf, chromiumPremiumAvailable } = await import(
+      './document-pdf-html'
+    )
     // If a self-check (startup probe or a prior failed attempt) already proved
     // Chromium cannot launch here, skip the premium engine entirely and go
     // straight to the dependency-free pdf-lib renderer — this avoids re-paying
@@ -562,7 +608,11 @@ async function createPdf(spec: CreatePdfSpec): Promise<Buffer> {
   // render it as a real, richly-formatted document.
   const source = buildMarkdownSource(anySpec)
   const blocks = parseMarkdown(source)
-  const writer = new PdfWriter(pdf, fonts, rgb as unknown as (r: number, g: number, b: number) => any)
+  const writer = new PdfWriter(
+    pdf,
+    fonts,
+    rgb as unknown as (r: number, g: number, b: number) => any
+  )
   writer.renderAll(blocks)
   return Buffer.from(await pdf.save())
 }
@@ -624,8 +674,14 @@ export function buildMarkdownSource(spec: Record<string, unknown>): string {
     }
     md = parts.join('\n\n')
   } else if (Array.isArray(spec.paragraphs)) {
-    md = (spec.paragraphs as unknown[]).filter(p => typeof p === 'string').join('\n\n')
-  } else if (Array.isArray(spec.data) || Array.isArray(spec.story) || Array.isArray(spec.items)) {
+    md = (spec.paragraphs as unknown[])
+      .filter(p => typeof p === 'string')
+      .join('\n\n')
+  } else if (
+    Array.isArray(spec.data) ||
+    Array.isArray(spec.story) ||
+    Array.isArray(spec.items)
+  ) {
     const arr = (spec.data ?? spec.story ?? spec.items) as unknown[]
     md = arr
       .map(it =>
@@ -647,7 +703,10 @@ export function buildMarkdownSource(spec: Record<string, unknown>): string {
 }
 
 /** Pick the first non-empty string value among the given keys. */
-function pickString(spec: Record<string, unknown>, keys: string[]): string | undefined {
+function pickString(
+  spec: Record<string, unknown>,
+  keys: string[]
+): string | undefined {
   for (const k of keys) {
     const v = spec[k]
     if (typeof v === 'string' && v.trim()) return v.trim()
@@ -686,12 +745,18 @@ function parseInline(input: string): Run[] {
   let m: RegExpExecArray | null
   while ((m = re.exec(input))) {
     if (m.index > last) runs.push({ text: input.slice(last, m.index) })
-    if (m[1] != null) runs.push(...applyStyle(parseInline(m[2]), { bold: true }))
-    else if (m[3] != null) runs.push(...applyStyle(parseInline(m[4]), { bold: true }))
-    else if (m[5] != null) runs.push(...applyStyle(parseInline(m[6]), { italic: true }))
-    else if (m[7] != null) runs.push(...applyStyle(parseInline(m[8]), { italic: true }))
-    else if (m[9] != null) runs.push(...applyStyle(parseInline(m[10]), { code: true }))
-    else if (m[11] != null) runs.push(...applyStyle(parseInline(m[12]), { link: m[13] }))
+    if (m[1] != null)
+      runs.push(...applyStyle(parseInline(m[2]), { bold: true }))
+    else if (m[3] != null)
+      runs.push(...applyStyle(parseInline(m[4]), { bold: true }))
+    else if (m[5] != null)
+      runs.push(...applyStyle(parseInline(m[6]), { italic: true }))
+    else if (m[7] != null)
+      runs.push(...applyStyle(parseInline(m[8]), { italic: true }))
+    else if (m[9] != null)
+      runs.push(...applyStyle(parseInline(m[10]), { code: true }))
+    else if (m[11] != null)
+      runs.push(...applyStyle(parseInline(m[12]), { link: m[13] }))
     last = re.lastIndex
   }
   if (last < input.length) runs.push({ text: input.slice(last) })
@@ -741,7 +806,11 @@ export function parseMarkdown(src: string): Block[] {
 
     const h = /^(#{1,6})\s+(.*)$/.exec(line)
     if (h) {
-      blocks.push({ type: 'heading', level: h[1].length, runs: parseInline(h[2]) })
+      blocks.push({
+        type: 'heading',
+        level: h[1].length,
+        runs: parseInline(h[2])
+      })
       i++
       continue
     }
@@ -809,7 +878,11 @@ export function parseMarkdown(src: string): Block[] {
     // Paragraph: consecutive non-blank, non-special lines.
     const buf = [line]
     i++
-    while (i < lines.length && !/^\s*$/.test(lines[i]) && !isSpecial(lines[i])) {
+    while (
+      i < lines.length &&
+      !/^\s*$/.test(lines[i]) &&
+      !isSpecial(lines[i])
+    ) {
       buf.push(lines[i])
       i++
     }
@@ -838,7 +911,11 @@ class PdfWriter {
   private page: any
   private y: number
 
-  constructor(pdf: any, fonts: any, rgb: (r: number, g: number, b: number) => any) {
+  constructor(
+    pdf: any,
+    fonts: any,
+    rgb: (r: number, g: number, b: number) => any
+  ) {
     this.pdf = pdf
     this.fonts = fonts
     this.rgb = rgb
@@ -899,7 +976,11 @@ class PdfWriter {
     this.ensure(size * 1.6 + 12)
     this.y -= gapBefore
     const runs = b.runs.map(r => ({ ...r, bold: true }))
-    this.drawRuns(runs, { size, lineHeight: size * 1.3, color: this.rgb(0.07, 0.07, 0.1) })
+    this.drawRuns(runs, {
+      size,
+      lineHeight: size * 1.3,
+      color: this.rgb(0.07, 0.07, 0.1)
+    })
     if (level <= 2) {
       this.page.drawLine({
         start: { x: MARGIN_X, y: this.y + size * 0.5 },
@@ -915,7 +996,11 @@ class PdfWriter {
 
   private renderParagraph(b: Extract<Block, { type: 'paragraph' }>): void {
     this.ensure(16)
-    this.drawRuns(b.runs, { size: 11, lineHeight: 16, color: this.rgb(0.12, 0.12, 0.15) })
+    this.drawRuns(b.runs, {
+      size: 11,
+      lineHeight: 16,
+      color: this.rgb(0.12, 0.12, 0.15)
+    })
     this.y -= 6
   }
 
@@ -925,7 +1010,10 @@ class PdfWriter {
       this.ensure(16)
       const prefix = ordered ? `${i + 1}.  ` : '•  '
       const prefixW = this.fonts.bold.widthOfTextAtSize(prefix, 11)
-      const runs = [{ text: prefix, bold: true, italic: false, code: false }, ...item]
+      const runs = [
+        { text: prefix, bold: true, italic: false, code: false },
+        ...item
+      ]
       this.drawRuns(runs, {
         size: 11,
         lineHeight: 16,
@@ -965,7 +1053,13 @@ class PdfWriter {
     const lines = b.code.replace(/\n+$/, '').split('\n')
     const wrapped: string[] = []
     for (const line of lines) {
-      wrapped.push(...this.wrapMono(line.length ? line : ' ', this.contentWidth - padX * 2, size))
+      wrapped.push(
+        ...this.wrapMono(
+          line.length ? line : ' ',
+          this.contentWidth - padX * 2,
+          size
+        )
+      )
     }
     const blockH = wrapped.length * lh + padY * 2
     this.ensure(blockH + 8)
@@ -1005,9 +1099,13 @@ class PdfWriter {
   }
 
   private renderTable(b: Extract<Block, { type: 'table' }>): void {
-    const all = [b.header, ...b.rows].map(r => (r || []).map(c => String(c ?? '')))
+    const all = [b.header, ...b.rows].map(r =>
+      (r || []).map(c => String(c ?? ''))
+    )
     const colCount = Math.max(1, ...all.map(r => r.length))
-    const grid = all.map(r => Array.from({ length: colCount }, (_, c) => r[c] ?? ''))
+    const grid = all.map(r =>
+      Array.from({ length: colCount }, (_, c) => r[c] ?? '')
+    )
     const weights: number[] = []
     for (let c = 0; c < colCount; c++) {
       let max = 0
@@ -1031,7 +1129,8 @@ class PdfWriter {
           size
         )
       )
-      const rowH = Math.max(1, ...cellLines.map(l => l.length)) * cellLH + padY * 2
+      const rowH =
+        Math.max(1, ...cellLines.map(l => l.length)) * cellLH + padY * 2
       this.ensure(rowH)
       const top = this.y
       this.page.drawRectangle({
@@ -1110,7 +1209,9 @@ class PdfWriter {
         const w = this.fontFor(r).widthOfTextAtSize(word, size)
         if (w > maxWidth) {
           const chunks = this.splitWord(word, r, maxWidth, size)
-          chunks.forEach((c, ci) => tokens.push({ text: c, run: r, noSpace: ci > 0 }))
+          chunks.forEach((c, ci) =>
+            tokens.push({ text: c, run: r, noSpace: ci > 0 })
+          )
         } else {
           tokens.push({ text: word, run: r, noSpace: false })
         }
@@ -1178,7 +1279,12 @@ class PdfWriter {
     if (line.length) flush()
   }
 
-  private splitWord(word: string, run: Run, maxWidth: number, size: number): string[] {
+  private splitWord(
+    word: string,
+    run: Run,
+    maxWidth: number,
+    size: number
+  ): string[] {
     const f = this.fontFor(run)
     const out: string[] = []
     let cur = ''
@@ -1199,7 +1305,8 @@ class PdfWriter {
     const out: string[] = []
     let cur = ''
     for (const ch of text) {
-      if (this.fonts.mono.widthOfTextAtSize(cur + ch, size) <= maxWidth) cur += ch
+      if (this.fonts.mono.widthOfTextAtSize(cur + ch, size) <= maxWidth)
+        cur += ch
       else {
         out.push(cur)
         cur = ch
@@ -1209,7 +1316,12 @@ class PdfWriter {
     return out
   }
 
-  private wrapText2(text: string, maxWidth: number, font: any, size: number): string[] {
+  private wrapText2(
+    text: string,
+    maxWidth: number,
+    font: any,
+    size: number
+  ): string[] {
     const t = sanitizePdfText(text)
     if (!t) return ['']
     const words = t.split(/\s+/).filter(Boolean)
@@ -1245,7 +1357,13 @@ class PdfWriter {
   }
 
   /** Add a clickable hyperlink annotation (best-effort). */
-  private addLink(x: number, yBaseline: number, w: number, size: number, url: string): void {
+  private addLink(
+    x: number,
+    yBaseline: number,
+    w: number,
+    size: number,
+    url: string
+  ): void {
     try {
       const ctx = this.pdf.context
       const annot = ctx.register(
@@ -1287,7 +1405,10 @@ export async function modifyDocument(
   return modifyXlsx(buffer, modifications as ModifyXlsxOptions)
 }
 
-async function modifyXlsx(buffer: Buffer, opts: ModifyXlsxOptions): Promise<Buffer> {
+async function modifyXlsx(
+  buffer: Buffer,
+  opts: ModifyXlsxOptions
+): Promise<Buffer> {
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.load(buffer as never)
@@ -1335,7 +1456,9 @@ export async function validateDocument(
       case 'pptx': {
         const JSZip = (await import('jszip')).default
         const zip = await JSZip.loadAsync(buffer)
-        const slideCount = Object.keys(zip.files).filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f)).length
+        const slideCount = Object.keys(zip.files).filter(f =>
+          /^ppt\/slides\/slide\d+\.xml$/.test(f)
+        ).length
         return { ok: slideCount > 0, meta: { slides: slideCount } }
       }
       case 'pdf': {

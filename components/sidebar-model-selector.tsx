@@ -23,7 +23,8 @@ import {
   ModelSelectorList,
   ModelSelectorRoot,
   ModelSelectorSearch,
-  ModelSelectorTrigger} from '@/components/model-selector'
+  ModelSelectorTrigger
+} from '@/components/model-selector'
 
 function modelKey(providerId: string, modelId: string): string {
   return `${providerId}:${modelId}`
@@ -56,8 +57,8 @@ export default function SidebarModelSelector({
       ([, list]) =>
         list.map(model => ({
           id: modelKey(model.providerId, model.id),
-        name: displayName(model),
-        description: ''
+          name: displayName(model),
+          description: ''
         }))
     )
   }, [modelSelectorData])

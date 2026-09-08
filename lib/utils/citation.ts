@@ -138,20 +138,21 @@ function normalizeBareCitations(
   return expanded.replace(
     /(?<![A-Za-z0-9_])\[\s*(\d{1,2})\s*\](?!\()/g,
     (_m, numStr) => {
-    const num = parseInt(numStr, 10)
-    // Only rewrite bare tokens that actually resolve to a search result.
-    // Anything else (array indices like arr[1], "section [12]", footnotes)
-    // is legitimate prose and must be left untouched — never deleted.
-    if (citationMaps['preloaded-search']?.[num]) {
-      return `[${num}](#preloaded-search)`
+      const num = parseInt(numStr, 10)
+      // Only rewrite bare tokens that actually resolve to a search result.
+      // Anything else (array indices like arr[1], "section [12]", footnotes)
+      // is legitimate prose and must be left untouched — never deleted.
+      if (citationMaps['preloaded-search']?.[num]) {
+        return `[${num}](#preloaded-search)`
+      }
+      // Find any toolCallId that has this citation number
+      const foundId = toolCallIds.find(id => citationMaps[id]?.[num])
+      if (foundId) {
+        return `[${num}](#${foundId})`
+      }
+      return _m
     }
-    // Find any toolCallId that has this citation number
-    const foundId = toolCallIds.find(id => citationMaps[id]?.[num])
-    if (foundId) {
-      return `[${num}](#${foundId})`
-    }
-    return _m
-  })
+  )
 }
 
 export function processCitations(

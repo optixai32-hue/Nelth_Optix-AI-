@@ -314,8 +314,8 @@ function StoryPromptPanel({
             onClick={onClose}
             aria-label="Fermer"
             className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-           >
-             <X className="h-4 w-4 transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:rotate-90" />
+          >
+            <X className="h-4 w-4 transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:rotate-90" />
           </button>
         </div>
 
@@ -434,31 +434,31 @@ export function ActionButtons({
     }
 
     const handleClickOutside = (e: MouseEvent) => {
-    if (
-      containerRef.current &&
-      !containerRef.current.contains(e.target as Node)
-    ) {
-      if (activeCategory && activeCategory !== 'createimage') {
-        // Check if click is not on the input field
-        if (!inputRef?.current?.contains(e.target as Node)) {
-          resetToButtons()
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        if (activeCategory && activeCategory !== 'createimage') {
+          // Check if click is not on the input field
+          if (!inputRef?.current?.contains(e.target as Node)) {
+            resetToButtons()
+          }
         }
       }
-    }
     }
 
     const handleFocusOut = () => {
       // Check if focus is moving outside both the container and input
       setTimeout(() => {
         const activeElement = document.activeElement
-      if (
-        activeCategory &&
-        activeCategory !== 'createimage' &&
-        !containerRef.current?.contains(activeElement) &&
-        activeElement !== inputRef?.current
-      ) {
-        resetToButtons()
-      }
+        if (
+          activeCategory &&
+          activeCategory !== 'createimage' &&
+          !containerRef.current?.contains(activeElement) &&
+          activeElement !== inputRef?.current
+        ) {
+          resetToButtons()
+        }
       }, FOCUS_OUT_DELAY_MS)
     }
 
@@ -538,16 +538,14 @@ export function ActionButtons({
           {activeCategory === 'createimage' ? (
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between px-1 pb-2">
-                <span className="text-sm font-medium">
-                  Découvrez des idées
-                </span>
+                <span className="text-sm font-medium">Découvrez des idées</span>
                 <button
                   type="button"
                   onClick={() => setActiveCategory(null)}
                   aria-label="Fermer"
                   className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-            <X className="h-4 w-4 transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:rotate-90" />
+                  <X className="h-4 w-4 transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:rotate-90" />
                 </button>
               </div>
               <ImageStories onStoryClick={story => setSelectedStory(story)} />

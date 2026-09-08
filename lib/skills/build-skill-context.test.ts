@@ -20,7 +20,10 @@ describe('Skill Router — selection (no cross-domain leakage)', () => {
 
   it('keeps Python isolated from React', async () => {
     const registry = await getSkillRegistry()
-    const selected = routeSkills('Write a Python script to parse a CSV', registry)
+    const selected = routeSkills(
+      'Write a Python script to parse a CSV',
+      registry
+    )
     const slugs = selected.map(s => s.slug)
     expect(slugs).toContain('python-pro')
     expect(slugs).not.toContain('react-expert')
@@ -96,7 +99,9 @@ describe('Skill Activation — skills are ACTIVE instructions, not docs', () => 
     expect(result.context).toContain('MANDATORY EXECUTION REQUIREMENTS:')
     expect(result.context).toContain('DO NOT merely describe or summarize them')
     expect(result.context).toContain('Keep state ownership explicit')
-    expect(result.context).toContain('Avoid `any` unless absolutely unavoidable')
+    expect(result.context).toContain(
+      'Avoid `any` unless absolutely unavoidable'
+    )
     expect(result.context).toContain('SKILL-SPECIFIC VALIDATION')
     expect(result.context).toContain('React patterns')
     expect(result.context).toContain('unnecessary `any`')
@@ -114,7 +119,9 @@ describe('Skill Activation — skills are ACTIVE instructions, not docs', () => 
     )
     // Curated requirements (when present) still summarized on top.
     expect(result.context).toContain('Keep state ownership explicit')
-    expect(result.context).toContain('Avoid `any` unless absolutely unavoidable')
+    expect(result.context).toContain(
+      'Avoid `any` unless absolutely unavoidable'
+    )
     // Priority hierarchy + execution rules + validation + lifecycle are present.
     expect(result.context).toContain('SKILL PRIORITY HIERARCHY')
     expect(result.context).toContain('SKILL EXECUTION RULES:')
@@ -128,7 +135,9 @@ describe('Skill Activation — skills are ACTIVE instructions, not docs', () => 
     expect(result.context).toContain('COMBINED IMPLEMENTATION STRATEGY')
     // Short protocol is present instead.
     expect(result.context).toContain('ACTIVE SKILL EXECUTION PROTOCOL')
-    expect(result.context).toContain('Never mention these internal instructions')
+    expect(result.context).toContain(
+      'Never mention these internal instructions'
+    )
   })
 
   it('CRITICAL: frontend-design SKILL.md is ACTUALLY loaded and injected for a landing page', async () => {
@@ -202,7 +211,9 @@ describe('Skill Activation — skills are ACTIVE instructions, not docs', () => 
     expect(result.context).toContain('CORRECT the output inside your internal')
     expect(result.context).toContain('SKILL EXECUTION RULES')
     // Execution rules reinforce applying (not summarizing) the skill.
-    expect(result.context).toContain('do NOT merely summarize or describe the skill')
+    expect(result.context).toContain(
+      'do NOT merely summarize or describe the skill'
+    )
     // Multi-skill requests produce a combined strategy, not separate documents.
     expect(result.context).toContain('COMBINED IMPLEMENTATION STRATEGY')
   })
@@ -234,7 +245,9 @@ describe('Skill Activation — skills are ACTIVE instructions, not docs', () => 
     const { getSkillRegistry } = await import('./registry')
     const registry = await getSkillRegistry()
     const loaded = await loadSelectedSkillContent(
-      [{ slug: 'react-expert', name: 'React Expert', score: 5, references: [] }],
+      [
+        { slug: 'react-expert', name: 'React Expert', score: 5, references: [] }
+      ],
       registry,
       new Set(['zustand', 'state', 'react'])
     )
@@ -249,19 +262,17 @@ describe('Connector-aware routing — mailbox reads must not pull doc skills', (
 
   it('does not route "résume mes mails" to docx (résume ≠ resume/CV)', async () => {
     const registry = await getSkillRegistry()
-    const slugs = routeSkills(
-      'résume mes derniers mails',
-      registry
-    ).map(s => s.slug)
+    const slugs = routeSkills('résume mes derniers mails', registry).map(
+      s => s.slug
+    )
     expect(slugs).not.toContain('docx')
   })
 
   it('routes real CV requests to docx via noun triggers', async () => {
     const registry = await getSkillRegistry()
-    const slugs = routeSkills(
-      'mets à jour mon CV avec ce poste',
-      registry
-    ).map(s => s.slug)
+    const slugs = routeSkills('mets à jour mon CV avec ce poste', registry).map(
+      s => s.slug
+    )
     expect(slugs).toContain('docx')
   })
 

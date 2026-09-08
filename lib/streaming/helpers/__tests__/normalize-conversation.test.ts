@@ -27,8 +27,11 @@ describe('normalizeConversationHistory — one authoritative history flow', () =
       assistant('a1', 'Paris.'),
       user('u2', 'And Germany?')
     ]
-    const { messages: out, droppedDuplicates, droppedEmpties } =
-      normalizeConversationHistory(messages)
+    const {
+      messages: out,
+      droppedDuplicates,
+      droppedEmpties
+    } = normalizeConversationHistory(messages)
     expect(out).toHaveLength(3)
     expect(droppedDuplicates).toBe(0)
     expect(droppedEmpties).toBe(0)

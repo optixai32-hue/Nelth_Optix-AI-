@@ -237,14 +237,16 @@ export function stripFakeToolCallXml(text: string): string {
   for (const pattern of FAKE_TOOL_PATTERNS) {
     result = result.replace(pattern, '')
   }
-  return result
-    .replace(/^[ \t]*search">.*$/gim, '')
-    .replace(/\n{3,}/g, '\n\n')
-    // Strip blank LINES at the edges only — never .trim(): streaming deltas
-    // carry meaningful leading/trailing spaces (" world") and trimming them
-    // glues words together ("Helloworld").
-    .replace(/^\n+/, '')
-    .replace(/\n+$/, '')
+  return (
+    result
+      .replace(/^[ \t]*search">.*$/gim, '')
+      .replace(/\n{3,}/g, '\n\n')
+      // Strip blank LINES at the edges only — never .trim(): streaming deltas
+      // carry meaningful leading/trailing spaces (" world") and trimming them
+      // glues words together ("Helloworld").
+      .replace(/^\n+/, '')
+      .replace(/\n+$/, '')
+  )
 }
 
 export function stripFakeToolCallXmlFromMessage(message: {
@@ -385,8 +387,7 @@ export class StreamTextSanitizer {
         this.introChecked = true
         this.buffer += incoming
       } else {
-        const decisive =
-          this.head.includes('\n\n') || this.head.length >= 1200
+        const decisive = this.head.includes('\n\n') || this.head.length >= 1200
         if (!decisive) return ''
         const stripped = stripLeadingIntroReset(this.head, {
           keepSelfIntro: this.keepSelfIntro
@@ -531,7 +532,10 @@ export function resolveContextualSearchQuery(
       q
     )
 
-  if (history.length > 1 && (hasPronounOrFollowUp || q.split(/\s+/).length <= 4)) {
+  if (
+    history.length > 1 &&
+    (hasPronounOrFollowUp || q.split(/\s+/).length <= 4)
+  ) {
     const previousUserMessages = history
       .slice(0, -1)
       .filter(m => m.role === 'user')
@@ -655,7 +659,10 @@ function hasOwnImageSubject(query: string): boolean {
       /\b(cherche|recherche|chercher|trouve|trouver|montre(?:-moi)?|montrez|affiche|affichez|donne(?:-moi)?|donnez|veux|voir|search|find|show|give|get|mitady|tadiavo|tadiavina)\b/gi,
       ' '
     )
-    .replace(/\b(images?|photos?|pictures?|illustrations?|visuels?|dessins?)\b/gi, ' ')
+    .replace(
+      /\b(images?|photos?|pictures?|illustrations?|visuels?|dessins?)\b/gi,
+      ' '
+    )
     .replace(/[’']/g, ' ')
     .replace(/[^a-zàâäéèêëîïôöùûüç0-9\s-]/gi, ' ')
   const meaningful = cleaned

@@ -2,7 +2,8 @@ import { getCurrentUserId } from '@/lib/auth/get-current-user'
 import {
   configuredProviders,
   type ConnectorProviderId,
-  servicesForProvider} from '@/lib/connectors/providers'
+  servicesForProvider
+} from '@/lib/connectors/providers'
 import { connectionNeedsReconnect, hasConnection } from '@/lib/connectors/vault'
 
 export const runtime = 'nodejs'
@@ -58,5 +59,10 @@ export async function GET() {
       connected[ids as ServiceId] = true
     }
   }
-  return Response.json({ connected, configured, guest: !userId, needsReconnect })
+  return Response.json({
+    connected,
+    configured,
+    guest: !userId,
+    needsReconnect
+  })
 }

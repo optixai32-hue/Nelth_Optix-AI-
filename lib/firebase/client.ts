@@ -1,8 +1,8 @@
 'use client'
 
-import { type Analytics,getAnalytics, isSupported } from 'firebase/analytics'
-import { type FirebaseApp,getApp, getApps, initializeApp } from 'firebase/app'
-import { type Auth,getAuth } from 'firebase/auth'
+import { type Analytics, getAnalytics, isSupported } from 'firebase/analytics'
+import { type FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app'
+import { type Auth, getAuth } from 'firebase/auth'
 
 import { getFirebaseClientConfig } from './config'
 

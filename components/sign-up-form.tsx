@@ -3,10 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-import {
-  createUserWithEmailAndPassword,
-  updateProfile
-} from 'firebase/auth'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 
 import { establishSession, getFirebaseAuth } from '@/lib/firebase/client'
 import { cn } from '@/lib/utils/index'
@@ -53,11 +50,7 @@ export function SignUpForm({
 
     try {
       const auth = getFirebaseAuth()
-      const cred = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      )
+      const cred = await createUserWithEmailAndPassword(auth, email, password)
       // Store the name with a space ("First Last") so the greeting can show
       // only the first name via first-word extraction.
       const displayName = `${firstName} ${lastName}`.trim()
@@ -80,15 +73,13 @@ export function SignUpForm({
       {...props}
     >
       <Card className="w-full max-w-sm">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl flex flex-col items-center justify-center gap-4">
-              <IconLogo className="size-16" />
-              {t('auth.createAccount')}
-            </CardTitle>
-            <CardDescription>
-              {t('auth.enterDetails')}
-            </CardDescription>
-          </CardHeader>
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl flex flex-col items-center justify-center gap-4">
+            <IconLogo className="size-16" />
+            {t('auth.createAccount')}
+          </CardTitle>
+          <CardDescription>{t('auth.enterDetails')}</CardDescription>
+        </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp}>
             <div className="flex flex-col gap-4">
@@ -140,7 +131,9 @@ export function SignUpForm({
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
-                  <Label htmlFor="repeat-password">{t('auth.repeatPassword')}</Label>
+                  <Label htmlFor="repeat-password">
+                    {t('auth.repeatPassword')}
+                  </Label>
                 </div>
                 <PasswordInput
                   id="repeat-password"

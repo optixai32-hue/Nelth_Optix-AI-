@@ -15,6 +15,4 @@ export const ALLOWED_UPLOAD_MIME_TYPES = [
 ] as const
 
 /** Human-readable accept string for <input type="file" accept=...>. */
-export const ALLOWED_UPLOAD_ACCEPT =
-  ALLOWED_UPLOAD_MIME_TYPES.join(',')
-
+export const ALLOWED_UPLOAD_ACCEPT = ALLOWED_UPLOAD_MIME_TYPES.join(',')

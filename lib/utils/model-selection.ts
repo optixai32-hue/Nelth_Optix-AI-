@@ -7,7 +7,10 @@ import {
   parseModelSelectionCookie
 } from '@/lib/config/model-selection-cookie'
 import { getModelForMode } from '@/lib/config/model-types'
-import { fetchAvailableModels, isRetiredModelId } from '@/lib/models/fetch-models'
+import {
+  fetchAvailableModels,
+  isRetiredModelId
+} from '@/lib/models/fetch-models'
 import { Model } from '@/lib/types/models'
 import { SearchMode } from '@/lib/types/search'
 import { isProviderEnabled } from '@/lib/utils/registry'

@@ -63,9 +63,9 @@ export function compareMessagesForOrder(
  * run and drop the rest. This guarantees the hydrated UI renders a clean
  * USER → AI → USER → AI sequence regardless of how the data was corrupted.
  */
-export function dedupeConsecutiveDuplicates<T extends OrderableMessage & { role?: string }>(
-  messages: T[]
-): T[] {
+export function dedupeConsecutiveDuplicates<
+  T extends OrderableMessage & { role?: string }
+>(messages: T[]): T[] {
   const result: T[] = []
   for (const message of messages) {
     const prev = result[result.length - 1]

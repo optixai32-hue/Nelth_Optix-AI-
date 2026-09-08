@@ -35,9 +35,12 @@ describe('TEST 8/10 — document download route returns the real file', () => {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     )
 
-    const res = await GET(new NextRequest(`http://localhost/api/documents/${stored.id}`), {
-      params: Promise.resolve({ id: stored.id })
-    } as never)
+    const res = await GET(
+      new NextRequest(`http://localhost/api/documents/${stored.id}`),
+      {
+        params: Promise.resolve({ id: stored.id })
+      } as never
+    )
 
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe(
@@ -50,9 +53,12 @@ describe('TEST 8/10 — document download route returns the real file', () => {
   })
 
   it('returns 404 for an unknown id (no fake artifact)', async () => {
-    const res = await GET(new NextRequest('http://localhost/api/documents/doesnotexist'), {
-      params: Promise.resolve({ id: 'doesnotexist' })
-    } as never)
+    const res = await GET(
+      new NextRequest('http://localhost/api/documents/doesnotexist'),
+      {
+        params: Promise.resolve({ id: 'doesnotexist' })
+      } as never
+    )
     expect(res.status).toBe(404)
   })
 })

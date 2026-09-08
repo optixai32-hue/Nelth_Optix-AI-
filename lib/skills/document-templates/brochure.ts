@@ -1,7 +1,9 @@
 import { BASE_CSS } from './shared'
 import type { TemplateDef } from './types'
 
-const css = (accent: string) => BASE_CSS + `
+const css = (accent: string) =>
+  BASE_CSS +
+  `
 main { max-width: 780px; }
 h1 { text-align: center; font-size: 2.6em; color: #0b0b0f; margin: 1em 0 0.3em; }
 h2 { text-align: center; font-size: 1.5em; color: var(--accent); margin: 1.4em 0 0.4em; }

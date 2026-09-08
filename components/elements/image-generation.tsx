@@ -1,6 +1,6 @@
 'use client'
 
-import { type ComponentProps,useEffect, useState } from 'react'
+import { type ComponentProps, useEffect, useState } from 'react'
 
 import { RefreshCwIcon, XIcon } from 'lucide-react'
 
@@ -141,9 +141,7 @@ export function ImageGeneration({
           <RefreshCwIcon className="size-3" />
         </button>
       </div>
-      {errorText && (
-        <p className="text-xs text-destructive">{errorText}</p>
-      )}
+      {errorText && <p className="text-xs text-destructive">{errorText}</p>}
     </div>
   )
 }

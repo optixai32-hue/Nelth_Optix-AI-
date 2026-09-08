@@ -99,7 +99,7 @@ export function shouldEngageConnectors(args: {
 const CONNECTOR_FOLLOWUP_RE = intentRe(
   'et|le|la|les|lui|leur|eux|celui|celle|ceux|celles|ca|ceci|cela|deuxieme|troisieme|premier|premiere|autre|encore|aussi|plus|apres|ensuite|demain|semaine|hier|matin|soir|jour|mois' +
     '|that|this|other|another|more|next|second|first|them|tomorrow|week|day|yesterday|morning|evening' +
-    '|oui|yes|yeah|ok|okay|d[’\']?accord|vas[-\\s]?y|allez[-\\s]?y|continuer?|volontiers|je[-\\s]?veux[-\\s]?bien|allons[-\\s]?y'
+    "|oui|yes|yeah|ok|okay|d[’']?accord|vas[-\\s]?y|allez[-\\s]?y|continuer?|volontiers|je[-\\s]?veux[-\\s]?bien|allons[-\\s]?y"
 )
 
 const CONNECTOR_PART_TYPES = new Set([

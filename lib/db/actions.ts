@@ -70,9 +70,7 @@ function toChat(doc: DocumentSnapshot): Chat | null {
   }
 }
 
-function toMessageDoc(
-  doc: DocumentSnapshot
-): {
+function toMessageDoc(doc: DocumentSnapshot): {
   id: string
   role: string
   createdAt: Date
@@ -207,10 +205,7 @@ export async function upsertMessage(
     .doc(message.id)
 
   const existing = await msgRef.get()
-  const dbParts = mapUIMessagePartsToDBParts(
-    message.parts as any[],
-    message.id
-  )
+  const dbParts = mapUIMessagePartsToDBParts(message.parts as any[], message.id)
   const messageData = mapUIMessageToDBMessage(message as any)
 
   // Sequence: keep the existing value for updates (so re-saving a message during
@@ -221,9 +216,7 @@ export async function upsertMessage(
   let sequence: number | null
   if (existing.exists) {
     sequence =
-      typeof existingData?.sequence === 'number'
-        ? existingData.sequence
-        : null
+      typeof existingData?.sequence === 'number' ? existingData.sequence : null
   } else {
     sequence = await getNextSequence(message.chatId)
   }
@@ -297,7 +290,10 @@ export async function findExistingAssistantId(
   const idx = docs.findIndex(d => d.id === userMessageId)
   if (idx === -1) return null
   const next = docs[idx + 1]
-  if (next && (next.data()?.role === 'assistant' || next.data()?.role === 'tool')) {
+  if (
+    next &&
+    (next.data()?.role === 'assistant' || next.data()?.role === 'tool')
+  ) {
     return next.id
   }
   return null
@@ -414,7 +410,8 @@ async function loadOrderedMessageRefs(
   const mapped = snap.docs.map(d => ({
     id: d.id,
     ref: d.ref,
-    sequence: typeof d.data()?.sequence === 'number' ? d.data()!.sequence : null,
+    sequence:
+      typeof d.data()?.sequence === 'number' ? d.data()!.sequence : null,
     createdAt: d.data()?.createdAt
   }))
 
@@ -526,7 +523,11 @@ export async function createNote(
 ): Promise<Note> {
   const id = generateId()
   const now = new Date()
-  const ref = firestore().collection('users').doc(note.userId).collection('notes').doc(id)
+  const ref = firestore()
+    .collection('users')
+    .doc(note.userId)
+    .collection('notes')
+    .doc(id)
   await ref.set({
     id,
     userId: note.userId,
@@ -973,6 +974,3 @@ export async function createChatWithFirstMessageTransaction({
 // Note: types are not re-exported from this `'use server'` module, as Next.js
 // compiles type-only re-exports into server-reference registrations. Consumers
 // should import `Feedback` directly from `@/lib/db/schema`.
-
-
-

@@ -48,8 +48,20 @@ export interface ValidateOptions {
 }
 
 const VOID_ELEMENTS = new Set([
-  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-  'link', 'meta', 'param', 'source', 'track', 'wbr'
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr'
 ])
 
 /**
@@ -64,7 +76,9 @@ export function extractCodeBlocks(
   let m: RegExpExecArray | null
   while ((m = re.exec(content))) {
     const lang = (m[1] || '').toLowerCase()
-    if (['html', 'css', 'js', 'javascript', 'ts', 'typescript'].includes(lang)) {
+    if (
+      ['html', 'css', 'js', 'javascript', 'ts', 'typescript'].includes(lang)
+    ) {
       blocks.push({ lang, code: m[2] })
     }
   }
@@ -261,16 +275,15 @@ export function validateHtml(html: string): Violation[] {
  * widths, no viewport <meta>, no media queries, no fluid units, no grid/flex).
  * A design using clamp()/vw, grid/flex + viewport meta, or media queries passes.
  */
-export function validateResponsive(
-  html: string,
-  css: string
-): Violation[] {
+export function validateResponsive(html: string, css: string): Violation[] {
   const violations: Violation[] = []
   const text = `${html}\n${css}`
 
   const hasViewport = /<meta[^>]+name\s*=\s*["']viewport["']/i.test(html)
   const hasMedia = /@media\s*\(/i.test(text)
-  const hasFluid = /\bclamp\(|minmax\(|\bvw\b|\bvmin\b|\bvmax\b|\bvh\b/i.test(text)
+  const hasFluid = /\bclamp\(|minmax\(|\bvw\b|\bvmin\b|\bvmax\b|\bvh\b/i.test(
+    text
+  )
   const hasGridFlex =
     /display\s*:\s*(grid|flex)|grid-template|flex-|\bflex\s*:/i.test(text)
   const hasMaxWidth = /max-width\s*:/i.test(text)
@@ -313,7 +326,7 @@ export function validateJs(js: string): Violation[] {
 
   try {
     // Compiles (does not execute) — catches real syntax errors.
-     
+
     new Function(body)
   } catch (e) {
     if (e instanceof SyntaxError) {
@@ -352,8 +365,7 @@ export function validateWebGame(html: string, js: string): Violation[] {
 
   const hasCanvas = /<canvas[\s>]/i.test(html)
   const hasLoop =
-    /requestAnimationFrame/i.test(combined) ||
-    /setInterval\s*\(/.test(combined)
+    /requestAnimationFrame/i.test(combined) || /setInterval\s*\(/.test(combined)
 
   if (html && !hasCanvas) {
     violations.push({
@@ -575,7 +587,8 @@ export function validateGeneratedOutput(
     // A small-scope edit should preserve the previous structure; if the output
     // is a fresh generic default template, warn (the enforcer can re-prompt).
     if (
-      (opts.intent === 'MODIFY_EXISTING' || opts.intent === 'ADD_TO_EXISTING') &&
+      (opts.intent === 'MODIFY_EXISTING' ||
+        opts.intent === 'ADD_TO_EXISTING') &&
       (hasHtml || hasCss)
     ) {
       const generic = detectGenericDesign(content, opts.query)
@@ -602,11 +615,10 @@ export function validateGeneratedOutput(
       .filter(b => ['js', 'javascript', 'ts', 'typescript'].includes(b.lang))
       .map(b => b.code)
       .join('\n')
-    violations.push(...validateWebGame(hasHtml ? htmlContent : content, jsContent))
-  } else if (
-    opts.slugs?.includes('canvas-design') &&
-    (hasHtml || hasJs)
-  ) {
+    violations.push(
+      ...validateWebGame(hasHtml ? htmlContent : content, jsContent)
+    )
+  } else if (opts.slugs?.includes('canvas-design') && (hasHtml || hasJs)) {
     for (const v of validateWebGame(
       hasHtml ? htmlContent : content,
       blocks

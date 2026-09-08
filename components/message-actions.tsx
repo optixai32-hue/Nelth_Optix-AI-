@@ -225,7 +225,10 @@ export function MessageActions({
             onClick={handleCopy}
             className="rounded-full"
           >
-            <Copy size={14} className="transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-125 active:scale-90" />
+            <Copy
+              size={14}
+              className="transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-125 active:scale-90"
+            />
           </Button>
           {searchResults && searchResults.length > 0 && (
             <div
@@ -256,13 +259,13 @@ export function MessageActions({
                   disabled={isSubmittingFeedback || feedbackScore === 1}
                   className="rounded-full"
                 >
-                   <ThumbsUp
-                     size={14}
-                     className={cn(
-                       'transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-125 hover:-rotate-12 active:scale-95',
-                       feedbackScore === 1 ? 'fill-current' : ''
-                     )}
-                   />
+                  <ThumbsUp
+                    size={14}
+                    className={cn(
+                      'transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-125 hover:-rotate-12 active:scale-95',
+                      feedbackScore === 1 ? 'fill-current' : ''
+                    )}
+                  />
                 </Button>
               )}
               {(feedbackScore === null || feedbackScore === -1) && (
@@ -273,13 +276,13 @@ export function MessageActions({
                   disabled={isSubmittingFeedback || feedbackScore === -1}
                   className="rounded-full"
                 >
-                   <ThumbsDown
-                     size={14}
-                     className={cn(
-                       'transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-125 hover:rotate-12 active:scale-95',
-                       feedbackScore === -1 ? 'fill-current' : ''
-                     )}
-                   />
+                  <ThumbsDown
+                    size={14}
+                    className={cn(
+                      'transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-125 hover:rotate-12 active:scale-95',
+                      feedbackScore === -1 ? 'fill-current' : ''
+                    )}
+                  />
                 </Button>
               )}
             </>
@@ -294,7 +297,10 @@ export function MessageActions({
             className="h-8 shrink-0 gap-1.5 rounded-full px-3"
             aria-label="Save to library"
           >
-            <Bookmark size={14} className="transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-110 hover:-rotate-6 active:scale-95" />
+            <Bookmark
+              size={14}
+              className="transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-110 hover:-rotate-6 active:scale-95"
+            />
             Save
           </Button>
         ) : (

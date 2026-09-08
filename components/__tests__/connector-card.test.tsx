@@ -36,7 +36,9 @@ describe('ConnectorCard', () => {
       expect(screen.queryByTestId('connector-card')).not.toBeInTheDocument()
     })
     // Dismissal is NOT persisted: nothing stored, card returns on remount.
-    expect(window.localStorage.getItem('nelth.connector-card.dismissed')).toBeNull()
+    expect(
+      window.localStorage.getItem('nelth.connector-card.dismissed')
+    ).toBeNull()
   })
 
   test('shows again on remount after dismiss (e.g. page refresh)', async () => {
@@ -62,18 +64,14 @@ describe('ConnectorCard', () => {
   })
 
   test('connecting a service shows success via injected impl', async () => {
-    render(
-      <ConnectorCard connectImpl={() => Promise.resolve()} />
-    )
+    render(<ConnectorCard connectImpl={() => Promise.resolve()} />)
     fireEvent.click(screen.getByTestId('connector-connect'))
     await waitFor(() => {
       expect(screen.getByTestId('connector-panel')).toBeInTheDocument()
     })
     fireEvent.click(screen.getByTestId('connector-service-drive'))
     await waitFor(() => {
-      expect(
-        screen.getByTestId('connector-status-drive')
-      ).toBeInTheDocument()
+      expect(screen.getByTestId('connector-status-drive')).toBeInTheDocument()
     })
   })
 
@@ -88,9 +86,9 @@ describe('ConnectorCard', () => {
     fireEvent.click(screen.getByTestId('connector-service-gmail'))
     await waitFor(() => {
       // Default locale in tests is English.
-      expect(
-        screen.getByTestId('connector-service-gmail')
-      ).toHaveTextContent('Retry')
+      expect(screen.getByTestId('connector-service-gmail')).toHaveTextContent(
+        'Retry'
+      )
     })
   })
 
@@ -215,18 +213,13 @@ describe('ConnectorCard', () => {
         expect(screen.getByTestId('connector-panel')).toBeInTheDocument()
       })
       await waitFor(() => {
-        expect(
-          screen.getByTestId('connector-status-drive')
-        ).toBeInTheDocument()
+        expect(screen.getByTestId('connector-status-drive')).toBeInTheDocument()
       })
       fireEvent.click(screen.getByTestId('connector-disconnect-drive'))
       await waitFor(() => {
         expect(
-          calls.some(
-            c =>
-              (c as { url: string }).url.includes(
-                '/api/connectors/disconnect'
-              )
+          calls.some(c =>
+            (c as { url: string }).url.includes('/api/connectors/disconnect')
           )
         ).toBe(true)
       })

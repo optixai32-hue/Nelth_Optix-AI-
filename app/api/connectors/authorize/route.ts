@@ -5,7 +5,8 @@ import {
   issueState,
   OAUTH_STATE_COOKIE,
   OAUTH_STATE_TTL_MS,
-  OAUTH_VERIFIER_COOKIE} from '@/lib/connectors/oauth-state'
+  OAUTH_VERIFIER_COOKIE
+} from '@/lib/connectors/oauth-state'
 import {
   buildAuthorizeUrl,
   type ConnectorProviderId
@@ -45,7 +46,9 @@ export async function GET(req: Request) {
     })
   }
   const url = new URL(req.url)
-  const provider = url.searchParams.get('provider') as ConnectorProviderId | null
+  const provider = url.searchParams.get(
+    'provider'
+  ) as ConnectorProviderId | null
   if (!provider || !PROVIDERS.includes(provider)) {
     return new Response('Unknown provider (google, github, notion)', {
       status: 400
@@ -70,7 +73,11 @@ export async function GET(req: Request) {
   }
 
   const res = NextResponse.redirect(authorizeUrl)
-  res.cookies.set(OAUTH_STATE_COOKIE, issued.state, cookieFlags(OAUTH_STATE_TTL_MS))
+  res.cookies.set(
+    OAUTH_STATE_COOKIE,
+    issued.state,
+    cookieFlags(OAUTH_STATE_TTL_MS)
+  )
   res.cookies.set(
     OAUTH_VERIFIER_COOKIE,
     issued.codeVerifier,

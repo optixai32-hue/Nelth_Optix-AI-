@@ -30,7 +30,7 @@ export function getDbInstance(): Firestore {
   return instance()
 }
 
-export { generateId,schema }
+export { generateId, schema }
 
 // Helper type for the data model (no longer tied to Drizzle).
 export type Schema = typeof schema

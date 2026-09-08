@@ -1,21 +1,21 @@
-"use client";
+'use client'
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState } from 'react'
 
-import type { Components } from "streamdown";
+import type { Components } from 'streamdown'
 
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils'
 
-import { CodeBlock } from "./code-block";
+import { CodeBlock } from './code-block'
 
 /**
  * Build the DuckDuckGo external-content proxy URL for a direct image URL.
  * Used ONLY as a client-side fallback when the direct URL fails to load.
  */
 function ddgProxyUrl(src: string): string | null {
-  if (!/^https?:\/\//i.test(src)) return null;
-  if (src.includes("external-content.duckduckgo.com")) return null;
-  return `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(src)}&f=1&nofb=1`;
+  if (!/^https?:\/\//i.test(src)) return null
+  if (src.includes('external-content.duckduckgo.com')) return null
+  return `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(src)}&f=1&nofb=1`
 }
 
 /**
@@ -28,31 +28,34 @@ function MarkdownImage({
   alt,
   ...props
 }: React.ImgHTMLAttributes<HTMLImageElement>) {
-  const [stage, setStage] = useState(0);
-  const direct = typeof src === "string" ? src : "";
+  const [stage, setStage] = useState(0)
+  const direct = typeof src === 'string' ? src : ''
 
   if (!direct) {
-    return alt ? <span>{alt}</span> : null;
+    return alt ? <span>{alt}</span> : null
   }
   if (stage >= 2) {
     return alt ? (
       <span className="text-sm text-muted-foreground">{alt}</span>
-    ) : null;
+    ) : null
   }
 
-  const url = stage === 0 ? direct : (ddgProxyUrl(direct) ?? direct);
+  const url = stage === 0 ? direct : (ddgProxyUrl(direct) ?? direct)
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={url}
-      alt={alt ?? ""}
+      alt={alt ?? ''}
       referrerPolicy="no-referrer"
       loading="lazy"
-      onError={() => setStage((s) => s + 1)}
+      onError={() => setStage(s => s + 1)}
       {...props}
-      className={cn("rounded-xl border border-border/40 shadow-sm", props.className)}
+      className={cn(
+        'rounded-xl border border-border/40 shadow-sm',
+        props.className
+      )}
     />
-  );
+  )
 }
 
 /**
@@ -61,7 +64,7 @@ function MarkdownImage({
  * use this context to tell the two apart: anything rendered inside a `pre` is a
  * real code block, everything else is inline code.
  */
-const InPreContext = createContext(false);
+const InPreContext = createContext(false)
 
 /**
  * Visual treatment for short code fragments that live inside a sentence. They
@@ -74,7 +77,7 @@ function InlineCode({ children }: { children?: React.ReactNode }) {
     <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground">
       {children}
     </code>
-  );
+  )
 }
 
 /**
@@ -86,25 +89,26 @@ function InlineCode({ children }: { children?: React.ReactNode }) {
  * `npm install` flowing naturally inside the text.
  */
 export const defaultComponents: Components = {
-  img: MarkdownImage as Components["img"],  pre: ({ children }) => (
+  img: MarkdownImage as Components['img'],
+  pre: ({ children }) => (
     <InPreContext.Provider value={true}>{children}</InPreContext.Provider>
   ),
   code: (({ node, className, children, ...props }) => {
-    const inPre = useContext(InPreContext);
+    const inPre = useContext(InPreContext)
     const hasLanguage =
-      typeof className === "string" && /language-/.test(className);
-    const isBlock = inPre || hasLanguage;
+      typeof className === 'string' && /language-/.test(className)
+    const isBlock = inPre || hasLanguage
 
     if (isBlock) {
       return (
         <CodeBlock node={node} className={className} {...props}>
           {children}
         </CodeBlock>
-      );
+      )
     }
 
-    return <InlineCode>{children}</InlineCode>;
-  }) as Components["code"],
+    return <InlineCode>{children}</InlineCode>
+  }) as Components['code'],
   // Modern Markdown table: rounded glassy surface, sticky-tinted header,
   // hover/zebra rows, horizontal scroll on small screens.
   table: ({ children }) => (
@@ -128,5 +132,5 @@ export const defaultComponents: Components = {
   ),
   td: ({ children }) => (
     <td className="px-4 py-2.5 align-top text-muted-foreground">{children}</td>
-  ),
-};
+  )
+}

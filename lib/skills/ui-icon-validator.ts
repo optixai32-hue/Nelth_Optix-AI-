@@ -29,10 +29,35 @@ const ICON_ROLE_RE = /^(img|icon)$/i
 
 // Text-bearing elements: emoji inside them count as content, not icons.
 const TEXT_ELEMENTS = new Set([
-  'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'a', 'li', 'label',
-  'td', 'th', 'blockquote', 'strong', 'em', 'small', 'figcaption', 'dd',
-  'dt', 'caption', 'option', 'summary', 'cite', 'q', 'mark', 'time',
-  'abbr', 'dfn'
+  'p',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'span',
+  'a',
+  'li',
+  'label',
+  'td',
+  'th',
+  'blockquote',
+  'strong',
+  'em',
+  'small',
+  'figcaption',
+  'dd',
+  'dt',
+  'caption',
+  'option',
+  'summary',
+  'cite',
+  'q',
+  'mark',
+  'time',
+  'abbr',
+  'dfn'
 ])
 
 // Any letter or digit => the text node carries real (non-emoji) content.
@@ -150,7 +175,8 @@ function evaluate(
   }
 
   const childAncestorHasText = ancestorHasText || elHasRealText
-  for (const child of el.children) evaluate(child, childAncestorHasText, violations)
+  for (const child of el.children)
+    evaluate(child, childAncestorHasText, violations)
 }
 
 /**
@@ -186,9 +212,7 @@ export function validateUiIconsCss(css: string): Violation[] {
     )
       continue
 
-    const contentMatch = body.match(
-      /content\s*:\s*(["'])([^"']*)\1/i
-    )
+    const contentMatch = body.match(/content\s*:\s*(["'])([^"']*)\1/i)
     if (!contentMatch) continue
 
     const value = contentMatch[2]
@@ -215,7 +239,8 @@ export function validateUiIconsCss(css: string): Violation[] {
  * re-inserting them. Conversational text OUTSIDE code blocks is never touched,
  * so legitimate on-page prose emoji in chat replies are preserved.
  */
-const CODE_BLOCK_RE = /```(html|css|js|javascript|ts|typescript|svg)\s*\n([\s\S]*?)```/gi
+const CODE_BLOCK_RE =
+  /```(html|css|js|javascript|ts|typescript|svg)\s*\n([\s\S]*?)```/gi
 
 export function stripEmojisFromCodeBlocks(content: string): string {
   if (!content) return content

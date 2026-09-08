@@ -21,7 +21,12 @@
 
 import { buildCvModel, renderCvHtml } from './document-cv'
 import { buildInvoiceModel, renderInvoiceHtml } from './document-invoice'
-import { type Block, buildMarkdownSource, parseMarkdown, type Run } from './document-runtime'
+import {
+  type Block,
+  buildMarkdownSource,
+  parseMarkdown,
+  type Run
+} from './document-runtime'
 import { getTemplate, TEMPLATES } from './document-templates'
 
 /**
@@ -112,8 +117,11 @@ export function chromiumPremiumAvailable(): boolean | null {
  * config change). Resolves `false` instead of throwing so callers can fall
  * back gracefully.
  */
-export function checkChromiumPremium(opts: { timeoutMs?: number; force?: boolean } = {}): Promise<boolean> {
-  if (!opts.force && _premiumAvailable !== null) return Promise.resolve(_premiumAvailable)
+export function checkChromiumPremium(
+  opts: { timeoutMs?: number; force?: boolean } = {}
+): Promise<boolean> {
+  if (!opts.force && _premiumAvailable !== null)
+    return Promise.resolve(_premiumAvailable)
   if (!opts.force && _premiumCheck) return _premiumCheck
   // 15s locally: generous enough that a slow-but-working cold start still
   // passes, while a truly broken environment (launch that hangs forever) is
@@ -124,7 +132,11 @@ export function checkChromiumPremium(opts: { timeoutMs?: number; force?: boolean
   const timeoutMs = isServerless() ? Math.max(baseTimeout, 60000) : baseTimeout
   _premiumCheck = (async () => {
     try {
-      const browser = await withTimeout(launchChromium(), timeoutMs, 'Chromium self-check')
+      const browser = await withTimeout(
+        launchChromium(),
+        timeoutMs,
+        'Chromium self-check'
+      )
       await browser.close()
       _premiumAvailable = true
     } catch {
@@ -137,9 +149,16 @@ export function checkChromiumPremium(opts: { timeoutMs?: number; force?: boolean
 }
 
 /** Reject if `promise` does not settle within `ms`; used to guard Chromium. */
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    const t = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms
+    )
     promise.then(
       v => {
         clearTimeout(t)
@@ -154,7 +173,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 /** Render a Markdown `spec` to a premium PDF buffer via Playwright. */
-export async function createPremiumPdf(spec: Record<string, unknown>): Promise<Buffer> {
+export async function createPremiumPdf(
+  spec: Record<string, unknown>
+): Promise<Buffer> {
   // If a self-check (startup or first attempt) already proved Chromium cannot
   // launch here, fail fast so the caller falls back to pdf-lib immediately
   // instead of burning the full launch timeout again.
@@ -162,12 +183,16 @@ export async function createPremiumPdf(spec: Record<string, unknown>): Promise<B
     throw new Error('Chromium premium renderer disabled (self-check failed)')
   }
   const markdown = buildMarkdownSource(spec)
-  const requested = typeof spec.template === 'string' && spec.template.trim() ? spec.template.trim() : 'default'
+  const requested =
+    typeof spec.template === 'string' && spec.template.trim()
+      ? spec.template.trim()
+      : 'default'
   const templateName = requested in TEMPLATES ? requested : 'default'
   // Only accept a strict #RGB or #RRGGBB hex — never inject an arbitrary value
   // into CSS (prevents injection / broken styles). Anything else → default.
   const accent =
-    typeof spec.accent === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(spec.accent)
+    typeof spec.accent === 'string' &&
+    /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(spec.accent)
       ? spec.accent
       : '#2563eb'
 
@@ -176,7 +201,10 @@ export async function createPremiumPdf(spec: Record<string, unknown>): Promise<B
   // Markdown transcription. Each renderer owns its layout, components, design
   // system and pagination rules; the shared AST/markdown source is only the
   // input. Everything else falls back to the generic styled-Markdown path.
-  const DEDICATED: Record<string, (spec: Record<string, unknown>, accent: string) => string> = {
+  const DEDICATED: Record<
+    string,
+    (spec: Record<string, unknown>, accent: string) => string
+  > = {
     invoice: (s, a) => renderInvoiceHtml(buildInvoiceModel(s), a),
     cv: (s, a) => renderCvHtml(buildCvModel(s), a),
     resume: (s, a) => renderCvHtml(buildCvModel(s), a)
@@ -231,9 +259,13 @@ export interface HtmlToPdfOptions {
  * Throws if Playwright/Chromium is unavailable — callers should surface a
  * helpful message rather than silently degrading to a fake PDF.
  */
-export async function htmlToPdf(rawHtml: string, opts: HtmlToPdfOptions = {}): Promise<Buffer> {
+export async function htmlToPdf(
+  rawHtml: string,
+  opts: HtmlToPdfOptions = {}
+): Promise<Buffer> {
   const trimmed = rawHtml.trim()
-  const isDocument = /^<!doctype\s+/i.test(trimmed) || /<html[\s>]/i.test(trimmed)
+  const isDocument =
+    /^<!doctype\s+/i.test(trimmed) || /<html[\s>]/i.test(trimmed)
   const html = isDocument
     ? trimmed
     : `<!doctype html><html lang="en"><head><meta charset="utf-8" /><style>html,body{margin:0;padding:0}</style></head><body>${trimmed}</body></html>`
@@ -261,10 +293,7 @@ export async function htmlToPdf(rawHtml: string, opts: HtmlToPdfOptions = {}): P
 }
 
 function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function runsToHtml(runs: Run[]): string {
@@ -312,10 +341,16 @@ function blockToHtml(b: Block): string {
 }
 
 /** Build a complete, styled HTML document from parsed Markdown blocks. */
-function markdownToHtml(blocks: Block[], templateName: string, accent: string): string {
+function markdownToHtml(
+  blocks: Block[],
+  templateName: string,
+  accent: string
+): string {
   const def = getTemplate(templateName)
   const body = blocks.map(blockToHtml).join('\n')
-  const inner = def.wrap ? def.wrap(body, accent) : `<main class="tpl-${templateName}">${body}</main>`
+  const inner = def.wrap
+    ? def.wrap(body, accent)
+    : `<main class="tpl-${templateName}">${body}</main>`
   const css = def.css(accent)
   return `<!doctype html>
 <html lang="en">

@@ -23,8 +23,14 @@ function parseArguments(raw: unknown): Record<string, unknown> | null {
 const VALID_CONTENT_TYPES = new Set(['web', 'video', 'image', 'news'])
 
 function asStringArray(value: unknown): string[] {
-  const list = Array.isArray(value) ? value : typeof value === 'string' ? [value] : []
-  return list.filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+  const list = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? [value]
+      : []
+  return list.filter(
+    (v): v is string => typeof v === 'string' && v.trim().length > 0
+  )
 }
 
 function normalizeSearchArguments(
@@ -33,7 +39,9 @@ function normalizeSearchArguments(
   const query = String(input.query ?? input.q ?? '').trim()
   const rawDepth = String(input.search_depth ?? input.depth ?? '').toLowerCase()
   const rawType = String(input.type ?? input.source ?? '').toLowerCase()
-  const maxResults = Number(input.max_results ?? input.topk ?? input.limit ?? 10)
+  const maxResults = Number(
+    input.max_results ?? input.topk ?? input.limit ?? 10
+  )
   // Preserve the model's requested content types (image search depends on
   // it) — fall back to web-only when nothing valid was given.
   const requested = asStringArray(input.content_types)
@@ -47,8 +55,11 @@ function normalizeSearchArguments(
     query,
     type: rawType === 'general' ? 'general' : 'optimized',
     content_types: requested.length > 0 ? requested : ['web'],
-    max_results: Number.isFinite(maxResults) ? Math.max(1, Math.floor(maxResults)) : 10,
-    search_depth: rawDepth === 'advanced' || rawDepth === 'medium' ? 'advanced' : 'basic',
+    max_results: Number.isFinite(maxResults)
+      ? Math.max(1, Math.floor(maxResults))
+      : 10,
+    search_depth:
+      rawDepth === 'advanced' || rawDepth === 'medium' ? 'advanced' : 'basic',
     include_domains: includeDomains,
     exclude_domains: excludeDomains
   }

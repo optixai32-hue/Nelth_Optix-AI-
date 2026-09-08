@@ -37,7 +37,11 @@ export function markdownToAst(src: string): DocumentAST {
         i++
       }
       i++
-      blocks.push({ type: 'code', language: lang || undefined, code: buf.join('\n') })
+      blocks.push({
+        type: 'code',
+        language: lang || undefined,
+        code: buf.join('\n')
+      })
       continue
     }
 
@@ -45,7 +49,8 @@ export function markdownToAst(src: string): DocumentAST {
     if (h) {
       const level = h[1].length
       const text = h[2].trim()
-      if (level === 1 && !metadata.title && blocks.length === 0) metadata.title = text
+      if (level === 1 && !metadata.title && blocks.length === 0)
+        metadata.title = text
       blocks.push({ type: 'heading', level, text })
       i++
       continue
@@ -76,7 +81,11 @@ export function markdownToAst(src: string): DocumentAST {
       continue
     }
 
-    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+    if (
+      /^\s*\|.*\|\s*$/.test(line) &&
+      i + 1 < lines.length &&
+      /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])
+    ) {
       const header = splitRow(line)
       i += 2
       const rows: string[][] = []
@@ -114,7 +123,11 @@ export function markdownToAst(src: string): DocumentAST {
 
     const buf = [line]
     i++
-    while (i < lines.length && !/^\s*$/.test(lines[i]) && !isSpecial(lines[i])) {
+    while (
+      i < lines.length &&
+      !/^\s*$/.test(lines[i]) &&
+      !isSpecial(lines[i])
+    ) {
       buf.push(lines[i])
       i++
     }
@@ -122,7 +135,8 @@ export function markdownToAst(src: string): DocumentAST {
   }
 
   const ast: DocumentAST = { type: 'document', blocks }
-  if (metadata.title || metadata.author || metadata.language) ast.metadata = metadata
+  if (metadata.title || metadata.author || metadata.language)
+    ast.metadata = metadata
   return ast
 }
 

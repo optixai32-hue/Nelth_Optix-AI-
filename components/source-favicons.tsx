@@ -46,7 +46,8 @@ export function SourceFavicons({
       onClick={onClick}
       className={cn(
         'flex items-center',
-        onClick && 'cursor-pointer rounded-full transition-opacity hover:opacity-80',
+        onClick &&
+          'cursor-pointer rounded-full transition-opacity hover:opacity-80',
         className
       )}
     >

@@ -347,7 +347,8 @@ describe('processCitations', () => {
     })
   })
 
-  describe('isCitationLabel', () => {    it('accepts numeric, simple domain, and dotted domain labels', () => {
+  describe('isCitationLabel', () => {
+    it('accepts numeric, simple domain, and dotted domain labels', () => {
       expect(isCitationLabel('1')).toBe(true)
       expect(isCitationLabel('youtube')).toBe(true)
       expect(isCitationLabel('global.example')).toBe(true)

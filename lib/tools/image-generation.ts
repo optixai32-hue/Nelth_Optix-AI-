@@ -6,10 +6,7 @@ import ImageKit from 'imagekit'
 import sharp from 'sharp'
 import { z } from 'zod'
 
-import {
-  getLocalFileUrl,
-  saveLocalFile
-} from '@/lib/storage/local-file-store'
+import { getLocalFileUrl, saveLocalFile } from '@/lib/storage/local-file-store'
 import {
   getR2Client,
   isObjectStorageConfigured,
@@ -28,9 +25,8 @@ const HIDREAM_SPACE_ID =
 // Image-to-image (img2img) backend. When the user supplies a reference photo
 // (e.g. an uploaded selfie to restyle), we route to nelth.space-z.ai instead of
 // the text-only ERNIE Space. Override the base with NELTH_API_BASE if needed.
-const NELTH_BASE = (
+const NELTH_BASE =
   process.env.NELTH_API_BASE?.replace(/\/+$/, '') || 'https://nelth.space-z.ai'
-)
 const NELTH_EDIT_URL = `${NELTH_BASE}/api/edit-image`
 
 // System prompt used to rewrite / enrich the user prompt before TEXT-TO-IMAGE
@@ -177,20 +173,14 @@ async function enhanceWithNvidia(
   return content.trim()
 }
 
-async function enhancePrompt(
-  prompt: string,
-  size: string
-): Promise<string> {
+async function enhancePrompt(prompt: string, size: string): Promise<string> {
   const apiKey = process.env.NVIDIA_API_KEY
   if (!apiKey) return prompt
 
   try {
     const { width, height } = parseSize(size)
     const userJson = JSON.stringify({ prompt, width, height })
-    const enhanced = await enhanceWithNvidia(
-      userJson,
-      HIDREAM_MASTER_SYSTEM
-    )
+    const enhanced = await enhanceWithNvidia(userJson, HIDREAM_MASTER_SYSTEM)
 
     const extract = (raw: string): string | null => {
       try {
@@ -273,7 +263,10 @@ async function persistGeneratedImage(
       })
       return result.url
     } catch (e) {
-      console.warn('Failed to upload generated image to ImageKit; falling back:', e)
+      console.warn(
+        'Failed to upload generated image to ImageKit; falling back:',
+        e
+      )
     }
   }
 
@@ -291,7 +284,10 @@ async function persistGeneratedImage(
       )
       return `${R2_PUBLIC_URL.replace(/\/+$/, '')}/${key}`
     } catch (e) {
-      console.warn('Failed to upload generated image to R2; using local store:', e)
+      console.warn(
+        'Failed to upload generated image to R2; using local store:',
+        e
+      )
     }
   }
 
@@ -509,7 +505,9 @@ async function generateViaHiDream(
       lastErr = undefined
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      if (/content (policy|moderation)|blocked|rejected|not compliant/i.test(msg)) {
+      if (
+        /content (policy|moderation)|blocked|rejected|not compliant/i.test(msg)
+      ) {
         throw err
       }
       lastErr = err
@@ -569,8 +567,8 @@ export function createImageGenerationTool(opts?: { runtimeImage?: string }) {
   // than triggering a from-scratch text-to-image generation.
   const runtimeImage = opts?.runtimeImage
   return tool({
-       description:
-        "Generate or transform an image. Use this whenever the user asks to create, draw, illustrate, or generate an image, OR to restyle/edit/transform a photo they provide (e.g. 'make this a Looney Tunes cartoon', 'turn my photo into anime'). Pass a detailed `prompt` describing the desired result. If the user supplies or references an image (an uploaded photo, a URL, or a base64 data URL) and wants it transformed while preserving the subject's likeness, pass that image as `image` — the request is then routed to the image-to-image backend (nelth edit-image) instead of text-to-image. For image-to-image, the prompt is first enhanced via nelth's enhance-prompt endpoint and then applied with the reference photo while preserving the subject (set `protectFace` to keep facial likeness). When `image` is omitted, the image is generated from scratch by the HiDream-I1-Dev model after prompt enhancement following the HiDream MASTER structure (descriptive subject, pose, environment, composition, lighting, camera, textures, palette, style — always enhanced to English, never keyword stuffing). Returns the generated image along with the (possibly enhanced) prompt. IMPORTANT: call this tool DIRECTLY, without any preamble, narration, or explanation of your intent beforehand. After calling it, do NOT reason further, do NOT analyze the result, and do NOT call any other tool. If you write any text, keep it to a single short, elegant sentence in the user's language (optionally prefixed with a relevant emoji title) that briefly presents the image, then stop.",
+    description:
+      "Generate or transform an image. Use this whenever the user asks to create, draw, illustrate, or generate an image, OR to restyle/edit/transform a photo they provide (e.g. 'make this a Looney Tunes cartoon', 'turn my photo into anime'). Pass a detailed `prompt` describing the desired result. If the user supplies or references an image (an uploaded photo, a URL, or a base64 data URL) and wants it transformed while preserving the subject's likeness, pass that image as `image` — the request is then routed to the image-to-image backend (nelth edit-image) instead of text-to-image. For image-to-image, the prompt is first enhanced via nelth's enhance-prompt endpoint and then applied with the reference photo while preserving the subject (set `protectFace` to keep facial likeness). When `image` is omitted, the image is generated from scratch by the HiDream-I1-Dev model after prompt enhancement following the HiDream MASTER structure (descriptive subject, pose, environment, composition, lighting, camera, textures, palette, style — always enhanced to English, never keyword stuffing). Returns the generated image along with the (possibly enhanced) prompt. IMPORTANT: call this tool DIRECTLY, without any preamble, narration, or explanation of your intent beforehand. After calling it, do NOT reason further, do NOT analyze the result, and do NOT call any other tool. If you write any text, keep it to a single short, elegant sentence in the user's language (optionally prefixed with a relevant emoji title) that briefly presents the image, then stop.",
     inputSchema: z.object({
       prompt: z
         .string()
@@ -586,7 +584,7 @@ export function createImageGenerationTool(opts?: { runtimeImage?: string }) {
         .optional()
         .default(true)
         .describe(
-          'Image-to-image only. When true (default), the edit-image backend preserves the subject\'s facial likeness while applying the style. Set false to allow more aggressive restyling that may alter the face. Ignored for text-to-image generation.'
+          "Image-to-image only. When true (default), the edit-image backend preserves the subject's facial likeness while applying the style. Set false to allow more aggressive restyling that may alter the face. Ignored for text-to-image generation."
         ),
       size: z
         .string()
@@ -712,5 +710,6 @@ export function createImageGenerationTool(opts?: { runtimeImage?: string }) {
 
 export const imageGenerationTool = createImageGenerationTool()
 
-export type ImageGenerationUIToolInvocation =
-  UIToolInvocation<typeof imageGenerationTool>
+export type ImageGenerationUIToolInvocation = UIToolInvocation<
+  typeof imageGenerationTool
+>

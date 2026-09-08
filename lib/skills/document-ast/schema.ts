@@ -67,6 +67,8 @@ export const documentAstSchema = z.object({
   blocks: z.array(documentBlockSchema)
 })
 
-export function validateAstInput(value: unknown): value is import('./types').DocumentAST {
+export function validateAstInput(
+  value: unknown
+): value is import('./types').DocumentAST {
   return documentAstSchema.safeParse(value).success
 }

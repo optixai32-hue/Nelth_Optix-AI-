@@ -77,7 +77,11 @@ describe('buildCvModel', () => {
     expect(m.experience[0].company).toBe('Nova Studio')
     expect(m.experience[0].period).toMatch(/2022/)
     expect(m.experience[0].location).toBe('Paris')
-    expect(m.experience[0].highlights.some(h => /Direction artistique de 12\+ produits/.test(h))).toBe(true)
+    expect(
+      m.experience[0].highlights.some(h =>
+        /Direction artistique de 12\+ produits/.test(h)
+      )
+    ).toBe(true)
 
     expect(m.skills[0].category).toBe('Design')
     expect(m.skills[0].skills).toContain('Figma')
@@ -97,7 +101,14 @@ describe('buildCvModel', () => {
       cv: {
         name: 'Jane Doe',
         title: 'Engineer',
-        experience: [{ role: 'CTO', company: 'Acme', period: '2020—', highlights: ['Grew team'] }],
+        experience: [
+          {
+            role: 'CTO',
+            company: 'Acme',
+            period: '2020—',
+            highlights: ['Grew team']
+          }
+        ],
         skills: [{ category: 'Lang', skills: ['Go'] }]
       }
     })

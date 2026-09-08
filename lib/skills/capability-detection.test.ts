@@ -35,10 +35,7 @@ describe('detectRequestCapabilities — all languages', () => {
   })
 
   it('detects image-generation intent in Spanish and Chinese', async () => {
-    for (const q of [
-      'Crea una imagen de un gato',
-      '生成一张猫的图片'
-    ]) {
+    for (const q of ['Crea una imagen de un gato', '生成一张猫的图片']) {
       const caps = await detectRequestCapabilities(q)
       expect(caps.needsImage, `query: ${q}`).toBe(true)
     }

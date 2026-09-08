@@ -213,10 +213,13 @@ function ThemeProviderInner({
     let isMounted = true
 
     const runTask =
-      typeof window !== 'undefined' && typeof window.queueMicrotask === 'function'
+      typeof window !== 'undefined' &&
+      typeof window.queueMicrotask === 'function'
         ? window.queueMicrotask.bind(window)
         : (cb: () => void) => {
-            Promise.resolve().then(cb).catch(() => setTimeout(cb, 0))
+            Promise.resolve()
+              .then(cb)
+              .catch(() => setTimeout(cb, 0))
           }
 
     runTask(() => {

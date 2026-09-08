@@ -4,7 +4,8 @@ import path from 'path'
 
 import {
   SKILLS_CLAUDE_ROUTING,
-  SKILLS_MAIN_ROUTING} from './skills-main-routing'
+  SKILLS_MAIN_ROUTING
+} from './skills-main-routing'
 import type { SkillMeta } from './types'
 
 /**
@@ -128,10 +129,7 @@ function applyRoutingOverrides(meta: SkillMeta): SkillMeta {
   // Merge additively: keep the skill's own triggers/related skills and SUPPLEMENT
   // them with the curated phrases (so generic/French code requests also match).
   const triggers = Array.from(
-    new Set([
-      ...meta.triggers,
-      ...override.triggers.map(t => t.toLowerCase())
-    ])
+    new Set([...meta.triggers, ...override.triggers.map(t => t.toLowerCase())])
   )
   const relatedSkills = Array.from(
     new Set([...meta.relatedSkills, ...override.relatedSkills])

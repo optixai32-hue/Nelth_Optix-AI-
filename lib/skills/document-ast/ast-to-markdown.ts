@@ -12,7 +12,10 @@ export function astToMarkdown(ast: DocumentAST): string {
   for (const b of ast.blocks) {
     out.push(...blockToMarkdown(b))
   }
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+  return out
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function blockToMarkdown(b: DocumentBlock): string[] {
@@ -23,11 +26,19 @@ function blockToMarkdown(b: DocumentBlock): string[] {
       return [b.text, '']
     case 'list':
       return [
-        ...b.items.map((it, idx) => (b.ordered ? `${idx + 1}. ${it}` : `- ${it}`)),
+        ...b.items.map((it, idx) =>
+          b.ordered ? `${idx + 1}. ${it}` : `- ${it}`
+        ),
         ''
       ]
     case 'quote':
-      return [b.text.split('\n').map(l => `> ${l}`).join('\n'), '']
+      return [
+        b.text
+          .split('\n')
+          .map(l => `> ${l}`)
+          .join('\n'),
+        ''
+      ]
     case 'code':
       return [`\`\`\`${b.language ?? ''}\n${b.code}\n\`\`\``, '']
     case 'table': {

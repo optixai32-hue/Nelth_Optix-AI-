@@ -31,7 +31,10 @@ export const capabilities: RendererCapabilities = {
  * existing, stabilized PDF engine (pdf-lib / Playwright). Keeps the PDF output
  * exactly as it is today — no regression.
  */
-export async function renderPdf(ast: DocumentAST, opts: RenderOptions = {}): Promise<Buffer> {
+export async function renderPdf(
+  ast: DocumentAST,
+  opts: RenderOptions = {}
+): Promise<Buffer> {
   const spec: Record<string, unknown> = { content: astToMarkdown(ast) }
   if (opts.premium) spec.premium = true
   if (opts.template) spec.template = opts.template

@@ -2,7 +2,7 @@
  * Universal runtime polyfills for older mobile browsers and older iOS Safari versions:
  * - iOS 12, 13, 14, 15.0-15.6, 16.0 (Safari lacks requestSubmit, ResizeObserver, Array.at, crypto.getRandomValues, etc.)
  * - Older Android WebViews and Chrome versions
- * 
+ *
  * Loaded at the very top of the app lifecycle to ensure seamless execution on any device.
  */
 
@@ -12,9 +12,15 @@ if (typeof window !== 'undefined') {
     ;(window as any).crypto = {}
   }
   if (!window.crypto.getRandomValues) {
-    window.crypto.getRandomValues = function <T extends ArrayBufferView | null>(array: T): T {
+    window.crypto.getRandomValues = function <T extends ArrayBufferView | null>(
+      array: T
+    ): T {
       if (!array) return array
-      const uint8 = new Uint8Array(array.buffer, array.byteOffset, array.byteLength)
+      const uint8 = new Uint8Array(
+        array.buffer,
+        array.byteOffset,
+        array.byteLength
+      )
       for (let i = 0; i < uint8.length; i++) {
         uint8[i] = Math.floor(Math.random() * 256)
       }
@@ -23,8 +29,13 @@ if (typeof window !== 'undefined') {
   }
 
   // 1. HTMLFormElement.prototype.requestSubmit (Safari < 16 lacks requestSubmit!)
-  if (typeof HTMLFormElement !== 'undefined' && !HTMLFormElement.prototype.requestSubmit) {
-    HTMLFormElement.prototype.requestSubmit = function (submitter?: HTMLElement | null) {
+  if (
+    typeof HTMLFormElement !== 'undefined' &&
+    !HTMLFormElement.prototype.requestSubmit
+  ) {
+    HTMLFormElement.prototype.requestSubmit = function (
+      submitter?: HTMLElement | null
+    ) {
       if (submitter) {
         if (typeof submitter.click === 'function') {
           submitter.click()
@@ -76,7 +87,10 @@ if (typeof window !== 'undefined') {
 
   // 5. Array.prototype.findLast
   if (!Array.prototype.findLast) {
-    Array.prototype.findLast = function (predicate: (value: any, index: number, obj: any[]) => boolean, thisArg?: any) {
+    Array.prototype.findLast = function (
+      predicate: (value: any, index: number, obj: any[]) => boolean,
+      thisArg?: any
+    ) {
       for (let i = this.length - 1; i >= 0; i--) {
         if (predicate.call(thisArg, this[i], i, this)) {
           return this[i]
@@ -88,7 +102,10 @@ if (typeof window !== 'undefined') {
 
   // 6. Array.prototype.findLastIndex
   if (!Array.prototype.findLastIndex) {
-    Array.prototype.findLastIndex = function (predicate: (value: any, index: number, obj: any[]) => boolean, thisArg?: any) {
+    Array.prototype.findLastIndex = function (
+      predicate: (value: any, index: number, obj: any[]) => boolean,
+      thisArg?: any
+    ) {
       for (let i = this.length - 1; i >= 0; i--) {
         if (predicate.call(thisArg, this[i], i, this)) {
           return i
@@ -110,21 +127,24 @@ if (typeof window !== 'undefined') {
 
   // 8. crypto.randomUUID fallback
   if (!window.crypto.randomUUID) {
-    window.crypto.randomUUID = function (): `${string}-${string}-${string}-${string}-${string}` {
-      if (typeof window.crypto.getRandomValues === 'function') {
-        const bytes = new Uint8Array(16)
-        window.crypto.getRandomValues(bytes)
-        bytes[6] = (bytes[6] & 0x0f) | 0x40
-        bytes[8] = (bytes[8] & 0x3f) | 0x80
-        const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
-        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}` as any
+    window.crypto.randomUUID =
+      function (): `${string}-${string}-${string}-${string}-${string}` {
+        if (typeof window.crypto.getRandomValues === 'function') {
+          const bytes = new Uint8Array(16)
+          window.crypto.getRandomValues(bytes)
+          bytes[6] = (bytes[6] & 0x0f) | 0x40
+          bytes[8] = (bytes[8] & 0x3f) | 0x80
+          const hex = Array.from(bytes, b =>
+            b.toString(16).padStart(2, '0')
+          ).join('')
+          return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}` as any
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = (Math.random() * 16) | 0
+          const v = c === 'x' ? r : (r & 0x3) | 0x8
+          return v.toString(16)
+        }) as any
       }
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = (Math.random() * 16) | 0
-        const v = c === 'x' ? r : (r & 0x3) | 0x8
-        return v.toString(16)
-      }) as any
-    }
   }
 
   // 9. structuredClone fallback
@@ -189,7 +209,8 @@ if (typeof window !== 'undefined') {
   } catch {
     const memoryStorage: Record<string, string> = {}
     const mockStorage = {
-      getItem: (key: string) => (key in memoryStorage ? memoryStorage[key] : null),
+      getItem: (key: string) =>
+        key in memoryStorage ? memoryStorage[key] : null,
       setItem: (key: string, value: string) => {
         memoryStorage[key] = String(value)
       },

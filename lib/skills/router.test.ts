@@ -71,7 +71,10 @@ describe('Skill Router (progressive disclosure)', () => {
 
   it('routes a French website request to frontend-design', async () => {
     const registry = await getSkillRegistry()
-    const selected = routeSkills('Crée un site vitrine pour une boulangerie', registry)
+    const selected = routeSkills(
+      'Crée un site vitrine pour une boulangerie',
+      registry
+    )
     const slugs = selected.map(s => s.slug)
     expect(slugs).toContain('frontend-design')
   })

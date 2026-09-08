@@ -7,7 +7,8 @@ import {
   formatFromName,
   modifyDocument,
   readDocument,
-  validateDocument} from './document-runtime'
+  validateDocument
+} from './document-runtime'
 
 /**
  * REAL document skill execution tests.
@@ -77,8 +78,14 @@ describe('TEST 2 — DOCX read + export', () => {
     const buf = await createDocument('docx', {
       title: 'Market Analysis',
       sections: [
-        { heading: 'Overview', paragraphs: ['The market is expanding rapidly.'] },
-        { heading: 'Risks', paragraphs: ['Supply chain disruption is the top risk.'] }
+        {
+          heading: 'Overview',
+          paragraphs: ['The market is expanding rapidly.']
+        },
+        {
+          heading: 'Risks',
+          paragraphs: ['Supply chain disruption is the top risk.']
+        }
       ]
     })
     expect(buf.length).toBeGreaterThan(0)
@@ -101,7 +108,9 @@ describe('TEST 3 — XLSX read (B27)', () => {
     for (let r = 1; r <= 30; r++) {
       rows.push([`Label${r}`, r === 27 ? 'B27_SECRET_VALUE' : `V${r}`])
     }
-    const buf = await createDocument('xlsx', { sheets: [{ name: 'Data', rows }] })
+    const buf = await createDocument('xlsx', {
+      sheets: [{ name: 'Data', rows }]
+    })
 
     const validation = await validateDocument('xlsx', buf)
     expect(validation.ok).toBe(true)

@@ -37,7 +37,9 @@ export interface ConnectorCardProps {
   /** Shortens simulated timings (tests). */
   timings?: { pressMs?: number }
   /** Custom connect implementation (tests / future real OAuth). */
-  connectImpl?: (id: Parameters<ReturnType<typeof useConnectors>['connect']>[0]) => Promise<void>
+  connectImpl?: (
+    id: Parameters<ReturnType<typeof useConnectors>['connect']>[0]
+  ) => Promise<void>
 }
 
 function Spinner({ className }: { className?: string }) {
@@ -97,7 +99,12 @@ function CheckMark({ className }: { className?: string }) {
  * interaction system: press scaling, stable-width loading, success pulse,
  * subtle error shake, animated dismiss, animated OAuth panel.
  */
-export function ConnectorCard({ className, timings, connectImpl, isGuest }: ConnectorCardProps) {
+export function ConnectorCard({
+  className,
+  timings,
+  connectImpl,
+  isGuest
+}: ConnectorCardProps) {
   const { t } = useI18n()
   const {
     services,
@@ -213,7 +220,11 @@ export function ConnectorCard({ className, timings, connectImpl, isGuest }: Conn
           phase === 'leaving' && 'nelth-connector-leave',
           className
         )}
-        key={pulseKey === 0 && shakeKey === 0 ? 'card' : `card-${pulseKey}-${shakeKey}`}
+        key={
+          pulseKey === 0 && shakeKey === 0
+            ? 'card'
+            : `card-${pulseKey}-${shakeKey}`
+        }
         data-testid="connector-card"
         data-phase={phase}
       >

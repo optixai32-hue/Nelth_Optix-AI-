@@ -92,149 +92,149 @@ export function AccountSettingsDialog({
 
   return (
     <>
-    <Dialog
-      open={open}
-      onOpenChange={nextOpen => {
-        if (!isDeleting) {
-          if (!nextOpen) {
-            setConfirmOpen(false)
+      <Dialog
+        open={open}
+        onOpenChange={nextOpen => {
+          if (!isDeleting) {
+            if (!nextOpen) {
+              setConfirmOpen(false)
+            }
+            onOpenChange(nextOpen)
           }
-          onOpenChange(nextOpen)
-        }
-      }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Account</DialogTitle>
-          <DialogDescription>
-            Manage your account preferences and data.
-          </DialogDescription>
-        </DialogHeader>
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Account</DialogTitle>
+            <DialogDescription>
+              Manage your account preferences and data.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="grid gap-6">
-          <section className="grid gap-3">
-            <div className="grid gap-1">
-              <h3 className="text-sm font-medium">Profile</h3>
-              <div className="text-sm text-muted-foreground">
-                <p className="truncate">{userName}</p>
-                <p className="truncate">{user.email}</p>
+          <div className="grid gap-6">
+            <section className="grid gap-3">
+              <div className="grid gap-1">
+                <h3 className="text-sm font-medium">Profile</h3>
+                <div className="text-sm text-muted-foreground">
+                  <p className="truncate">{userName}</p>
+                  <p className="truncate">{user.email}</p>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          <Separator />
+            <Separator />
 
-          <section className="grid gap-3">
-            <div className="grid gap-1">
-              <h3 className="text-sm font-medium">Theme</h3>
-              <p className="text-sm text-muted-foreground">
-                Choose how Nelth-IA appears on this device.
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {themeOptions.map(option => {
-                const Icon = option.icon
-                const selected = activeTheme === option.value
+            <section className="grid gap-3">
+              <div className="grid gap-1">
+                <h3 className="text-sm font-medium">Theme</h3>
+                <p className="text-sm text-muted-foreground">
+                  Choose how Nelth-IA appears on this device.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {themeOptions.map(option => {
+                  const Icon = option.icon
+                  const selected = activeTheme === option.value
 
-                return (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    variant={selected ? 'secondary' : 'outline'}
-                    className="h-16 flex-col gap-1.5 px-2"
-                    aria-pressed={selected}
-                    onClick={() => setTheme(option.value)}
-                  >
-                    <Icon className="size-4" />
-                    <span className="text-xs">{option.label}</span>
-                  </Button>
-                )
-              })}
-            </div>
-          </section>
+                  return (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={selected ? 'secondary' : 'outline'}
+                      className="h-16 flex-col gap-1.5 px-2"
+                      aria-pressed={selected}
+                      onClick={() => setTheme(option.value)}
+                    >
+                      <Icon className="size-4" />
+                      <span className="text-xs">{option.label}</span>
+                    </Button>
+                  )
+                })}
+              </div>
+            </section>
 
-          <Separator />
+            <Separator />
 
-          <section className="grid gap-3">
-            <div className="grid gap-1">
-              <h3 className="text-sm font-medium">Feedback</h3>
-              <p className="text-sm text-muted-foreground">
-                Tell us what you think or report a problem.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-fit gap-2"
-              onClick={() => setFeedbackOpen(true)}
-            >
-              Send feedback
-            </Button>
-          </section>
+            <section className="grid gap-3">
+              <div className="grid gap-1">
+                <h3 className="text-sm font-medium">Feedback</h3>
+                <p className="text-sm text-muted-foreground">
+                  Tell us what you think or report a problem.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-fit gap-2"
+                onClick={() => setFeedbackOpen(true)}
+              >
+                Send feedback
+              </Button>
+            </section>
 
-          <Separator />
+            <Separator />
 
-          <section className="grid gap-3">
-            <div className="grid gap-1">
-              <h3 className="text-sm font-medium text-destructive">
-                Delete account
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Permanently delete your account, chat history, and uploaded
-                files. This action cannot be undone.
-              </p>
-            </div>
-
-            <AlertDialog
-              open={confirmOpen}
-              onOpenChange={nextOpen => {
-                if (!isDeleting) {
-                  setConfirmOpen(nextOpen)
-                }
-              }}
-            >
-              <AlertDialogTrigger asChild>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="w-fit gap-2"
-                  disabled={isDeleting}
-                >
-                  <Trash2 className="size-4" />
+            <section className="grid gap-3">
+              <div className="grid gap-1">
+                <h3 className="text-sm font-medium text-destructive">
                   Delete account
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. Your account, chat history,
-                    and uploaded files will be permanently deleted.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isDeleting}>
-                    Cancel
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    disabled={isDeleting}
-                    onClick={event => {
-                      event.preventDefault()
-                      handleDeleteAccount()
-                    }}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    {isDeleting ? <Spinner /> : 'Delete account'}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </section>
-        </div>
-      </DialogContent>
-    </Dialog>
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Permanently delete your account, chat history, and uploaded
+                  files. This action cannot be undone.
+                </p>
+              </div>
 
-    <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+              <AlertDialog
+                open={confirmOpen}
+                onOpenChange={nextOpen => {
+                  if (!isDeleting) {
+                    setConfirmOpen(nextOpen)
+                  }
+                }}
+              >
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="w-fit gap-2"
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="size-4" />
+                    Delete account
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. Your account, chat history,
+                      and uploaded files will be permanently deleted.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={isDeleting}
+                      onClick={event => {
+                        event.preventDefault()
+                        handleDeleteAccount()
+                      }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {isDeleting ? <Spinner /> : 'Delete account'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </section>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <FeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </>
   )
 }

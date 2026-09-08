@@ -8,7 +8,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 // Import after mocking
 import { getDb } from '@/lib/firebase/admin'
 
-import { getMessageFeedback,updateMessageFeedback } from '../feedback'
+import { getMessageFeedback, updateMessageFeedback } from '../feedback'
 
 const mockGet = vi.fn()
 const mockUpdate = vi.fn()

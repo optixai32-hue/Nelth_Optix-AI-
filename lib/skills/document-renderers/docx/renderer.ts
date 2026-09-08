@@ -73,11 +73,18 @@ const HEADING_BY_LEVEL: Record<number, HeadingValue> = {
 function hexToRgb(hex: string | undefined, fallback = '2563EB'): string {
   const clean = (hex ?? fallback).replace(/^#/, '')
   return clean.length === 3
-    ? clean.split('').map(c => c + c).join('').toUpperCase()
+    ? clean
+        .split('')
+        .map(c => c + c)
+        .join('')
+        .toUpperCase()
     : clean.slice(0, 6).toUpperCase()
 }
 
-export async function renderDocx(ast: DocumentAST, opts: RenderOptions = {}): Promise<Buffer> {
+export async function renderDocx(
+  ast: DocumentAST,
+  opts: RenderOptions = {}
+): Promise<Buffer> {
   const accent = hexToRgb(opts.accent)
   const children: (Paragraph | Table)[] = []
 
@@ -86,7 +93,10 @@ export async function renderDocx(ast: DocumentAST, opts: RenderOptions = {}): Pr
   const startsWithHeading = ast.blocks[0]?.type === 'heading'
   if (ast.metadata?.title && !startsWithHeading) {
     children.push(
-      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: ast.metadata.title, color: accent })] })
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun({ text: ast.metadata.title, color: accent })]
+      })
     )
   }
 
@@ -105,17 +115,40 @@ export async function renderDocx(ast: DocumentAST, opts: RenderOptions = {}): Pr
         }
       },
       paragraphStyles: [
-        { id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal', quickFormat: true,
-          run: { size: 40, bold: true, color: accent }, paragraph: { spacing: { before: 280, after: 140 } } },
-        { id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal', quickFormat: true,
-          run: { size: 32, bold: true, color: accent }, paragraph: { spacing: { before: 240, after: 120 } } },
-        { id: 'Heading3', name: 'Heading 3', basedOn: 'Normal', next: 'Normal', quickFormat: true,
-          run: { size: 28, bold: true, color: accent }, paragraph: { spacing: { before: 200, after: 100 } } }
+        {
+          id: 'Heading1',
+          name: 'Heading 1',
+          basedOn: 'Normal',
+          next: 'Normal',
+          quickFormat: true,
+          run: { size: 40, bold: true, color: accent },
+          paragraph: { spacing: { before: 280, after: 140 } }
+        },
+        {
+          id: 'Heading2',
+          name: 'Heading 2',
+          basedOn: 'Normal',
+          next: 'Normal',
+          quickFormat: true,
+          run: { size: 32, bold: true, color: accent },
+          paragraph: { spacing: { before: 240, after: 120 } }
+        },
+        {
+          id: 'Heading3',
+          name: 'Heading 3',
+          basedOn: 'Normal',
+          next: 'Normal',
+          quickFormat: true,
+          run: { size: 28, bold: true, color: accent },
+          paragraph: { spacing: { before: 200, after: 100 } }
+        }
       ]
     },
     sections: [
       {
-        properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
+        properties: {
+          page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } }
+        },
         children
       }
     ]
@@ -123,11 +156,19 @@ export async function renderDocx(ast: DocumentAST, opts: RenderOptions = {}): Pr
   return Buffer.from(await Packer.toBuffer(doc))
 }
 
-async function blockToDocx(b: DocumentBlock, accent: string): Promise<(Paragraph | Table)[]> {
+async function blockToDocx(
+  b: DocumentBlock,
+  accent: string
+): Promise<(Paragraph | Table)[]> {
   switch (b.type) {
     case 'heading': {
       const level = Math.min(Math.max(b.level, 1), 6)
-      return [new Paragraph({ heading: HEADING_BY_LEVEL[level], children: [new TextRun({ text: b.text, color: accent })] })]
+      return [
+        new Paragraph({
+          heading: HEADING_BY_LEVEL[level],
+          children: [new TextRun({ text: b.text, color: accent })]
+        })
+      ]
     }
     case 'paragraph':
       return [new Paragraph({ children: [new TextRun(b.text)] })]
@@ -139,14 +180,20 @@ async function blockToDocx(b: DocumentBlock, accent: string): Promise<(Paragraph
               numbering: { reference: 'docx-ordered', level: 0 },
               spacing: { after: 80 }
             })
-          : new Paragraph({ text: item, bullet: { level: 0 }, spacing: { after: 80 } })
+          : new Paragraph({
+              text: item,
+              bullet: { level: 0 },
+              spacing: { after: 80 }
+            })
       )
     case 'table':
       return [blockToTable(b, accent)]
     case 'quote':
       return [
         new Paragraph({
-          children: [new TextRun({ text: b.text, italics: true, color: '55555C' })],
+          children: [
+            new TextRun({ text: b.text, italics: true, color: '55555C' })
+          ],
           indent: { left: 720 },
           border: { left: { color: accent, style: 'single', size: 24 } },
           spacing: { before: 80, after: 160 }
@@ -163,9 +210,16 @@ async function blockToDocx(b: DocumentBlock, accent: string): Promise<(Paragraph
       ]
     case 'image': {
       const run = await buildImageRun(b.url, b.alt)
-      if (run) return [new Paragraph({ children: [run], spacing: { after: 160 } })]
+      if (run)
+        return [new Paragraph({ children: [run], spacing: { after: 160 } })]
       // Graceful fallback: keep a trace of the image instead of dropping it.
-      return [new Paragraph({ children: [new TextRun({ text: `[image: ${b.alt ?? b.url}]`, italics: true })] })]
+      return [
+        new Paragraph({
+          children: [
+            new TextRun({ text: `[image: ${b.alt ?? b.url}]`, italics: true })
+          ]
+        })
+      ]
     }
     case 'pageBreak':
       return [new Paragraph({ children: [new PageBreak()] })]
@@ -174,26 +228,46 @@ async function blockToDocx(b: DocumentBlock, accent: string): Promise<(Paragraph
 
 const TABLE_BORDER = { style: 'single' as const, size: 4, color: 'D4D4DC' }
 
-function blockToTable(b: Extract<DocumentBlock, { type: 'table' }>, accent: string): Table {
+function blockToTable(
+  b: Extract<DocumentBlock, { type: 'table' }>,
+  accent: string
+): Table {
   const headerRow = new TableRow({
     tableHeader: true,
     children: b.headers.map(h => cell(h, true, accent))
   })
-  const bodyRows = b.rows.map(r => new TableRow({ children: r.map(c => cell(c, false, accent)) }))
+  const bodyRows = b.rows.map(
+    r => new TableRow({ children: r.map(c => cell(c, false, accent)) })
+  )
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: { top: TABLE_BORDER, bottom: TABLE_BORDER, left: TABLE_BORDER, right: TABLE_BORDER, insideHorizontal: TABLE_BORDER, insideVertical: TABLE_BORDER },
+    borders: {
+      top: TABLE_BORDER,
+      bottom: TABLE_BORDER,
+      left: TABLE_BORDER,
+      right: TABLE_BORDER,
+      insideHorizontal: TABLE_BORDER,
+      insideVertical: TABLE_BORDER
+    },
     rows: [headerRow, ...bodyRows]
   })
 }
 
 function cell(text: string, header: boolean, accent: string): TableCell {
   return new TableCell({
-    shading: header ? { type: 'solid', color: accent, fill: accent } : undefined,
+    shading: header
+      ? { type: 'solid', color: accent, fill: accent }
+      : undefined,
     margins: { top: 60, bottom: 60, left: 120, right: 120 },
     children: [
       new Paragraph({
-        children: [new TextRun({ text, bold: header, color: header ? 'FFFFFF' : '1A1A1E' })]
+        children: [
+          new TextRun({
+            text,
+            bold: header,
+            color: header ? 'FFFFFF' : '1A1A1E'
+          })
+        ]
       })
     ]
   })
@@ -207,7 +281,9 @@ function imageTypeFromMime(mime: string): 'png' | 'jpg' | 'gif' | 'bmp' | null {
   return null
 }
 
-async function resolveImageBytes(url: string): Promise<{ data: Buffer; type: 'png' | 'jpg' | 'gif' | 'bmp' } | null> {
+async function resolveImageBytes(
+  url: string
+): Promise<{ data: Buffer; type: 'png' | 'jpg' | 'gif' | 'bmp' } | null> {
   // data: URL → decode inline base64 (no network).
   const dataMatch = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(url)
   if (dataMatch) {
@@ -235,7 +311,10 @@ async function resolveImageBytes(url: string): Promise<{ data: Buffer; type: 'pn
   return null
 }
 
-async function buildImageRun(url: string, alt?: string): Promise<ImageRun | null> {
+async function buildImageRun(
+  url: string,
+  alt?: string
+): Promise<ImageRun | null> {
   const resolved = await resolveImageBytes(url)
   if (!resolved) return null
   try {

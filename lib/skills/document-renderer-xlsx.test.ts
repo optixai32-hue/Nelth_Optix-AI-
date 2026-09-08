@@ -18,7 +18,11 @@ const AST: DocumentAST = {
   blocks: [
     { type: 'heading', level: 1, text: 'Architecture Maturity' },
     { type: 'paragraph', text: 'The AST is now format-agnostic.' },
-    { type: 'list', ordered: false, items: ['Decoupled', 'Stable', 'Extensible'] },
+    {
+      type: 'list',
+      ordered: false,
+      items: ['Decoupled', 'Stable', 'Extensible']
+    },
     { type: 'list', ordered: true, items: ['First', 'Second'] },
     {
       type: 'table',
@@ -49,7 +53,10 @@ async function reopenXlsx(buf: Buffer) {
       ws.eachRow(row =>
         row.eachCell(cell => {
           const v = cell.value
-          t += (typeof v === 'object' && v && 'text' in v ? String((v as { text: string }).text) : String(v ?? '')) + '\n'
+          t +=
+            (typeof v === 'object' && v && 'text' in v
+              ? String((v as { text: string }).text)
+              : String(v ?? '')) + '\n'
         })
       )
       return t

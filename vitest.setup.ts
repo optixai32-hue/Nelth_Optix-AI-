@@ -6,7 +6,8 @@ import '@testing-library/jest-dom'
 process.env.FIREBASE_PROJECT_ID =
   process.env.FIREBASE_PROJECT_ID ?? 'test-project'
 process.env.FIREBASE_CLIENT_EMAIL =
-  process.env.FIREBASE_CLIENT_EMAIL ?? 'test@test-project.iam.gserviceaccount.com'
+  process.env.FIREBASE_CLIENT_EMAIL ??
+  'test@test-project.iam.gserviceaccount.com'
 process.env.FIREBASE_PRIVATE_KEY =
   process.env.FIREBASE_PRIVATE_KEY ?? 'test-private-key'
 

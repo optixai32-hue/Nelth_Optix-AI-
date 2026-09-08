@@ -62,7 +62,9 @@ export const RENDERER_CAPABILITIES: Record<string, RendererCapabilities> = {
   svg: svgCaps
 }
 
-export function getCapabilities(format: string): RendererCapabilities | undefined {
+export function getCapabilities(
+  format: string
+): RendererCapabilities | undefined {
   return RENDERER_CAPABILITIES[format]
 }
 

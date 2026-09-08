@@ -61,12 +61,14 @@ export function convertDataPart(part: {
   // (e.g. NVIDIA) reject non-standard content-part types and return a 400
   // ("data did not match any variant of ... UserMessageContent").
   if (part.type === 'data-file') {
-    const data = part.data as {
-      url?: unknown
-      filename?: unknown
-      mediaType?: unknown
-      key?: unknown
-    } | undefined
+    const data = part.data as
+      | {
+          url?: unknown
+          filename?: unknown
+          mediaType?: unknown
+          key?: unknown
+        }
+      | undefined
     const url = typeof data?.url === 'string' ? data.url : ''
     const name = typeof data?.filename === 'string' ? data.filename : 'file'
     const mediaType =

@@ -61,7 +61,8 @@ describe('groupMarkdownImages', () => {
     const out = groupMarkdownImages(text)
     expect(out).toContain('```spec')
     // URL 1 appears once as a src (plus once in the children id list check below).
-    const srcCount = (out.match(/"src":"https:\/\/a\.test\/1\.jpg"/g) || []).length
+    const srcCount = (out.match(/"src":"https:\/\/a\.test\/1\.jpg"/g) || [])
+      .length
     expect(srcCount).toBe(1)
     expect(out).toContain('"columns":2')
   })

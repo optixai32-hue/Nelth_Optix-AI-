@@ -109,7 +109,10 @@ export async function deleteConnection(
   provider: ConnectorProviderId
 ): Promise<void> {
   if (!userId) return
-  await providersCollection(userId).doc(provider).delete().catch(() => {})
+  await providersCollection(userId)
+    .doc(provider)
+    .delete()
+    .catch(() => {})
 }
 
 /** True when the user has stored (refreshable or permanent) credentials. */
@@ -137,8 +140,7 @@ export async function getValidAccessToken(
   if (!conn?.accessTokenSealed) {
     throw new ConnectorAuthError(provider)
   }
-  const fresh =
-    !conn.expiresAt || conn.expiresAt - Date.now() > REFRESH_SKEW_MS
+  const fresh = !conn.expiresAt || conn.expiresAt - Date.now() > REFRESH_SKEW_MS
   if (fresh) {
     if (conn.authFailedAt) {
       // A previous call proved the grant dead — don't serve the token.

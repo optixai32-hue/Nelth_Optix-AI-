@@ -22,4 +22,3 @@ export function createSearchProvider(
 
 export { FourGetSearchProvider }
 export type { SearchProvider }
-

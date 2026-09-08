@@ -134,11 +134,13 @@ export class FourGetSearchProvider implements SearchProvider {
 
           const hrefMatch = block.match(/<a\b[^>]*\bhref="([^"]+)"[^>]*>/i)
           const titleMatch =
-            block.match(/<div\b[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
-            block.match(/<h\d\b[^>]*>([\s\S]*?)<\/h\d>/i)
+            block.match(
+              /<div\b[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/div>/i
+            ) || block.match(/<h\d\b[^>]*>([\s\S]*?)<\/h\d>/i)
           const descMatch =
-            block.match(/<div\b[^>]*class="[^"]*description[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
-            block.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)
+            block.match(
+              /<div\b[^>]*class="[^"]*description[^"]*"[^>]*>([\s\S]*?)<\/div>/i
+            ) || block.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)
 
           if (hrefMatch && titleMatch && descMatch) {
             const rawUrl = cleanResultUrl(hrefMatch[1])
@@ -215,7 +217,11 @@ export class FourGetSearchProvider implements SearchProvider {
                 .replace(/&gt;/g, '>')
                 .replace(/&#039;/g, "'")
               const parsed = JSON.parse(unescaped)
-              if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.url) {
+              if (
+                Array.isArray(parsed) &&
+                parsed.length > 0 &&
+                parsed[0]?.url
+              ) {
                 fullUrl = parsed[0].url
               }
             } catch {
@@ -237,7 +243,11 @@ export class FourGetSearchProvider implements SearchProvider {
             // external-content proxy was tried before but its hotlinked URLs
             // fail to load in browsers (403/broken renders), so direct URLs
             // are primary (client falls back to the proxy on error).
-            if (!images.some(img => (typeof img === 'string' ? img : img.url) === fullUrl)) {
+            if (
+              !images.some(
+                img => (typeof img === 'string' ? img : img.url) === fullUrl
+              )
+            ) {
               images.push({
                 url: fullUrl,
                 description: title,

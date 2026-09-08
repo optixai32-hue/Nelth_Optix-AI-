@@ -4,7 +4,7 @@
  * (Outputs go to ./_audit_out; cleaned up at the end.)
  */
 import { promises as fs } from 'fs'
-import { existsSync, mkdtempSync, readFileSync,rmSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import os from 'os'
 import path from 'path'
 
@@ -77,13 +77,21 @@ async function main(): Promise<void> {
   }
   const gifInfo = await b.save(path.join(OUT, 'anim.gif'), { numColors: 32 })
   const gifBuf = readFileSync(path.join(OUT, 'anim.gif'))
-  check('GIF89a header', gifBuf.toString('ascii', 0, 6) === 'GIF89a', gifBuf.toString('ascii', 0, 6))
+  check(
+    'GIF89a header',
+    gifBuf.toString('ascii', 0, 6) === 'GIF89a',
+    gifBuf.toString('ascii', 0, 6)
+  )
   const w = gifBuf[6] | (gifBuf[7] << 8)
   const h = gifBuf[8] | (gifBuf[9] << 8)
   check('width from LSD', w === 120, `w=${w}`)
   check('height from LSD', h === 120, `h=${h}`)
   check('trailer 0x3B', gifBuf[gifBuf.length - 1] === 0x3b)
-  check('frame count reported', gifInfo.frameCount === 5, `fc=${gifInfo.frameCount}`)
+  check(
+    'frame count reported',
+    gifInfo.frameCount === 5,
+    `fc=${gifInfo.frameCount}`
+  )
   // Frame primitive roundtrip
   const fr = Frame.blank(10, 10, [0, 0, 0])
   fr.setPixel(3, 3, [9, 8, 7])
@@ -93,12 +101,21 @@ async function main(): Promise<void> {
   const b2 = new GIFBuilder(50, 50, 10)
   for (let i = 0; i < 4; i++) b2.addFrame(Frame.blank(50, 50, [10, 10, 10]))
   const removed = b2.deduplicateFrames()
-  check('deduplicate removes identical frames', removed === 3, `removed=${removed}`)
+  check(
+    'deduplicate removes identical frames',
+    removed === 3,
+    `removed=${removed}`
+  )
 
   // ---------- webapp-testing: with_server orchestration ----------
   console.log('\n[webapp-testing] with_server')
   const code = await withServer(
-    [{ cmd: `node -e "const h=require('http');h.createServer((q,r)=>r.end('hi')).listen(${8799})`, port: 8799 }],
+    [
+      {
+        cmd: `node -e "const h=require('http');h.createServer((q,r)=>r.end('hi')).listen(${8799})`,
+        port: 8799
+      }
+    ],
     8000,
     ['node', '-e', "process.stdout.write('CMD_OK')"]
   )
@@ -106,12 +123,17 @@ async function main(): Promise<void> {
 
   // ---------- docx / pptx / xlsx / pdf (real file generation) ----------
   console.log('\n[docx] buildDocx')
-  await buildDocx(path.join(OUT, 'doc.docx'), { title: 'T', paragraphs: ['Hello'] })
+  await buildDocx(path.join(OUT, 'doc.docx'), {
+    title: 'T',
+    paragraphs: ['Hello']
+  })
   const docBuf = readFileSync(path.join(OUT, 'doc.docx'))
   check('docx is a ZIP (PK)', docBuf[0] === 0x50 && docBuf[1] === 0x4b)
 
   console.log('\n[pptx] buildPptx')
-  await buildPptx(path.join(OUT, 'deck.pptx'), [{ title: 'Slide', bullets: ['a', 'b'] }])
+  await buildPptx(path.join(OUT, 'deck.pptx'), [
+    { title: 'Slide', bullets: ['a', 'b'] }
+  ])
   const pptxBuf = readFileSync(path.join(OUT, 'deck.pptx'))
   check('pptx is a ZIP (PK)', pptxBuf[0] === 0x50 && pptxBuf[1] === 0x4b)
 
@@ -141,9 +163,14 @@ async function main(): Promise<void> {
   const formPath = path.join(OUT, 'form.pdf')
   await fs.writeFile(formPath, pdfBytes)
   await fillPdf(formPath, path.join(OUT, 'filled.pdf'), { Name: 'Alice' })
-  const filled = await PDFDocument.load(readFileSync(path.join(OUT, 'filled.pdf')))
+  const filled = await PDFDocument.load(
+    readFileSync(path.join(OUT, 'filled.pdf'))
+  )
   const f2 = filled.getForm()
-  check('pdf field filled with Alice', f2.getTextField('Name').getText() === 'Alice')
+  check(
+    'pdf field filled with Alice',
+    f2.getTextField('Name').getText() === 'Alice'
+  )
 
   // ---------- mcp-builder: real stdio server round-trip ----------
   console.log('\n[mcp-builder] connections (stdio round-trip)')
@@ -158,7 +185,10 @@ s.tool('ping', 'returns pong', async () => ({ content: [{ type: 'text', text: 'p
 await s.connect(new StdioServerTransport());
 `
     )
-    const conn = createConnection('stdio', { command: 'bun', args: [serverFile] })
+    const conn = createConnection('stdio', {
+      command: 'bun',
+      args: [serverFile]
+    })
     await conn.connect()
     const tools = await conn.listTools()
     const hasPing = (tools as any).tools?.some((t: any) => t.name === 'ping')
@@ -172,7 +202,9 @@ await s.connect(new StdioServerTransport());
     check('MCP round-trip', false, String(e).slice(0, 120))
   }
 
-  console.log(`\n================ AUDIT TESTS: ${pass} PASS / ${fail} FAIL ================`)
+  console.log(
+    `\n================ AUDIT TESTS: ${pass} PASS / ${fail} FAIL ================`
+  )
   rmSync(OUT, { recursive: true, force: true })
   process.exit(fail === 0 ? 0 : 1)
 }

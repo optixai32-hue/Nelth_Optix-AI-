@@ -47,12 +47,17 @@ export async function GET(req: NextRequest) {
 
       if (res.ok) {
         const contentType = res.headers.get('content-type') || 'image/jpeg'
-        if (contentType.startsWith('image/') || contentType.startsWith('application/octet-stream')) {
+        if (
+          contentType.startsWith('image/') ||
+          contentType.startsWith('application/octet-stream')
+        ) {
           const body = await res.arrayBuffer()
           return new Response(body, {
             status: 200,
             headers: {
-              'Content-Type': contentType.startsWith('image/') ? contentType : 'image/jpeg',
+              'Content-Type': contentType.startsWith('image/')
+                ? contentType
+                : 'image/jpeg',
               'Cache-Control':
                 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400',
               'Access-Control-Allow-Origin': '*'

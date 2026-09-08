@@ -27,7 +27,11 @@ const FIXTURE: DocumentAST = {
   blocks: [
     { type: 'heading', level: 1, text: 'Architecture Maturity' },
     { type: 'paragraph', text: 'The AST is now format-agnostic.' },
-    { type: 'list', ordered: false, items: ['Decoupled', 'Stable', 'Extensible'] },
+    {
+      type: 'list',
+      ordered: false,
+      items: ['Decoupled', 'Stable', 'Extensible']
+    },
     { type: 'list', ordered: true, items: ['First', 'Second'] },
     {
       type: 'table',
@@ -59,7 +63,10 @@ async function extractText(format: Fmt, buf: Buffer): Promise<string> {
 beforeAll(async () => {
   for (const f of FORMATS) {
     // Each renderer receives a FRESH clone so the fixture can never be mutated.
-    results[f] = await generateDocument({ format: f, content: structuredClone(FIXTURE) })
+    results[f] = await generateDocument({
+      format: f,
+      content: structuredClone(FIXTURE)
+    })
   }
 }, 180000)
 
@@ -91,15 +98,21 @@ describe('Golden — all renderers produce artifacts', () => {
     // contract is expressed declaratively instead of via per-format exceptions.
     if (getCapabilities('docx')!.supportsImages) {
       const docx = await JSZip.loadAsync(results.docx)
-      expect(Object.keys(docx.files).some(f => /^word\/media\//.test(f))).toBe(true)
+      expect(Object.keys(docx.files).some(f => /^word\/media\//.test(f))).toBe(
+        true
+      )
     }
     if (getCapabilities('pptx')!.supportsImages) {
       const pptx = await JSZip.loadAsync(results.pptx)
-      expect(Object.keys(pptx.files).some(f => /^ppt\/media\//.test(f))).toBe(true)
+      expect(Object.keys(pptx.files).some(f => /^ppt\/media\//.test(f))).toBe(
+        true
+      )
     }
     if (getCapabilities('xlsx')!.supportsImages) {
       const xlsx = await JSZip.loadAsync(results.xlsx)
-      expect(Object.keys(xlsx.files).some(f => /^xl\/media\//.test(f))).toBe(true)
+      expect(Object.keys(xlsx.files).some(f => /^xl\/media\//.test(f))).toBe(
+        true
+      )
     }
     if (getCapabilities('svg')!.supportsImages) {
       expect(results.svg.toString('utf-8')).toContain('<image')
@@ -113,13 +126,17 @@ describe('Golden — all renderers produce artifacts', () => {
     for (const f of FORMATS) {
       const text = await extractText(f, results[f])
       expect(text, `${f}: heading`).toContain('Architecture Maturity')
-      expect(text, `${f}: paragraph`).toContain('The AST is now format-agnostic.')
+      expect(text, `${f}: paragraph`).toContain(
+        'The AST is now format-agnostic.'
+      )
       expect(text, `${f}: bullet list`).toContain('Decoupled')
       // Ordered items: docx/pptx rely on native numbering (text is "First"),
       // xlsx/svg prepend "1. ". The semantic item is preserved in every format.
       expect(text, `${f}: numbered list`).toContain('First')
       expect(text, `${f}: table header`).toContain('Format')
-      expect(text, `${f}: quote`).toContain('No renderer owns the document logic.')
+      expect(text, `${f}: quote`).toContain(
+        'No renderer owns the document logic.'
+      )
       expect(text, `${f}: code`).toContain('const ast = toAst(input)')
     }
   })
@@ -128,13 +145,19 @@ describe('Golden — all renderers produce artifacts', () => {
     // Page-break semantics are format-specific and gated by capabilities, so the
     // test asserts each format's real contract rather than one uniform behavior.
     if (getCapabilities('docx')!.supportsPageBreak) {
-      const docxXml = (await JSZip.loadAsync(results.docx)).file('word/document.xml')
-      expect((await docxXml?.async('string')) ?? '').toContain('<w:br w:type="page"/>')
+      const docxXml = (await JSZip.loadAsync(results.docx)).file(
+        'word/document.xml'
+      )
+      expect((await docxXml?.async('string')) ?? '').toContain(
+        '<w:br w:type="page"/>'
+      )
     }
 
     if (getCapabilities('pptx')!.supportsPageBreak) {
       const pptx = await JSZip.loadAsync(results.pptx)
-      const slideCount = Object.keys(pptx.files).filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f)).length
+      const slideCount = Object.keys(pptx.files).filter(f =>
+        /^ppt\/slides\/slide\d+\.xml$/.test(f)
+      ).length
       expect(slideCount).toBeGreaterThanOrEqual(2)
     }
 

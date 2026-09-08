@@ -10,10 +10,7 @@ import {
 } from '@tabler/icons-react'
 import { signOut } from 'firebase/auth'
 
-import {
-  clearSession,
-  getFirebaseAuth
-} from '@/lib/firebase/client'
+import { clearSession, getFirebaseAuth } from '@/lib/firebase/client'
 import type { AppUser } from '@/lib/firebase/user'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'

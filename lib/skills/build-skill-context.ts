@@ -133,7 +133,8 @@ export const EXECUTION_REQUIREMENTS_BY_SLUG: Record<string, string[]> = {
     'Avoid generic / basic visual treatment.',
     'Use gradients, depth and coherent stroke / fill where relevant.'
   ],
-  'frontend-design': [    'CODE MODIFICATION CONTINUITY: when the user asks to modify, improve, fix, animate, optimize, restyle, extend or adjust an EXISTING generated interface, DO NOT rebuild from scratch, DO NOT replace the HTML structure, existing components or icons unnecessarily, and DO NOT introduce emoji as UI icons. Preserve existing functionality, interactions and content. Change ONLY what the request requires (e.g. "improve the animation" → animations only; "make it dark" → theme tokens only; "fix the mobile menu" → menu behavior only).',
+  'frontend-design': [
+    'CODE MODIFICATION CONTINUITY: when the user asks to modify, improve, fix, animate, optimize, restyle, extend or adjust an EXISTING generated interface, DO NOT rebuild from scratch, DO NOT replace the HTML structure, existing components or icons unnecessarily, and DO NOT introduce emoji as UI icons. Preserve existing functionality, interactions and content. Change ONLY what the request requires (e.g. "improve the animation" → animations only; "make it dark" → theme tokens only; "fix the mobile menu" → menu behavior only).',
     'CODE-FIRST MODIFICATION RULE: if the conversation already contains a generated code artifact, treat it as the source of truth. When the user asks for an improvement / modification / fix / animation / responsive / feature change, ALWAYS edit that existing artifact and return the modified version — never generate an unrelated replacement from scratch. Preserve every unrelated UI component, interaction, content, asset and icon; change only the requested scope.',
     'DETECTED ≠ LOADED ≠ APPLIED: the skill counts as applied ONLY when its principles demonstrably shape the final code. Loading the SKILL.md is never enough on its own — the output must show a real art direction, intentional typography, a visual signature, and intentional, accessible motion.',
     'FINAL QUALITY GATE (frontend-design = PASS only if ALL hold): skill loaded + design principles genuinely applied + code valid/functional + NO emoji used as UI icons + responsive (viewport <meta> + fluid units / grid / flex + breakpoints down to mobile) + distinctive (NOT the generic hero → 3 cards → testimonial → CTA → footer default). If any fails, refine before returning.',
@@ -175,16 +176,16 @@ export const EXECUTION_REQUIREMENTS_BY_SLUG: Record<string, string[]> = {
   // you already read). Observed failure: "génère un docx avec ce résumé"
   // right after a Gmail summary → the model asked the user to re-paste the
   // mails instead of using the summary sitting directly above.
-  'docx': [
+  docx: [
     'When the user refers to content already in the conversation ("ce résumé", "ces mails", "ces résultats", your own previous answer, connector results, a file you already read) as the document source, USE IT DIRECTLY to build the spec — never ask the user to re-paste, re-upload, or re-share what is already visible above. Ask for source material ONLY when the conversation genuinely contains none.'
   ],
-  'pdf': [
+  pdf: [
     'When the user refers to content already in the conversation ("ce résumé", "ces mails", "ces résultats", your own previous answer, connector results, a file you already read) as the document source, USE IT DIRECTLY to build the spec — never ask the user to re-paste, re-upload, or re-share what is already visible above. Ask for source material ONLY when the conversation genuinely contains none.'
   ],
-  'xlsx': [
+  xlsx: [
     'When the user refers to content already in the conversation ("ce résumé", "ces mails", "ces résultats", your own previous answer, connector results, a file you already read) as the document source, USE IT DIRECTLY to build the spec — never ask the user to re-paste, re-upload, or re-share what is already visible above. Ask for source material ONLY when the conversation genuinely contains none.'
   ],
-  'pptx': [
+  pptx: [
     'When the user refers to content already in the conversation ("ce résumé", "ces mails", "ces résultats", your own previous answer, connector results, a file you already read) as the document source, USE IT DIRECTLY to build the spec — never ask the user to re-paste, re-upload, or re-share what is already visible above. Ask for source material ONLY when the conversation genuinely contains none.'
   ]
 }
@@ -294,13 +295,13 @@ export async function buildSkillContext(
   previousCode?: string,
   compact = false
 ): Promise<SkillContextResult> {
-    const empty: SkillContextResult = {
-      context: '',
-      selected: [],
-      activated: [],
-      validationRules: [],
-      previousCode: previousCode ?? ''
-    }
+  const empty: SkillContextResult = {
+    context: '',
+    selected: [],
+    activated: [],
+    validationRules: [],
+    previousCode: previousCode ?? ''
+  }
 
   if (!query || query.trim().length < 3) return empty
 
@@ -349,7 +350,10 @@ export async function buildSkillContext(
         return !DOC_GEN_DOMAINS.has((meta?.domain ?? '').toLowerCase())
       })
       if (filtered.length !== selections.length) {
-        perfTime('[TTFT] read-only intent: dropped document-generation skills', tBuild)
+        perfTime(
+          '[TTFT] read-only intent: dropped document-generation skills',
+          tBuild
+        )
       }
       selections = filtered
     }
@@ -396,7 +400,7 @@ export async function buildSkillContext(
 
     const isVisual = isVisualQuery(query)
     const skillBlocks: string[] = []
-      const activated: ActivatedSkill[] = []
+    const activated: ActivatedSkill[] = []
     const allValidation: string[] = []
     const states: Record<string, SkillExecutionState> = {}
 
@@ -456,7 +460,9 @@ ${refsText}`
           blocks.push(
             ...(curated && curated.length
               ? curated.map(r => `- ${r}`)
-              : [`- Apply best practices for the ${item.meta.domain || 'requested'} domain.`])
+              : [
+                  `- Apply best practices for the ${item.meta.domain || 'requested'} domain.`
+                ])
           )
           skillBlocks.push(blocks.join('\n'))
         } else {
@@ -526,7 +532,9 @@ ${lines}`
       const rawPrevCode = (previousCode ?? '').trim()
       if (hasDesignSkill && rawPrevCode) {
         const truncated = rawPrevCode.length > MAX_PREV_CODE
-        const shown = truncated ? rawPrevCode.slice(0, MAX_PREV_CODE) : rawPrevCode
+        const shown = truncated
+          ? rawPrevCode.slice(0, MAX_PREV_CODE)
+          : rawPrevCode
         currentArtifactBlock = `
 
 CURRENT ARTIFACT (the EXISTING code from the previous turn — you MUST edit THIS, not regenerate a replacement):
@@ -563,12 +571,12 @@ DESIGN VARIATION (this is an "another version" / variation request):
           ? `
 
 MODIFY / EXTEND IN PLACE (this is a "${
-            intent === 'ADD_TO_EXISTING'
-              ? 'add to existing'
-              : intent === 'REBUILD_REQUEST'
-                ? 'rebuild'
-                : 'modify existing'
-          }" request):
+              intent === 'ADD_TO_EXISTING'
+                ? 'add to existing'
+                : intent === 'REBUILD_REQUEST'
+                  ? 'rebuild'
+                  : 'modify existing'
+            }" request):
 - The previous turn ALREADY produced code. The EXACT existing code is provided above
   in the CURRENT ARTIFACT block. EDIT THAT EXISTING CODE; do NOT say "I don't have
   access to the previous code" and do NOT generate a new standalone application.
@@ -671,29 +679,30 @@ Only mark a skill COMPLETED when its instructions are genuinely reflected in the
 output AND validation passes. If validation fails, correct the output and
 re-validate before completing. Detection is NEVER completion.`
 
-    const context = (mode === 'full'
-      ? [
-          fullHeader,
-          priorityBlock,
-          ...skillBlocks,
-          strategyBlock,
-          executionBlock,
-          validationBlock,
-          lifecycleBlock,
-          continuityBlock,
-          ACTIVE_SKILL_EXECUTION_PROTOCOL
-        ]
-      : [
-          minimalHeader,
-          ...skillBlocks,
-          strategyBlock,
-          priorityBlock,
-          executionBlock,
-          validationBlock,
-          lifecycleBlock,
-          continuityBlock,
-          MINIMAL_SKILL_PROTOCOL
-        ]
+    const context = (
+      mode === 'full'
+        ? [
+            fullHeader,
+            priorityBlock,
+            ...skillBlocks,
+            strategyBlock,
+            executionBlock,
+            validationBlock,
+            lifecycleBlock,
+            continuityBlock,
+            ACTIVE_SKILL_EXECUTION_PROTOCOL
+          ]
+        : [
+            minimalHeader,
+            ...skillBlocks,
+            strategyBlock,
+            priorityBlock,
+            executionBlock,
+            validationBlock,
+            lifecycleBlock,
+            continuityBlock,
+            MINIMAL_SKILL_PROTOCOL
+          ]
     )
       .filter(Boolean)
       .join('\n')
@@ -779,7 +788,11 @@ function extractDesignSummary(text: string): string {
 
   const fontRe = /font-family:\s*([^;"}]+)/gi
   while ((m = fontRe.exec(text))) {
-    const f = m[1].trim().replace(/^['"]|['"]$/g, '').split(',')[0].trim()
+    const f = m[1]
+      .trim()
+      .replace(/^['"]|['"]$/g, '')
+      .split(',')[0]
+      .trim()
     if (f) fonts.add(f)
   }
   const fontRe2 = /fontFamily\s*[:=]\s*['"]([^'"]+)['"]/gi
@@ -794,23 +807,27 @@ function extractDesignSummary(text: string): string {
   // Layout signals.
   if (/\bgrid\b/.test(lower)) layouts.add('grid')
   if (/\bflex\b/.test(lower)) layouts.add('flex')
-  if (/split|two-?column|asymmetric|side-by-side/.test(lower)) layouts.add('split/asymmetric')
+  if (/split|two-?column|asymmetric|side-by-side/.test(lower))
+    layouts.add('split/asymmetric')
   if (/centered|text-center|mx-auto/.test(lower)) layouts.add('centered hero')
   // Navigation style.
-  if (/\bnav\b|navbar|navigation bar|header\b/.test(lower)) components.add('top nav/header')
+  if (/\bnav\b|navbar|navigation bar|header\b/.test(lower))
+    components.add('top nav/header')
   if (/sidebar|side nav/.test(lower)) components.add('side nav')
   // Card style.
   if (/\bcard\b|cards\b/.test(lower)) components.add('card components')
   if (/bento/.test(lower)) components.add('bento grid')
   // Hero composition.
   if (/\bhero\b/.test(lower)) components.add('hero section')
-  if (/immersive|fullscreen|full-?screen/.test(lower)) components.add('immersive hero')
+  if (/immersive|fullscreen|full-?screen/.test(lower))
+    components.add('immersive hero')
   // Visual motif.
   if (/gradient/.test(lower)) motifs.add('gradient motif')
   if (/\bborder\b|outline/.test(lower)) motifs.add('line/border motif')
   if (/shadow/.test(lower)) motifs.add('soft-shadow motif')
   if (/glass|blur|backdrop/.test(lower)) motifs.add('glassmorphism')
-  if (/brutal|neo-?brutal|bold border|thick border/.test(lower)) motifs.add('brutalist motif')
+  if (/brutal|neo-?brutal|bold border|thick border/.test(lower))
+    motifs.add('brutalist motif')
   // Spacing rhythm sample (so a later variation can avoid the same rhythm).
   const spRe = /(padding|margin|gap)[:\s]+([0-9.]+(?:px|rem|em))/gi
   while ((m = spRe.exec(text))) spacing.add(m[2])
@@ -821,7 +838,8 @@ function extractDesignSummary(text: string): string {
   if (layouts.size) parts.push('layout: ' + [...layouts].join(', '))
   if (components.size) parts.push('components: ' + [...components].join(', '))
   if (motifs.size) parts.push('motif: ' + [...motifs].join(', '))
-  if (spacing.size) parts.push('spacing samples: ' + [...spacing].slice(0, 6).join(', '))
+  if (spacing.size)
+    parts.push('spacing samples: ' + [...spacing].slice(0, 6).join(', '))
   return parts.join('; ')
 }
 
@@ -853,7 +871,12 @@ function messageText(msg: {
  * This reuses `buildSkillContext` (and therefore the router) — no second router.
  */
 export async function getPreviousDesignContext(
-  messages: { role?: string; parts?: unknown; id?: string; content?: unknown }[],
+  messages: {
+    role?: string
+    parts?: unknown
+    id?: string
+    content?: unknown
+  }[],
   currentMessageId?: string
 ): Promise<PreviousDesignContext> {
   const tPrev = performance.now()
@@ -869,8 +892,7 @@ export async function getPreviousDesignContext(
   if (!prevUser) return { slugs: [], designSummary: '', previousCode: '' }
 
   const prevQuery = getTextFromParts(prevUser.parts as never)
-  if (!prevQuery)
-    return { slugs: [], designSummary: '', previousCode: '' }
+  if (!prevQuery) return { slugs: [], designSummary: '', previousCode: '' }
 
   // OPTIMIZE-TTFT: derive the previous turn's active skills with the lightweight
   // router ONLY. The previous implementation called the full buildSkillContext

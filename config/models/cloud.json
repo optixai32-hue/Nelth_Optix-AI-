@@ -8,7 +8,10 @@
       "providerId": "openai-compatible",
       "providerOptions": {
         "openai-compatible": {
-          "chat_template_kwargs": { "enable_thinking": false, "clear_thinking": true }
+          "chat_template_kwargs": {
+            "enable_thinking": false,
+            "clear_thinking": true
+          }
         }
       }
     },
@@ -19,7 +22,10 @@
       "providerId": "openai-compatible",
       "providerOptions": {
         "openai-compatible": {
-          "chat_template_kwargs": { "enable_thinking": false, "clear_thinking": true }
+          "chat_template_kwargs": {
+            "enable_thinking": false,
+            "clear_thinking": true
+          }
         }
       }
     }

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { validateUiIcons } from './ui-icon-validator'
 import { validateGeneratedOutput } from './validate'
 
-const withSkill = (code: string) => validateGeneratedOutput(code, { slugs: ['frontend-design'] })
+const withSkill = (code: string) =>
+  validateGeneratedOutput(code, { slugs: ['frontend-design'] })
 
 const hasIconViolation = (r: ReturnType<typeof validateGeneratedOutput>) =>
   r.violations.some(v => v.rule === 'ui.emoji-as-icon')

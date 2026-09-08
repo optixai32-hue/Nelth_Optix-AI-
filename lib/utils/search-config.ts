@@ -60,4 +60,3 @@ export function getSearchStrategyGuidance(): string {
 export function getGeneralSearchProviderType(): SearchProviderType | null {
   return resolveSearchProviderType()
 }
-

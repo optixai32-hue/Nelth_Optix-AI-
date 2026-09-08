@@ -35,37 +35,64 @@ export const documentTool = tool({
     fileName: z
       .string()
       .optional()
-      .describe('File name to use for the produced/referenced artifact, e.g. "report.docx".'),
+      .describe(
+        'File name to use for the produced/referenced artifact, e.g. "report.docx".'
+      ),
     fileContentBase64: z
       .string()
       .optional()
-      .describe('Base64 of the source file, required for read/modify of an uploaded file.'),
+      .describe(
+        'Base64 of the source file, required for read/modify of an uploaded file.'
+      ),
     fileUrl: z
       .string()
       .optional()
-      .describe('URL of the source file (e.g. the signed upload URL from an attachment). Used to fetch the bytes when fileContentBase64 is not supplied.'),
+      .describe(
+        'URL of the source file (e.g. the signed upload URL from an attachment). Used to fetch the bytes when fileContentBase64 is not supplied.'
+      ),
     spec: z
       .record(z.string(), z.any())
       .optional()
-      .describe('Structured content for create/export (docx sections, xlsx sheets, pptx slides, pdf paragraphs/markdown).'),
+      .describe(
+        'Structured content for create/export (docx sections, xlsx sheets, pptx slides, pdf paragraphs/markdown).'
+      ),
     premium: z
       .boolean()
       .optional()
-      .describe('PDF only — set true to produce a premium, design-quality PDF rendered from Markdown via HTML/CSS (Playwright). Falls back to the standard engine if unavailable.'),
+      .describe(
+        'PDF only — set true to produce a premium, design-quality PDF rendered from Markdown via HTML/CSS (Playwright). Falls back to the standard engine if unavailable.'
+      ),
     template: z
       .string()
       .optional()
-      .describe("PDF only — premium layout template: 'default' | 'cv' | 'report' | 'minimal'. Any value selects the premium engine."),
+      .describe(
+        "PDF only — premium layout template: 'default' | 'cv' | 'report' | 'minimal'. Any value selects the premium engine."
+      ),
     accent: z
       .string()
       .optional()
-      .describe('PDF only — premium brand color as a hex string, e.g. "#2563eb".'),
+      .describe(
+        'PDF only — premium brand color as a hex string, e.g. "#2563eb".'
+      ),
     modifications: z
       .record(z.string(), z.any())
       .optional()
-      .describe('Modification description for modify (e.g. add a column to xlsx).')
+      .describe(
+        'Modification description for modify (e.g. add a column to xlsx).'
+      )
   }),
-  execute: async ({ operation, format, fileName, fileContentBase64, fileUrl, spec, modifications, premium, template, accent }) => {
+  execute: async ({
+    operation,
+    format,
+    fileName,
+    fileContentBase64,
+    fileUrl,
+    spec,
+    modifications,
+    premium,
+    template,
+    accent
+  }) => {
     try {
       const fmt = format as DocumentFormat
 
@@ -74,7 +101,8 @@ export const documentTool = tool({
         if (!buffer) {
           return {
             success: false,
-            error: 'read requires fileContentBase64 or fileUrl of the source file.'
+            error:
+              'read requires fileContentBase64 or fileUrl of the source file.'
           }
         }
         const result = await readDocument(fmt, buffer)
@@ -104,14 +132,16 @@ export const documentTool = tool({
         })
         const validation = await validateDocument(fmt, buffer)
         if (!validation.ok) {
-          return { success: false, error: `Generated file failed validation: ${validation.error}` }
+          return {
+            success: false,
+            error: `Generated file failed validation: ${validation.error}`
+          }
         }
         const name = fileName || defaultName(fmt)
         const stored = await storeDocument(buffer, name, mimeForFormat(fmt))
         // Permanent cloud URL when available (survives serverless instances);
         // otherwise the instance-local download route.
-        const downloadUrl =
-          stored.publicUrl ?? `/api/documents/${stored.id}`
+        const downloadUrl = stored.publicUrl ?? `/api/documents/${stored.id}`
         return {
           success: true,
           format: fmt,
@@ -132,13 +162,17 @@ export const documentTool = tool({
       if (!src) {
         return {
           success: false,
-          error: 'modify requires fileContentBase64 or fileUrl of the source file.'
+          error:
+            'modify requires fileContentBase64 or fileUrl of the source file.'
         }
       }
       const out = await modifyDocument(fmt, src, modifications ?? {})
       const validation = await validateDocument(fmt, out)
       if (!validation.ok) {
-        return { success: false, error: `Modified file failed validation: ${validation.error}` }
+        return {
+          success: false,
+          error: `Modified file failed validation: ${validation.error}`
+        }
       }
       const name = fileName || defaultName(fmt)
       const stored = await storeDocument(out, name, mimeForFormat(fmt))
@@ -150,8 +184,7 @@ export const documentTool = tool({
           fileName: stored.fileName,
           mimeType: stored.mimeType,
           size: stored.size,
-          downloadUrl:
-            stored.publicUrl ?? `/api/documents/${stored.id}`,
+          downloadUrl: stored.publicUrl ?? `/api/documents/${stored.id}`,
           downloadMarkdown: `[${stored.fileName}](${stored.publicUrl ?? `/api/documents/${stored.id}`})`
         },
         validation: validation.meta

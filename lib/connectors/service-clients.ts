@@ -554,11 +554,9 @@ export async function notionRead(
   const parentsWithKids = top.filter(b => b?.has_children).slice(0, 10)
   const nestedLists = await Promise.all(
     parentsWithKids.map(parent =>
-      fetchNotionBlocks(
-        userId,
-        String(parent.id).replace(/-/g, ''),
-        20
-      ).catch(() => [] as Array<any>)
+      fetchNotionBlocks(userId, String(parent.id).replace(/-/g, ''), 20).catch(
+        () => [] as Array<any>
+      )
     )
   )
   const kidsByParent = new Map<string, Array<any>>()

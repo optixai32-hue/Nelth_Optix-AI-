@@ -71,12 +71,10 @@ export function FeedbackModal({ open, onOpenChange }: FeedbackModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px]">
-         <DialogHeader>
-           <DialogTitle>{t('feedback.title')}</DialogTitle>
-           <DialogDescription>
-             {t('feedback.help')}
-           </DialogDescription>
-         </DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{t('feedback.title')}</DialogTitle>
+          <DialogDescription>{t('feedback.help')}</DialogDescription>
+        </DialogHeader>
 
         <div className="space-y-4 mt-4">
           <div className="flex gap-2">

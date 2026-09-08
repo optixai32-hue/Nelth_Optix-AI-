@@ -11,7 +11,9 @@ import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 
 const isAllowedFileType = (file: File) =>
-  ALLOWED_UPLOAD_MIME_TYPES.includes(file.type as (typeof ALLOWED_UPLOAD_MIME_TYPES)[number])
+  ALLOWED_UPLOAD_MIME_TYPES.includes(
+    file.type as (typeof ALLOWED_UPLOAD_MIME_TYPES)[number]
+  )
 
 export function FileUploadButton({
   onFileSelect

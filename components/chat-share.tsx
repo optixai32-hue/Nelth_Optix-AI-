@@ -77,7 +77,10 @@ export function ChatShare({ chatId, className }: ChatShareProps) {
             variant={'ghost'}
             onClick={() => setOpen(true)}
           >
-            <Share size={14} className="transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-125 active:scale-90" />
+            <Share
+              size={14}
+              className="transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-125 active:scale-90"
+            />
           </Button>
         </DialogTrigger>
         <DialogContent>

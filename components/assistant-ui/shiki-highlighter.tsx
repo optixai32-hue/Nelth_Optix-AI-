@@ -1,26 +1,26 @@
-"use client";
+'use client'
 
-import type { ReactNode } from "react";
-import ShikiHighlighter, {
-  type ShikiHighlighterProps,
-} from "react-shiki";
+import type { ReactNode } from 'react'
+import ShikiHighlighter, { type ShikiHighlighterProps } from 'react-shiki'
 
 function toCode(children: ReactNode): string {
-  if (typeof children === "string") return children;
-  if (Array.isArray(children)) return children.map(toCode).join("");
-  if (children && typeof children === "object" && "props" in children) {
-    return toCode((children as { props: { children?: ReactNode } }).props.children);
+  if (typeof children === 'string') return children
+  if (Array.isArray(children)) return children.map(toCode).join('')
+  if (children && typeof children === 'object' && 'props' in children) {
+    return toCode(
+      (children as { props: { children?: ReactNode } }).props.children
+    )
   }
-  return "";
+  return ''
 }
 
 export type SyntaxHighlighterProps = {
-  code?: string;
-  language?: string;
-  className?: string;
-  children?: ReactNode;
-  [key: string]: unknown;
-};
+  code?: string
+  language?: string
+  className?: string
+  children?: ReactNode
+  [key: string]: unknown
+}
 
 /**
  * Single, unified syntax-highlighting renderer (react-shiki / Shiki).
@@ -36,20 +36,20 @@ export function SyntaxHighlighter({
   children,
   ...props
 }: SyntaxHighlighterProps) {
-  const source = code ?? toCode(children);
+  const source = code ?? toCode(children)
 
   return (
     <ShikiHighlighter
-      {...(props as Omit<ShikiHighlighterProps, "children" | "theme">)}
-      language={language ?? "text"}
+      {...(props as Omit<ShikiHighlighterProps, 'children' | 'theme'>)}
+      language={language ?? 'text'}
       theme={{
-        light: "github-light",
-        dark: "github-dark",
+        light: 'github-light',
+        dark: 'github-dark'
       }}
       defaultColor="light-dark()"
       className={className}
     >
       {source}
     </ShikiHighlighter>
-  );
+  )
 }

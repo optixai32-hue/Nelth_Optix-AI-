@@ -107,10 +107,8 @@ const en: Dict = {
   'feedback.placeholder': 'Share your feedback...',
   'feedback.send': 'Send feedback',
   'feedback.thanks': 'Thank you for your feedback!',
-  'feedback.failed':
-    'Failed to submit feedback. Please try again later.',
-  'feedback.selectRequired':
-    'Please select your sentiment and write a message',
+  'feedback.failed': 'Failed to submit feedback. Please try again later.',
+  'feedback.selectRequired': 'Please select your sentiment and write a message',
 
   'error.rateLimit': 'Rate Limit Exceeded',
   'error.accessDenied': 'Access Denied',
@@ -129,8 +127,7 @@ const en: Dict = {
   'common.submit': 'Submit',
   'common.submitting': 'Submitting...',
 
-  'footer.tip':
-    'Nelth-IA can make mistakes. Please double-check responses.'
+  'footer.tip': 'Nelth-IA can make mistakes. Please double-check responses.'
 }
 
 const fr: Dict = {
@@ -222,8 +219,7 @@ const fr: Dict = {
   'connector.activity.readingPage': 'Lecture de la page…',
   'connector.activity.generatingDoc': 'Génération du document…',
   'connector.activity.generatingImage': 'Génération de l’image…',
-  'connector.signInRequired':
-    'Connectez-vous pour connecter des applications',
+  'connector.signInRequired': 'Connectez-vous pour connecter des applications',
   'connector.revokeNote':
     'Révoquez aussi l’accès dans les paramètres du fournisseur pour une déconnexion complète.',
   'connector.manage': 'Gérer',
@@ -261,8 +257,7 @@ const fr: Dict = {
   'common.submit': 'Envoyer',
   'common.submitting': 'Envoi...',
 
-  'footer.tip':
-    'Nelth-IA peut faire des erreurs. Vérifiez bien les réponses.'
+  'footer.tip': 'Nelth-IA peut faire des erreurs. Vérifiez bien les réponses.'
 }
 
 export const translations: Record<Locale, Dict> = { en, fr }

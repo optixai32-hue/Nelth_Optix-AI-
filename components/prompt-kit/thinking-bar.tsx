@@ -1,10 +1,10 @@
-"use client"
+'use client'
 
-import { ChevronRight } from "lucide-react"
+import { ChevronRight } from 'lucide-react'
 
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils'
 
-import { TextShimmer } from "@/components/prompt-kit/text-shimmer"
+import { TextShimmer } from '@/components/prompt-kit/text-shimmer'
 
 type ThinkingBarProps = {
   className?: string
@@ -16,13 +16,13 @@ type ThinkingBarProps = {
 
 export function ThinkingBar({
   className,
-  text = "Thinking",
+  text = 'Thinking',
   onStop,
-  stopLabel = "Answer now",
-  onClick,
+  stopLabel = 'Answer now',
+  onClick
 }: ThinkingBarProps) {
   return (
-    <div className={cn("flex w-full items-center justify-between", className)}>
+    <div className={cn('flex w-full items-center justify-between', className)}>
       {onClick ? (
         <button
           type="button"

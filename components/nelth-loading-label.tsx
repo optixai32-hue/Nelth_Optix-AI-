@@ -23,7 +23,7 @@ import { useI18n } from './i18n-provider'
 const PHASE_KEYS = [
   'loading.phase1',
   'loading.phase2',
-  'loading.phase3',
+  'loading.phase3'
 ] as const
 
 export function NelthLoadingLabel({ activity }: { activity?: string | null }) {
@@ -61,7 +61,7 @@ export function NelthLoadingLabel({ activity }: { activity?: string | null }) {
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
         backgroundClip: 'text',
-        animation: 'shimmer 1.6s linear infinite',
+        animation: 'shimmer 1.6s linear infinite'
       }}
     >
       {activity || t(PHASE_KEYS[phaseIdx])}

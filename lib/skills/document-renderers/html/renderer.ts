@@ -37,10 +37,15 @@ function escAttr(s: string): string {
  * and emits a semantic, styled HTML document. It never decides document
  * structure — only `AST → target format`.
  */
-export async function renderHtml(ast: DocumentAST, opts: RenderOptions = {}): Promise<Buffer> {
-  const accent = typeof opts.accent === 'string' && /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(opts.accent)
-    ? opts.accent
-    : '#2563eb'
+export async function renderHtml(
+  ast: DocumentAST,
+  opts: RenderOptions = {}
+): Promise<Buffer> {
+  const accent =
+    typeof opts.accent === 'string' &&
+    /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(opts.accent)
+      ? opts.accent
+      : '#2563eb'
   const title = ast.metadata?.title ?? 'Document'
   const lang = ast.metadata?.language ?? 'fr'
   const body = ast.blocks.map(blockToHtml).join('\n')

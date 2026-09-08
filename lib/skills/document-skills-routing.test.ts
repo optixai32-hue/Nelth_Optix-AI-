@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildSkillContext } from './build-skill-context'
-import {
-  extractAttachmentFormats,
-  formatFromName
-} from './document-runtime'
+import { extractAttachmentFormats, formatFromName } from './document-runtime'
 import { getSkillRegistry } from './registry'
 import { routeSkills } from './router'
 

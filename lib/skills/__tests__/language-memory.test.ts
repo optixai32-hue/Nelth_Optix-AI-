@@ -51,9 +51,10 @@ describe('detectLanguage', () => {
 
 describe('resolveConversationLanguage', () => {
   it('current explicit request wins immediately', () => {
-    expect(
-      resolveConversationLanguage([], 'ATAOVO TENY MALAGASY')
-    ).toEqual({ lang: 'mg', source: 'requested' })
+    expect(resolveConversationLanguage([], 'ATAOVO TENY MALAGASY')).toEqual({
+      lang: 'mg',
+      source: 'requested'
+    })
   })
 
   it('persists the preference from history across turns', () => {
@@ -63,7 +64,9 @@ describe('resolveConversationLanguage', () => {
       u('ATAOVO TENY MALAGASY'),
       a('Fanazavana amin ny teny Malagasy...')
     ]
-    expect(resolveConversationLanguage(history, 'Azavao indray ilay OAuth')).toEqual({
+    expect(
+      resolveConversationLanguage(history, 'Azavao indray ilay OAuth')
+    ).toEqual({
       lang: 'mg',
       source: 'requested'
     })
@@ -91,13 +94,16 @@ describe('resolveConversationLanguage', () => {
 describe('messageTextAny', () => {
   it('reads UIMessage parts and ModelMessage content', () => {
     expect(messageTextAny(u('hello') as never)).toBe('hello')
-    expect(
-      messageTextAny({ role: 'user', content: 'hi there' } as never)
-    ).toBe('hi there')
+    expect(messageTextAny({ role: 'user', content: 'hi there' } as never)).toBe(
+      'hi there'
+    )
     expect(
       messageTextAny({
         role: 'user',
-        content: [{ type: 'text', text: 'a' }, { type: 'image', image: 'x' }]
+        content: [
+          { type: 'text', text: 'a' },
+          { type: 'image', image: 'x' }
+        ]
       } as never)
     ).toBe('a')
     expect(messageTextAny(null)).toBe('')

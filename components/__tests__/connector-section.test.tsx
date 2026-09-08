@@ -68,9 +68,7 @@ describe('ConnectorSection', () => {
       />
     )
     expect(screen.getByText('Reconnect required')).toBeInTheDocument()
-    expect(
-      screen.getByText(/Reconnect the app from the/)
-    ).toBeInTheDocument()
+    expect(screen.getByText(/Reconnect the app from the/)).toBeInTheDocument()
   })
 
   test('shows read character count for single-item reads', () => {

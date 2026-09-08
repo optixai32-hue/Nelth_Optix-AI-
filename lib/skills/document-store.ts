@@ -185,15 +185,24 @@ export async function resolveStoredDocument(
   const mimeType = mimeByExtension(meta[1])
   return {
     buffer,
-    meta: { id, fileName: meta[1], mimeType, size: buffer.length, publicUrl: null }
+    meta: {
+      id,
+      fileName: meta[1],
+      mimeType,
+      size: buffer.length,
+      publicUrl: null
+    }
   }
 }
 
 function mimeByExtension(fileName: string): string {
   const lower = fileName.toLowerCase()
   if (lower.endsWith('.pdf')) return 'application/pdf'
-  if (lower.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  if (lower.endsWith('.xlsx')) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  if (lower.endsWith('.pptx')) return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  if (lower.endsWith('.docx'))
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  if (lower.endsWith('.xlsx'))
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  if (lower.endsWith('.pptx'))
+    return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
   return 'application/octet-stream'
 }

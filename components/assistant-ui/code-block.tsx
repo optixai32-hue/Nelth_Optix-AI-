@@ -1,7 +1,7 @@
-"use client";
+'use client'
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import {
   CheckIcon,
@@ -10,26 +10,28 @@ import {
   DownloadIcon,
   EyeIcon,
   Maximize2,
-  XIcon,
-} from "lucide-react";
+  XIcon
+} from 'lucide-react'
 
-import { SpecFenceBlock } from "@/components/spec-fence-block";
+import { SpecFenceBlock } from '@/components/spec-fence-block'
 
-import { SyntaxHighlighter } from "./shiki-highlighter";
+import { SyntaxHighlighter } from './shiki-highlighter'
 
 function extractCode(children: unknown): string {
-  if (typeof children === "string") return children;
-  if (Array.isArray(children)) return children.map(extractCode).join("");
-  if (children && typeof children === "object" && "props" in children) {
-    return extractCode((children as { props: { children?: unknown } }).props.children);
+  if (typeof children === 'string') return children
+  if (Array.isArray(children)) return children.map(extractCode).join('')
+  if (children && typeof children === 'object' && 'props' in children) {
+    return extractCode(
+      (children as { props: { children?: unknown } }).props.children
+    )
   }
-  return "";
+  return ''
 }
 
-const LANG_RE = /language-([\w-]+)/;
+const LANG_RE = /language-([\w-]+)/
 
 /** Languages that support an in-app visual preview. */
-const PREVIEWABLE = new Set(["html", "htm", "svg"]);
+const PREVIEWABLE = new Set(['html', 'htm', 'svg'])
 
 /**
  * Heuristic: does the raw code look like an HTML/SVG document? Lets us preview
@@ -37,49 +39,49 @@ const PREVIEWABLE = new Set(["html", "htm", "svg"]);
  * HTML pages (common for AI-generated output).
  */
 function looksLikeMarkup(code: string): boolean {
-  const head = code.trimStart().slice(0, 256).toLowerCase();
+  const head = code.trimStart().slice(0, 256).toLowerCase()
   return (
-    head.startsWith("<!doctype") ||
-    head.startsWith("<html") ||
-    head.startsWith("<svg")
-  );
+    head.startsWith('<!doctype') ||
+    head.startsWith('<html') ||
+    head.startsWith('<svg')
+  )
 }
 
 /** File extension used when downloading a code block. */
 const EXTENSIONS: Record<string, string> = {
-  html: "html",
-  htm: "html",
-  svg: "svg",
-  javascript: "js",
-  js: "js",
-  typescript: "ts",
-  ts: "ts",
-  tsx: "tsx",
-  jsx: "jsx",
-  css: "css",
-  json: "json",
-  python: "py",
-  py: "py",
-  bash: "sh",
-  sh: "sh",
-  markdown: "md",
-  md: "md",
-  xml: "xml",
-  yml: "yml",
-  yaml: "yaml"
-};
+  html: 'html',
+  htm: 'html',
+  svg: 'svg',
+  javascript: 'js',
+  js: 'js',
+  typescript: 'ts',
+  ts: 'ts',
+  tsx: 'tsx',
+  jsx: 'jsx',
+  css: 'css',
+  json: 'json',
+  python: 'py',
+  py: 'py',
+  bash: 'sh',
+  sh: 'sh',
+  markdown: 'md',
+  md: 'md',
+  xml: 'xml',
+  yml: 'yml',
+  yaml: 'yaml'
+}
 
 function normalizeLang(lang: string | undefined): string {
-  if (!lang) return "text";
-  const l = lang.toLowerCase();
+  if (!lang) return 'text'
+  const l = lang.toLowerCase()
   // Map common aliases to a stable key used for extensions/preview.
-  if (l === "js") return "javascript";
-  if (l === "ts") return "typescript";
-  if (l === "py") return "python";
-  if (l === "sh" || l === "shell" || l === "zsh") return "bash";
-  if (l === "md") return "markdown";
-  if (l === "yml") return "yaml";
-  return l;
+  if (l === 'js') return 'javascript'
+  if (l === 'ts') return 'typescript'
+  if (l === 'py') return 'python'
+  if (l === 'sh' || l === 'shell' || l === 'zsh') return 'bash'
+  if (l === 'md') return 'markdown'
+  if (l === 'yml') return 'yaml'
+  return l
 }
 
 function getFileName(
@@ -88,10 +90,10 @@ function getFileName(
 ): string | undefined {
   if (meta && meta.trim().length > 0) {
     // A filename (with or without extension) was provided after the language.
-    const candidate = meta.trim().split(/\s+/)[0];
-    if (candidate && !candidate.includes(" ")) return candidate;
+    const candidate = meta.trim().split(/\s+/)[0]
+    if (candidate && !candidate.includes(' ')) return candidate
   }
-  return undefined;
+  return undefined
 }
 
 /**
@@ -128,26 +130,29 @@ function getFileName(
  * is never rewritten.
  */
 const PREVIEW_SANDBOX =
-  "allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox";
+  'allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox'
 
 // Injected into the iframe document head ONLY (not into the user's code logic).
 // Provides a non-throwing storage shim for sandboxed iframes and reports JS
 // errors to the parent window. Active only when the native API is unavailable.
-const PREVIEW_BOOTSTRAP = `<script>(function(){try{function s(){var m={};return{getItem:function(k){return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null},setItem:function(k,v){m[k]=String(v)},removeItem:function(k){delete m[k]},clear:function(){m={}},key:function(i){return Object.keys(m)[i]||null},get length(){return Object.keys(m).length}}}try{window.localStorage.getItem("__p")}catch(e){Object.defineProperty(window,"localStorage",{configurable:true,value:s()})}try{window.sessionStorage.getItem("__p")}catch(e){Object.defineProperty(window,"sessionStorage",{configurable:true,value:s()})}}catch(e){}function r(p){try{parent.postMessage(Object.assign({__previewError:true},p),"*")}catch(e){}}window.addEventListener("error",function(ev){var e2=ev.error;r({message:ev.message||"Script error",stack:e2&&e2.stack?e2.stack:""})});window.addEventListener("unhandledrejection",function(ev){var rr=ev.reason;r({message:rr&&rr.message?rr.message:String(rr),stack:rr&&rr.stack?rr.stack:""})})})();<\/script>`;
+const PREVIEW_BOOTSTRAP = `<script>(function(){try{function s(){var m={};return{getItem:function(k){return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null},setItem:function(k,v){m[k]=String(v)},removeItem:function(k){delete m[k]},clear:function(){m={}},key:function(i){return Object.keys(m)[i]||null},get length(){return Object.keys(m).length}}}try{window.localStorage.getItem("__p")}catch(e){Object.defineProperty(window,"localStorage",{configurable:true,value:s()})}try{window.sessionStorage.getItem("__p")}catch(e){Object.defineProperty(window,"sessionStorage",{configurable:true,value:s()})}}catch(e){}function r(p){try{parent.postMessage(Object.assign({__previewError:true},p),"*")}catch(e){}}window.addEventListener("error",function(ev){var e2=ev.error;r({message:ev.message||"Script error",stack:e2&&e2.stack?e2.stack:""})});window.addEventListener("unhandledrejection",function(ev){var rr=ev.reason;r({message:rr&&rr.message?rr.message:String(rr),stack:rr&&rr.stack?rr.stack:""})})})();<\/script>`
 
 function buildPreviewSrcDoc(code: string): string {
   if (/<head[^>]*>/i.test(code)) {
-    return code.replace(/<head([^>]*)>/i, `<head$1>${PREVIEW_BOOTSTRAP}`);
+    return code.replace(/<head([^>]*)>/i, `<head$1>${PREVIEW_BOOTSTRAP}`)
   }
   if (/<html[^>]*>/i.test(code)) {
-    return code.replace(/<html([^>]*)>/i, `<html$1><head>${PREVIEW_BOOTSTRAP}</head>`);
+    return code.replace(
+      /<html([^>]*)>/i,
+      `<html$1><head>${PREVIEW_BOOTSTRAP}</head>`
+    )
   }
-  return `<!doctype html><html><head>${PREVIEW_BOOTSTRAP}</head>${code}`;
+  return `<!doctype html><html><head>${PREVIEW_BOOTSTRAP}</head>${code}`
 }
 
 function PreviewBody({ language, code }: { language: string; code: string }) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [runtimeError, setRuntimeError] = useState<string | null>(null)
 
   // The generated code is rendered as-is into an isolated iframe; we never
   // rewrite it. A small bootstrap (injected only inside the iframe) reports
@@ -159,40 +164,41 @@ function PreviewBody({ language, code }: { language: string; code: string }) {
   // freeze the whole tab (observed with the non-thinking model). We only commit
   // a new srcDoc once the code has stopped changing for a short window, so the
   // preview settles to the final artifact instead of thrashing during streaming.
-  const [srcDoc, setSrcDoc] = useState(() => buildPreviewSrcDoc(code));
+  const [srcDoc, setSrcDoc] = useState(() => buildPreviewSrcDoc(code))
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setSrcDoc(buildPreviewSrcDoc(code));
-      setRuntimeError(null);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [code]);
+      setSrcDoc(buildPreviewSrcDoc(code))
+      setRuntimeError(null)
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [code])
 
   useEffect(() => {
     function onMessage(e: MessageEvent) {
-      if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
+      if (!iframeRef.current || e.source !== iframeRef.current.contentWindow)
+        return
       const data = e.data as
         | { __previewError?: boolean; message?: string; stack?: string }
-        | undefined;
+        | undefined
       if (data && data.__previewError) {
         setRuntimeError(
-          `${data.message ?? "Unknown error"}${data.stack ? `\n${data.stack}` : ""}`
-        );
+          `${data.message ?? 'Unknown error'}${data.stack ? `\n${data.stack}` : ''}`
+        )
       }
     }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
 
-  if (language === "svg") {
+  if (language === 'svg') {
     return (
       <div
         className="flex min-h-[12rem] items-center justify-center bg-white p-4 text-sm"
         // SVG is static and safe to inline; it cannot execute scripts.
         dangerouslySetInnerHTML={{ __html: code }}
       />
-    );
+    )
   }
 
   return (
@@ -213,85 +219,83 @@ function PreviewBody({ language, code }: { language: string; code: string }) {
         </div>
       )}
     </div>
-  );
+  )
 }
 
 function StandardCodeBlock({
   language,
   code,
-  meta,
+  meta
 }: {
-  language: string;
-  code: string;
-  meta?: string;
+  language: string
+  code: string
+  meta?: string
 }) {
   const previewable =
     PREVIEWABLE.has(language) ||
-    ((language === "xml" ||
-      language === "markup" ||
-      language === "text") &&
-      looksLikeMarkup(code));
-  const [copied, setCopied] = useState(false);
+    ((language === 'xml' || language === 'markup' || language === 'text') &&
+      looksLikeMarkup(code))
+  const [copied, setCopied] = useState(false)
   // Previews open by default once a visualizable block (html/svg) finishes
   // generating, so the rendered result shows first; the user can switch to Code.
-  const [showPreview, setShowPreview] = useState(previewable);
+  const [showPreview, setShowPreview] = useState(previewable)
   // Fullscreen preview overlay (opened by the expand button in the header).
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false)
 
   // Close the fullscreen preview with Escape and lock background scroll while
   // it is open.
   useEffect(() => {
-    if (!expanded) return;
+    if (!expanded) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setExpanded(false);
-    };
-    document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+      if (e.key === 'Escape') setExpanded(false)
+    }
+    document.addEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [expanded]);
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [expanded])
 
   const fileName = useMemo(() => {
-    const provided = getFileName(language, meta);
-    if (provided) return provided;
-    const ext = EXTENSIONS[language];
-    if (ext) return `code.${ext}`;
-    return undefined;
-  }, [language, meta]);
+    const provided = getFileName(language, meta)
+    if (provided) return provided
+    const ext = EXTENSIONS[language]
+    if (ext) return `code.${ext}`
+    return undefined
+  }, [language, meta])
 
-  const downloadExt = fileName?.includes(".")
-    ? ""
+  const downloadExt = fileName?.includes('.')
+    ? ''
     : EXTENSIONS[language]
       ? `.${EXTENSIONS[language]}`
-      : "";
+      : ''
 
   const onCopy = async () => {
     try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
     } catch {
       /* ignore */
     }
-  };
+  }
 
   const onDownload = () => {
-    const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${fileName ?? "code"}${downloadExt}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
+    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${fileName ?? 'code'}${downloadExt}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
 
-  const label = fileName ?? (language === "text" ? "code" : language);
-  const lineCount = useMemo(() => code.split("\n").length, [code]);
+  const label = fileName ?? (language === 'text' ? 'code' : language)
+  const lineCount = useMemo(() => code.split('\n').length, [code])
 
   return (
     <div className="group relative my-4 overflow-hidden rounded-xl border border-border/60 bg-muted/30 shadow-sm">
@@ -316,9 +320,9 @@ function StandardCodeBlock({
           {previewable && (
             <button
               type="button"
-              onClick={() => setShowPreview((v) => !v)}
-              aria-label={showPreview ? "Show code" : "Show preview"}
-              title={showPreview ? "Show code" : "Show preview"}
+              onClick={() => setShowPreview(v => !v)}
+              aria-label={showPreview ? 'Show code' : 'Show preview'}
+              title={showPreview ? 'Show code' : 'Show preview'}
               aria-pressed={showPreview}
               className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
@@ -371,12 +375,15 @@ function StandardCodeBlock({
           <PreviewBody language={language} code={code} />
         </div>
       ) : (
-        <SyntaxHighlighter language={language} className="overflow-auto text-sm">
+        <SyntaxHighlighter
+          language={language}
+          className="overflow-auto text-sm"
+        >
           {code}
         </SyntaxHighlighter>
       )}
 
-      {expanded && previewable && typeof document !== "undefined"
+      {expanded && previewable && typeof document !== 'undefined'
         ? createPortal(
             <div
               role="dialog"
@@ -402,11 +409,11 @@ function StandardCodeBlock({
                 <PreviewBody language={language} code={code} />
               </div>
             </div>,
-            document.body,
+            document.body
           )
         : null}
     </div>
-  );
+  )
 }
 
 export function CodeBlock({
@@ -415,21 +422,21 @@ export function CodeBlock({
   node,
   ...props
 }: {
-  children?: unknown;
-  className?: string;
-  node?: { properties?: { metastring?: string; className?: string[] } };
-  [key: string]: unknown;
+  children?: unknown
+  className?: string
+  node?: { properties?: { metastring?: string; className?: string[] } }
+  [key: string]: unknown
 }) {
   const rawLang =
-    typeof className === "string" ? LANG_RE.exec(className)?.[1] : undefined;
-  const language = normalizeLang(rawLang);
-  const code = extractCode(children);
-  const meta = node?.properties?.metastring;
+    typeof className === 'string' ? LANG_RE.exec(className)?.[1] : undefined
+  const language = normalizeLang(rawLang)
+  const code = extractCode(children)
+  const meta = node?.properties?.metastring
 
   // `spec` fences drive the Generated UI (Related questions / Images).
-  if (language === "spec") {
-    return <SpecFenceBlock source={code} />;
+  if (language === 'spec') {
+    return <SpecFenceBlock source={code} />
   }
 
-  return <StandardCodeBlock language={language} code={code} meta={meta} />;
+  return <StandardCodeBlock language={language} code={code} meta={meta} />
 }

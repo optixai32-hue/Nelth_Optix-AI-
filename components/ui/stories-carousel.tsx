@@ -1,46 +1,47 @@
-'use client';
+'use client'
 
-import type {
-  ComponentProps,
-  HTMLAttributes,
-  VideoHTMLAttributes,
-} from 'react';
-import { useEffect, useRef } from 'react';
+import type { ComponentProps, HTMLAttributes, VideoHTMLAttributes } from 'react'
+import { useEffect, useRef } from 'react'
 
-import { type ClassValue,clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
-  CarouselPrevious,
-} from '@/components/ui/carousel';
+  CarouselPrevious
+} from '@/components/ui/carousel'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export type StoriesProps = ComponentProps<typeof Carousel>;
+export type StoriesProps = ComponentProps<typeof Carousel>
 
-export const Stories = ({ className, opts, children, ...props }: StoriesProps) => (
+export const Stories = ({
+  className,
+  opts,
+  children,
+  ...props
+}: StoriesProps) => (
   <Carousel
     className={cn('w-full', className)}
     opts={{
       align: 'start',
       loop: false,
       dragFree: true,
-      ...opts,
+      ...opts
     }}
     {...props}
   >
     {children}
   </Carousel>
-);
+)
 
-export type StoriesNavProps = ComponentProps<typeof CarouselPrevious>;
+export type StoriesNavProps = ComponentProps<typeof CarouselPrevious>
 
 export const StoriesPrevious = ({ className, ...props }: StoriesNavProps) => (
   <CarouselPrevious
@@ -51,7 +52,7 @@ export const StoriesPrevious = ({ className, ...props }: StoriesNavProps) => (
     )}
     {...props}
   />
-);
+)
 
 export const StoriesNext = ({ className, ...props }: StoriesNavProps) => (
   <CarouselNext
@@ -62,18 +63,18 @@ export const StoriesNext = ({ className, ...props }: StoriesNavProps) => (
     )}
     {...props}
   />
-);
+)
 
-export type StoriesContentProps = ComponentProps<typeof CarouselContent>;
+export type StoriesContentProps = ComponentProps<typeof CarouselContent>
 
 export const StoriesContent = ({
   className,
   ...props
 }: StoriesContentProps) => (
   <CarouselContent className={cn('gap-2', className)} {...props} />
-);
+)
 
-export type StoryProps = HTMLAttributes<HTMLDivElement>;
+export type StoryProps = HTMLAttributes<HTMLDivElement>
 
 export const Story = ({ className, ...props }: StoryProps) => (
   <CarouselItem className={cn('basis-auto !w-[170px] pl-2 md:pl-4', className)}>
@@ -90,60 +91,60 @@ export const Story = ({ className, ...props }: StoryProps) => (
       {...props}
     />
   </CarouselItem>
-);
+)
 
-export type StoryVideoProps = VideoHTMLAttributes<HTMLVideoElement>;
+export type StoryVideoProps = VideoHTMLAttributes<HTMLVideoElement>
 
-const tRegex = /t=(\d+(?:\.\d+)?)/;
+const tRegex = /t=(\d+(?:\.\d+)?)/
 
 export const StoryVideo = ({ className, ...props }: StoryVideoProps) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const initialTimeRef = useRef<number>(0);
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const initialTimeRef = useRef<number>(0)
 
   useEffect(() => {
-    const src = (props.src ?? '') as string;
-    let initialTime = 0;
+    const src = (props.src ?? '') as string
+    let initialTime = 0
     if (typeof src === 'string') {
-      const hashIndex = src.indexOf('#');
+      const hashIndex = src.indexOf('#')
       if (hashIndex !== -1) {
-        const hash = src.slice(hashIndex + 1);
+        const hash = src.slice(hashIndex + 1)
 
-        const tMatch = hash.match(tRegex);
+        const tMatch = hash.match(tRegex)
         if (tMatch) {
-          initialTime = Number.parseFloat(tMatch[1]);
+          initialTime = Number.parseFloat(tMatch[1])
         }
       }
     }
-    initialTimeRef.current = initialTime;
-  }, [props.src]);
+    initialTimeRef.current = initialTime
+  }, [props.src])
 
   const handleMouseOver = () => {
-    const playPromise = videoRef.current?.play();
+    const playPromise = videoRef.current?.play()
     if (playPromise) {
-      playPromise.catch(() => {});
+      playPromise.catch(() => {})
     }
-  };
+  }
 
   const handleMouseOut = () => {
     if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = initialTimeRef.current;
+      videoRef.current.pause()
+      videoRef.current.currentTime = initialTimeRef.current
     }
-  };
+  }
 
   const handleFocus = () => {
-    const playPromise = videoRef.current?.play();
+    const playPromise = videoRef.current?.play()
     if (playPromise) {
-      playPromise.catch(() => {});
+      playPromise.catch(() => {})
     }
-  };
+  }
 
   const handleBlur = () => {
     if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = initialTimeRef.current;
+      videoRef.current.pause()
+      videoRef.current.currentTime = initialTimeRef.current
     }
-  };
+  }
 
   return (
     <video
@@ -164,12 +165,12 @@ export const StoryVideo = ({ className, ...props }: StoryVideoProps) => {
       tabIndex={0}
       {...props}
     />
-  );
-};
+  )
+}
 
 export type StoryImageProps = ComponentProps<'img'> & {
-  alt: string;
-};
+  alt: string
+}
 
 export const StoryImage = ({ className, alt, ...props }: StoryImageProps) => (
   <img
@@ -182,9 +183,9 @@ export const StoryImage = ({ className, alt, ...props }: StoryImageProps) => (
     )}
     {...props}
   />
-);
+)
 
-export type StoryAuthorProps = HTMLAttributes<HTMLDivElement>;
+export type StoryAuthorProps = HTMLAttributes<HTMLDivElement>
 
 export const StoryAuthor = ({
   className,
@@ -201,13 +202,13 @@ export const StoryAuthor = ({
   >
     <div className="flex items-center gap-2">{children}</div>
   </div>
-);
+)
 
 export type StoryAuthorImageProps = ComponentProps<typeof Avatar> & {
-  src?: string;
-  name?: string;
-  fallback?: string;
-};
+  src?: string
+  name?: string
+  fallback?: string
+}
 
 export const StoryAuthorImage = ({
   src,
@@ -218,13 +219,13 @@ export const StoryAuthorImage = ({
 }: StoryAuthorImageProps) => (
   <Avatar className={cn('size-6 border border-white/20', className)} {...props}>
     {src && <AvatarImage alt={name} src={src} />}
-    <AvatarFallback className='bg-white/10 text-white text-xs'>
+    <AvatarFallback className="bg-white/10 text-white text-xs">
       {fallback || name?.charAt(0)?.toUpperCase()}
     </AvatarFallback>
   </Avatar>
-);
+)
 
-export type StoryAuthorNameProps = HTMLAttributes<HTMLSpanElement>;
+export type StoryAuthorNameProps = HTMLAttributes<HTMLSpanElement>
 
 export const StoryAuthorName = ({
   className,
@@ -234,9 +235,9 @@ export const StoryAuthorName = ({
     className={cn('font-medium text-sm leading-snug break-words', className)}
     {...props}
   />
-);
+)
 
-export type StoryTitleProps = HTMLAttributes<HTMLDivElement>;
+export type StoryTitleProps = HTMLAttributes<HTMLDivElement>
 
 export const StoryTitle = ({ className, ...props }: StoryTitleProps) => (
   <div
@@ -247,11 +248,11 @@ export const StoryTitle = ({ className, ...props }: StoryTitleProps) => (
     )}
     {...props}
   />
-);
+)
 
 export type StoryOverlayProps = HTMLAttributes<HTMLDivElement> & {
-  side?: 'top' | 'bottom';
-};
+  side?: 'top' | 'bottom'
+}
 
 export const StoryOverlay = ({
   className,
@@ -259,7 +260,7 @@ export const StoryOverlay = ({
   ...props
 }: StoryOverlayProps) => {
   const positionClasses =
-    side === 'top' ? 'top-0 bg-gradient-to-b' : 'bottom-0 bg-gradient-to-t';
+    side === 'top' ? 'top-0 bg-gradient-to-b' : 'bottom-0 bg-gradient-to-t'
 
   return (
     <div
@@ -270,5 +271,5 @@ export const StoryOverlay = ({
       )}
       {...props}
     />
-  );
-};
+  )
+}

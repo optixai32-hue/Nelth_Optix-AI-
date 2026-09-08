@@ -51,7 +51,9 @@ describe('buildInvoiceModel', () => {
     expect(m.taxLabel).toBe('TVA 20 %')
     expect(m.tax).toBe('626,00 €')
     expect(m.total).toBe('3 756,00 €')
-    expect(m.paymentTerms.some(t => /paiement d. sous 15 jours/i.test(t))).toBe(true)
+    expect(m.paymentTerms.some(t => /paiement d. sous 15 jours/i.test(t))).toBe(
+      true
+    )
     expect(m.bank.some(b => /IBAN/.test(b))).toBe(true)
     expect(m.footer).toMatch(/Merci/)
   })
@@ -69,7 +71,14 @@ describe('buildInvoiceModel', () => {
         brand: 'ACME',
         invoiceNumber: 'INV-9',
         customer: ['Jane'],
-        items: [{ description: 'Consulting', qty: '2', unitPrice: '100,00 €', total: '200,00 €' }],
+        items: [
+          {
+            description: 'Consulting',
+            qty: '2',
+            unitPrice: '100,00 €',
+            total: '200,00 €'
+          }
+        ],
         subtotal: '200,00 €',
         tax: '40,00 €',
         total: '240,00 €'

@@ -30,6 +30,8 @@ for (const [q, expected] of cases) {
   const r = classifyVisualIntent(q)
   const ok = r.intent === expected
   if (ok) pass++
-  console.log(`${ok ? 'OK ' : 'XX '} [${r.intent.padEnd(12)} s=${r.score}] ${q}  (${ok ? '' : 'expected ' + expected + ' — ' + r.reason})`)
+  console.log(
+    `${ok ? 'OK ' : 'XX '} [${r.intent.padEnd(12)} s=${r.score}] ${q}  (${ok ? '' : 'expected ' + expected + ' — ' + r.reason})`
+  )
 }
 console.log(`\n${pass}/${cases.length} passed`)

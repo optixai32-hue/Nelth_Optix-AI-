@@ -131,7 +131,9 @@ export function RenderMessage({
   const messageSearchResults: SearchResultItem[] =
     searchResults ??
     (message.parts ?? [])
-      .filter((p: any) => p.type === 'tool-search' && p.state === 'output-available')
+      .filter(
+        (p: any) => p.type === 'tool-search' && p.state === 'output-available'
+      )
       .flatMap((p: any) => {
         const output = p.output ?? {}
         return [
@@ -143,7 +145,8 @@ export function RenderMessage({
           })),
           ...(output.images ?? []).map((img: any) => ({
             title: typeof img === 'string' ? '' : (img.title ?? ''),
-            url: typeof img === 'string' ? img : (img.sourceUrl ?? img.url ?? ''),
+            url:
+              typeof img === 'string' ? img : (img.sourceUrl ?? img.url ?? ''),
             content: typeof img === 'string' ? '' : (img.description ?? '')
           }))
         ].filter((r: any) => r && r.url) as SearchResultItem[]

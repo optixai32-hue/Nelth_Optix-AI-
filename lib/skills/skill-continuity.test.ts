@@ -88,24 +88,20 @@ describe('TEST 2/3/4 — follow-up keeps the skill ACTIVE', () => {
 describe('Router inheritance (existing router, no new one)', () => {
   it('inherits previous skill on variation', async () => {
     const registry = await getSkillRegistry()
-    const selected = routeSkills(
-      'Make another version',
-      registry,
-      undefined,
-      ['frontend-design']
-    )
+    const selected = routeSkills('Make another version', registry, undefined, [
+      'frontend-design'
+    ])
     expect(selected.map(s => s.slug)).toContain('frontend-design')
-    expect(selected.find(s => s.slug === 'frontend-design')?.inherited).toBe(true)
+    expect(selected.find(s => s.slug === 'frontend-design')?.inherited).toBe(
+      true
+    )
   })
 
   it('does NOT inherit when the user switches domain', async () => {
     const registry = await getSkillRegistry()
-    const selected = routeSkills(
-      'Write a python script',
-      registry,
-      undefined,
-      ['frontend-design']
-    )
+    const selected = routeSkills('Write a python script', registry, undefined, [
+      'frontend-design'
+    ])
     expect(selected.map(s => s.slug)).not.toContain('frontend-design')
   })
 })
@@ -182,9 +178,7 @@ describe('TEST 5/6/7/8/9/10 — continuity directives are genuinely injected', (
     expect(result.context).toContain('CURRENT ARTIFACT')
     expect(result.context).toContain('<!doctype html>')
     expect(result.context).toContain('BEGIN CURRENT ARTIFACT')
-    expect(result.context).toContain(
-      'EDIT THAT EXISTING CODE; do NOT say'
-    )
+    expect(result.context).toContain('EDIT THAT EXISTING CODE; do NOT say')
     expect(result.context).toContain('access to the previous code')
     // The hard emoji-as-icon gate is surfaced to the model.
     expect(result.context).toContain('HARD validation gate')
@@ -206,19 +200,26 @@ describe('TEST 5/6/7/8/9/10 — continuity directives are genuinely injected', (
 describe('getPreviousDesignContext — carries the previous code for in-place edits', () => {
   it('returns the previous assistant code as previousCode', async () => {
     const messages = [
-      { role: 'user', id: 'u1', parts: [{ type: 'text', text: 'Create modern landing page' }] },
+      {
+        role: 'user',
+        id: 'u1',
+        parts: [{ type: 'text', text: 'Create modern landing page' }]
+      },
       {
         role: 'assistant',
         id: 'a1',
         parts: [
           {
             type: 'text',
-            text:
-              'export default function Page(){return <div style={{fontFamily:"Inter",color:"#3366ff"}}>Hi</div>}'
+            text: 'export default function Page(){return <div style={{fontFamily:"Inter",color:"#3366ff"}}>Hi</div>}'
           }
         ]
       },
-      { role: 'user', id: 'u2', parts: [{ type: 'text', text: 'Improve the animation' }] }
+      {
+        role: 'user',
+        id: 'u2',
+        parts: [{ type: 'text', text: 'Improve the animation' }]
+      }
     ]
     const prev = await getPreviousDesignContext(messages, 'u2')
     expect(prev.slugs).toContain('frontend-design')
@@ -230,19 +231,26 @@ describe('getPreviousDesignContext — carries the previous code for in-place ed
 describe('getPreviousDesignContext — derives continuity from history', () => {
   it('recovers the previous active skill from the prior user turn', async () => {
     const messages = [
-      { role: 'user', id: 'u1', parts: [{ type: 'text', text: 'Create modern landing page' }] },
+      {
+        role: 'user',
+        id: 'u1',
+        parts: [{ type: 'text', text: 'Create modern landing page' }]
+      },
       {
         role: 'assistant',
         id: 'a1',
         parts: [
           {
             type: 'text',
-            text:
-              'export default function Page(){return <div style={{fontFamily:"Inter",color:"#3366ff"}}>Hi</div>}'
+            text: 'export default function Page(){return <div style={{fontFamily:"Inter",color:"#3366ff"}}>Hi</div>}'
           }
         ]
       },
-      { role: 'user', id: 'u2', parts: [{ type: 'text', text: 'Make another version' }] }
+      {
+        role: 'user',
+        id: 'u2',
+        parts: [{ type: 'text', text: 'Make another version' }]
+      }
     ]
     const prev = await getPreviousDesignContext(messages, 'u2')
     expect(prev.slugs).toContain('frontend-design')
@@ -253,7 +261,11 @@ describe('getPreviousDesignContext — derives continuity from history', () => {
 
   it('returns empty for a first message (no previous turn)', async () => {
     const messages = [
-      { role: 'user', id: 'u1', parts: [{ type: 'text', text: 'Create modern landing page' }] }
+      {
+        role: 'user',
+        id: 'u1',
+        parts: [{ type: 'text', text: 'Create modern landing page' }]
+      }
     ]
     const prev = await getPreviousDesignContext(messages, 'u1')
     expect(prev.slugs).toHaveLength(0)
@@ -265,17 +277,27 @@ describe('Follow-up INTENT classification (spec §2)', () => {
     expect(classifyFollowUpIntent('Make it dark')).toBe('MODIFY_EXISTING')
     expect(classifyFollowUpIntent('Change the colors')).toBe('MODIFY_EXISTING')
     expect(classifyFollowUpIntent('Fix the button')).toBe('MODIFY_EXISTING')
-    expect(classifyFollowUpIntent('Make the navbar smaller')).toBe('MODIFY_EXISTING')
+    expect(classifyFollowUpIntent('Make the navbar smaller')).toBe(
+      'MODIFY_EXISTING'
+    )
     expect(classifyFollowUpIntent('Change the hero')).toBe('MODIFY_EXISTING')
-    expect(classifyFollowUpIntent('Improve the animation')).toBe('MODIFY_EXISTING')
+    expect(classifyFollowUpIntent('Improve the animation')).toBe(
+      'MODIFY_EXISTING'
+    )
     expect(classifyFollowUpIntent('Make it responsive')).toBe('MODIFY_EXISTING')
-    expect(classifyFollowUpIntent('Fix the mobile menu')).toBe('MODIFY_EXISTING')
-    expect(classifyFollowUpIntent('Make the button blue')).toBe('MODIFY_EXISTING')
+    expect(classifyFollowUpIntent('Fix the mobile menu')).toBe(
+      'MODIFY_EXISTING'
+    )
+    expect(classifyFollowUpIntent('Make the button blue')).toBe(
+      'MODIFY_EXISTING'
+    )
   })
 
   it('classifies appends as ADD_TO_EXISTING', () => {
     expect(classifyFollowUpIntent('Add pricing')).toBe('ADD_TO_EXISTING')
-    expect(classifyFollowUpIntent('Add a pricing section')).toBe('ADD_TO_EXISTING')
+    expect(classifyFollowUpIntent('Add a pricing section')).toBe(
+      'ADD_TO_EXISTING'
+    )
     expect(classifyFollowUpIntent('Add testimonials')).toBe('ADD_TO_EXISTING')
     expect(classifyFollowUpIntent('Add a contact form')).toBe('ADD_TO_EXISTING')
     expect(classifyFollowUpIntent('Add dark mode')).toBe('ADD_TO_EXISTING')
@@ -283,16 +305,28 @@ describe('Follow-up INTENT classification (spec §2)', () => {
   })
 
   it('classifies restyles as VARIATION_REQUEST', () => {
-    expect(classifyFollowUpIntent('Make another version')).toBe('VARIATION_REQUEST')
-    expect(classifyFollowUpIntent('Make it more futuristic')).toBe('VARIATION_REQUEST')
-    expect(classifyFollowUpIntent('Try a completely different style')).toBe('VARIATION_REQUEST')
-    expect(classifyFollowUpIntent('Give me a completely different design')).toBe('VARIATION_REQUEST')
+    expect(classifyFollowUpIntent('Make another version')).toBe(
+      'VARIATION_REQUEST'
+    )
+    expect(classifyFollowUpIntent('Make it more futuristic')).toBe(
+      'VARIATION_REQUEST'
+    )
+    expect(classifyFollowUpIntent('Try a completely different style')).toBe(
+      'VARIATION_REQUEST'
+    )
+    expect(
+      classifyFollowUpIntent('Give me a completely different design')
+    ).toBe('VARIATION_REQUEST')
     expect(classifyFollowUpIntent('Refais le design')).toBe('VARIATION_REQUEST')
-    expect(classifyFollowUpIntent('Try something more premium')).toBe('VARIATION_REQUEST')
+    expect(classifyFollowUpIntent('Try something more premium')).toBe(
+      'VARIATION_REQUEST'
+    )
   })
 
   it('classifies full throwaways as REBUILD_REQUEST', () => {
-    expect(classifyFollowUpIntent('Rebuild it from scratch')).toBe('REBUILD_REQUEST')
+    expect(classifyFollowUpIntent('Rebuild it from scratch')).toBe(
+      'REBUILD_REQUEST'
+    )
     expect(classifyFollowUpIntent('Start over')).toBe('REBUILD_REQUEST')
   })
 

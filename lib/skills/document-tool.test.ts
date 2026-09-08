@@ -22,7 +22,9 @@ describe('TEST 5/6/7/8 — document tool create + artifact', () => {
       operation: 'create',
       format: 'docx',
       fileName: 'analysis.docx',
-      spec: { sections: [{ heading: 'Summary', paragraphs: ['Real content here.'] }] }
+      spec: {
+        sections: [{ heading: 'Summary', paragraphs: ['Real content here.'] }]
+      }
     })) as any
 
     expect(result.success).toBe(true)
@@ -39,7 +41,11 @@ describe('TEST 5/6/7/8 — document tool create + artifact', () => {
   it('creates a PDF, XLSX and PPTX with valid artifacts', async () => {
     for (const [format, fileName, mime] of [
       ['pdf', 'export.pdf', 'application/pdf'],
-      ['xlsx', 'data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+      [
+        'xlsx',
+        'data.xlsx',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ],
       [
         'pptx',
         'deck.pptx',

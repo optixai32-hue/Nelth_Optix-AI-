@@ -6,9 +6,14 @@ import { renderPdf } from './document-renderers/pdf/renderer'
 import { renderPptx } from './document-renderers/pptx/renderer'
 import { renderSvg } from './document-renderers/svg/renderer'
 import { renderXlsx } from './document-renderers/xlsx/renderer'
-import { astToLegacySpec,isLegacySpec, normalizeToAst, validateAst } from './document-ast'
+import {
+  astToLegacySpec,
+  isLegacySpec,
+  normalizeToAst,
+  validateAst
+} from './document-ast'
 import { hasRenderer } from './document-capabilities'
-import { buildMarkdownSource,createDocument } from './document-runtime'
+import { buildMarkdownSource, createDocument } from './document-runtime'
 
 export interface GenerateRequest {
   format: string
@@ -33,7 +38,13 @@ export interface GenerateResult {
  * regression). AST / Markdown input flows through the AST core; formats without
  * a dedicated renderer fall back to the legacy engine via `astToLegacySpec`.
  */
-const AST_RENDERERS: Record<string, (ast: DocumentAST, opts: { premium?: boolean; template?: string; accent?: string }) => Promise<Buffer>> = {
+const AST_RENDERERS: Record<
+  string,
+  (
+    ast: DocumentAST,
+    opts: { premium?: boolean; template?: string; accent?: string }
+  ) => Promise<Buffer>
+> = {
   pdf: renderPdf,
   markdown: renderMarkdown,
   html: renderHtml,
@@ -62,7 +73,11 @@ function isAstContent(value: unknown): boolean {
 
 export async function generateDocument(req: GenerateRequest): Promise<Buffer> {
   const { format, content } = req
-  const opts = { premium: req.premium, template: req.template, accent: req.accent }
+  const opts = {
+    premium: req.premium,
+    template: req.template,
+    accent: req.accent
+  }
   // A format is AST-native when a dedicated renderer exists for it. Derived from
   // the capability registry so the format list lives in ONE place (no hardcoded
   // branching in the core).

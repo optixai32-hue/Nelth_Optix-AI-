@@ -23,12 +23,64 @@ const HOMOGRAPH_FOLDED_TOKENS = new Set(['resume'])
  * skills. Routing therefore relies on the curated `triggers` and skill `name`.
  */
 const STOPWORDS = new Set([
-  'a', 'an', 'the', 'to', 'of', 'in', 'on', 'for', 'with', 'and', 'or', 'my',
-  'your', 'this', 'that', 'is', 'are', 'be', 'build', 'create', 'make', 'write',
-  'generate', 'produce', 'code', 'script', 'app', 'application', 'me', 'i',
-  'you', 'it', 'as', 'at', 'by', 'from', 'into', 'using', 'use', 'to', 'an',
-  'please', 'can', 'how', 'what', 'why', 'explain', 'show', 'get', 'set', 'new',
-  'modern', 'premium', 'professional', 'complete', 'simple', 'small', 'good'
+  'a',
+  'an',
+  'the',
+  'to',
+  'of',
+  'in',
+  'on',
+  'for',
+  'with',
+  'and',
+  'or',
+  'my',
+  'your',
+  'this',
+  'that',
+  'is',
+  'are',
+  'be',
+  'build',
+  'create',
+  'make',
+  'write',
+  'generate',
+  'produce',
+  'code',
+  'script',
+  'app',
+  'application',
+  'me',
+  'i',
+  'you',
+  'it',
+  'as',
+  'at',
+  'by',
+  'from',
+  'into',
+  'using',
+  'use',
+  'to',
+  'an',
+  'please',
+  'can',
+  'how',
+  'what',
+  'why',
+  'explain',
+  'show',
+  'get',
+  'set',
+  'new',
+  'modern',
+  'premium',
+  'professional',
+  'complete',
+  'simple',
+  'small',
+  'good'
 ])
 
 /** Lowercase + accent-folded + Unicode-aware tokenization (keeps `+`, `#`, digits). */
@@ -288,7 +340,8 @@ const ADD_KEYWORDS = [
   'ampio',
   'ampiana'
 ]
-const ADD_PATTERN = /\b(new|extra|another|more)\s+(section|page|part|block|module|area|row)\b/i
+const ADD_PATTERN =
+  /\b(new|extra|another|more)\s+(section|page|part|block|module|area|row)\b/i
 
 // MODIFY_EXISTING signals: a small, surgical change to existing code. This is the
 // DEFAULT follow-up mode — when the user names a specific element/scope to change
@@ -350,7 +403,8 @@ const MODIFY_KEYWORDS = [
   'ovao',
   'ahitsio'
 ]
-const MODIFY_PATTERN = /\b(make|change|fix|adjust|update|improve|modify|turn|set)\b/i
+const MODIFY_PATTERN =
+  /\b(make|change|fix|adjust|update|improve|modify|turn|set)\b/i
 
 // Requests that clearly move to a different domain must not inherit the previous skill.
 const SWITCH_AWAY_PATTERN =
@@ -405,7 +459,10 @@ export function classifyFollowUpIntent(query: string): FollowUpIntent | null {
   if (REBUILD_KEYWORDS.some(k => q.includes(k))) {
     return 'REBUILD_REQUEST'
   }
-  if (VARIATION_ONLY_KEYWORDS.some(k => q.includes(k)) || VARIATION_PATTERN.test(q)) {
+  if (
+    VARIATION_ONLY_KEYWORDS.some(k => q.includes(k)) ||
+    VARIATION_PATTERN.test(q)
+  ) {
     return 'VARIATION_REQUEST'
   }
   if (MODIFY_KEYWORDS.some(k => q.includes(k)) || MODIFY_PATTERN.test(q)) {
@@ -514,7 +571,10 @@ function scoreSkill(
  * If none match, no references are loaded (strict progressive disclosure) —
  * the SKILL.md body already carries a reference guide summary.
  */
-function selectReferences(skill: SkillMeta, queryTokens: Set<string>): string[] {
+function selectReferences(
+  skill: SkillMeta,
+  queryTokens: Set<string>
+): string[] {
   const scored = skill.references
     .map(ref => {
       const stem = ref.replace(/\.md$/, '').replace(/[-_]/g, ' ')
@@ -620,12 +680,16 @@ export function routeSkills(
   // "not React". A skill whose name/slug is explicitly rejected must never be
   // activated — this is the routing-level enforcement of USER REQUEST OVERRIDES
   // (the model is also told to follow the user's tech in the execution protocol).
-  const excludesReact = /\b(no|without|not|never|avoid)\s+(react|react\.?js|framework)\b/i.test(
-    query
-  )
+  const excludesReact =
+    /\b(no|without|not|never|avoid)\s+(react|react\.?js|framework)\b/i.test(
+      query
+    )
   if (excludesReact) {
     for (let i = selections.length - 1; i >= 0; i--) {
-      if (/react/i.test(selections[i].slug) || /react/i.test(selections[i].name)) {
+      if (
+        /react/i.test(selections[i].slug) ||
+        /react/i.test(selections[i].name)
+      ) {
         selections.splice(i, 1)
       }
     }
@@ -692,7 +756,12 @@ export function routeSkills(
   // signal). Reuses the existing router — no second router is created.
   if (attachmentFormats && attachmentFormats.length > 0) {
     const fmtSet = new Set(
-      attachmentFormats.map(f => f.toLowerCase().replace(/^\./, '').replace(/\.(docx|dotx|xlsx|xlsm|pptx|pdf)$/, '$1'))
+      attachmentFormats.map(f =>
+        f
+          .toLowerCase()
+          .replace(/^\./, '')
+          .replace(/\.(docx|dotx|xlsx|xlsm|pptx|pdf)$/, '$1')
+      )
     )
     for (const skill of registry) {
       if (selections.some(s => s.slug === skill.slug)) continue

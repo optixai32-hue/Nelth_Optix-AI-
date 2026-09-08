@@ -155,8 +155,7 @@ export function ChatPanel({
   const rawName = user?.name || user?.email?.split('@')[0] || ''
   // Display only the first name (prénom), capitalized.
   const firstName = rawName.split(/\s+/)[0] || ''
-  const displayName =
-    firstName.charAt(0).toUpperCase() + firstName.slice(1)
+  const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1)
   // Stable initial value for SSR/first client render (no Math.random during
   // render) to avoid hydration mismatches; randomized on the client after mount.
   const [greeting, setGreeting] = useState(
@@ -385,9 +384,7 @@ export function ChatPanel({
             )
           } catch (e) {
             const reason =
-              e instanceof Error &&
-              e.message &&
-              e.message !== 'Upload failed'
+              e instanceof Error && e.message && e.message !== 'Upload failed'
                 ? `: ${e.message}`
                 : ''
             toast.error(`Failed to upload ${uf.file.name}${reason}`)
@@ -805,7 +802,10 @@ export function ChatPanel({
             </div>
           )}
           {uploadedFiles.length > 0 && (
-            <UploadedFileList files={uploadedFiles} onRemove={handleFileRemove} />
+            <UploadedFileList
+              files={uploadedFiles}
+              onRemove={handleFileRemove}
+            />
           )}
           <Textarea
             ref={inputRef}
@@ -937,7 +937,9 @@ export function ChatPanel({
                         // When a discussion is open the panel sits at the bottom,
                         // so open the menu upward to keep it in view. On the main
                         // (empty) view keep it opening downward.
-                        messages.length > 0 ? 'bottom-full mb-2' : 'top-full mt-2'
+                        messages.length > 0
+                          ? 'bottom-full mb-2'
+                          : 'top-full mt-2'
                       )}
                     >
                       <button
@@ -968,7 +970,7 @@ export function ChatPanel({
                 onAdaptiveAuthRequired={onAdaptiveModeAuthRequired}
               />
             </div>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               {messages.length > 0 && (
                 <Button
                   variant="outline"
@@ -1005,9 +1007,7 @@ export function ChatPanel({
                       : undefined
                 }
                 title={
-                  hasAvailableModels
-                    ? undefined
-                    : t('chat.noModelAvailable')
+                  hasAvailableModels ? undefined : t('chat.noModelAvailable')
                 }
               >
                 {isLoading ? (

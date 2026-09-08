@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 
 import { getAuth } from '@/lib/firebase/admin'
-import { hasFirebaseConfig,SESSION_COOKIE } from '@/lib/firebase/config'
+import { hasFirebaseConfig, SESSION_COOKIE } from '@/lib/firebase/config'
 import type { AppUser } from '@/lib/firebase/user'
 import { perfLog } from '@/lib/utils/perf-logging'
 import { incrementAuthCallCount } from '@/lib/utils/perf-tracking'

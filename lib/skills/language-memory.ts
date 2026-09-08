@@ -20,9 +20,7 @@ export function messageTextAny(message: AnyMessage | null | undefined): string {
   if (!message || typeof message !== 'object') return ''
   if (Array.isArray((message as { parts?: unknown }).parts)) {
     try {
-      return getTextFromParts(
-        (message as { parts?: never }).parts
-      ).trim()
+      return getTextFromParts((message as { parts?: never }).parts).trim()
     } catch {
       return ''
     }
@@ -32,7 +30,9 @@ export function messageTextAny(message: AnyMessage | null | undefined): string {
   if (Array.isArray(content)) {
     return content
       .map(part =>
-        part && typeof part === 'object' && (part as { type?: unknown }).type === 'text'
+        part &&
+        typeof part === 'object' &&
+        (part as { type?: unknown }).type === 'text'
           ? String((part as { text?: unknown }).text ?? '')
           : ''
       )
@@ -65,8 +65,7 @@ const norm = (text: string): string =>
     .filter(Boolean)
     .join(' ')} `
 
-const escRe = (s: string): string =>
-  s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const escRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 function countHits(folded: string, words: string[]): number {
   let n = 0
