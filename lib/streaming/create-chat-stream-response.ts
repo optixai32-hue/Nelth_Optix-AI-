@@ -561,6 +561,11 @@ export async function createChatStreamResponse(
       let wroteContent = false
       let wroteToolPart = false
       let writtenPartCount = 0
+      // For "lire mon dernier mail" fallback: keep the last Gmail read body
+      // so an empty model answer can be replaced with the actual mail content
+      // instead of a generic "Désolé...".
+      let lastGmailRead: { subject?: string; from?: string; body?: string } | null =
+        null
 
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
@@ -735,6 +740,24 @@ export async function createChatStreamResponse(
                   part.type.startsWith('tool-')
                 ) {
                   markTools()
+                  // Capture Gmail read body for empty-answer fallback.
+                  if (
+                    part.type === 'tool-gmail' &&
+                    (part as any).state === 'output-available'
+                  ) {
+                    const out = (part as any).output as {
+                      body?: string
+                      subject?: string
+                      from?: string
+                    } | undefined
+                    if (out?.body) {
+                      lastGmailRead = {
+                        subject: out.subject,
+                        from: out.from,
+                        body: out.body
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -778,6 +801,8 @@ export async function createChatStreamResponse(
             // render a blank bubble with no Retry. Inject an honest fallback
             // line instead (localized, counted as content so a trailing
             // stream error stays suppressed).
+            // For "lire mon dernier mail" we have the actual mail body from
+            // the tool/preload — show that instead of a generic apology.
             if (
               shouldInjectEmptyFallback({
                 wroteContent,
@@ -788,10 +813,37 @@ export async function createChatStreamResponse(
               console.error(
                 '[Stream] silent-empty response — injecting fallback text'
               )
+              let fallbackDelta: string | null = null
+              if (lastGmailRead?.body) {
+                const subj = lastGmailRead.subject || 'Mail'
+                const from = lastGmailRead.from
+                  ? `*De : ${lastGmailRead.from}*\n\n`
+                  : ''
+                fallbackDelta = `**${subj}**\n${from}${lastGmailRead.body}`
+              } else {
+                const preloadGmailRead = connectorPreloadCalls.find(
+                  c =>
+                    c.service === 'gmail' &&
+                    typeof (c.output as any)?.body === 'string' &&
+                    (c.output as any).body.trim()
+                )
+                if (preloadGmailRead) {
+                  const out = preloadGmailRead.output as {
+                    subject?: string
+                    from?: string
+                    body?: string
+                  }
+                  const subj = out.subject || 'Mail'
+                  const from = out.from ? `*De : ${out.from}*\n\n` : ''
+                  fallbackDelta = `**${subj}**\n${from}${out.body}`
+                }
+              }
               writer.write({
                 type: 'text-delta',
                 id: 'txt-0',
-                delta: emptyResponseText(conversationLanguage?.lang)
+                delta:
+                  fallbackDelta ??
+                  emptyResponseText(conversationLanguage?.lang)
               } as unknown as Parameters<typeof writer.write>[0])
               wroteContent = true
               writtenPartCount++
