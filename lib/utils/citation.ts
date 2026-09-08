@@ -135,13 +135,24 @@ function normalizeBareCitations(
 
   const expanded = expandGroupedCitations(content)
 
+  // Max valid citation number across all maps — bare [n] beyond this is a
+  // hallucinated citation (e.g. [11] when only 10 results exist) and must
+  // be stripped instead of left as raw "[11]" text alongside real inline
+  // citations.
+  const maxCitNum = Math.max(
+    0,
+    ...Object.values(citationMaps).flatMap(m =>
+      Object.keys(m)
+        .map(k => parseInt(k, 10))
+        .filter(n => !isNaN(n))
+    )
+  )
+
   return expanded.replace(
     /(?<![A-Za-z0-9_])\[\s*(\d{1,2})\s*\](?!\()/g,
     (_m, numStr) => {
       const num = parseInt(numStr, 10)
       // Only rewrite bare tokens that actually resolve to a search result.
-      // Anything else (array indices like arr[1], "section [12]", footnotes)
-      // is legitimate prose and must be left untouched — never deleted.
       if (citationMaps['preloaded-search']?.[num]) {
         return `[${num}](#preloaded-search)`
       }
@@ -149,6 +160,14 @@ function normalizeBareCitations(
       const foundId = toolCallIds.find(id => citationMaps[id]?.[num])
       if (foundId) {
         return `[${num}](#${foundId})`
+      }
+      // Hallucinated citation (e.g. [11] when max is 10) — strip it instead
+      // of leaving raw "[11]" alongside real inline citations. Legitimate
+      // prose like "section [12]" is kept when no search was performed
+      // (early return above) or when inside code blocks (handled by
+      // mapOutsideCodeBlocks).
+      if (maxCitNum > 0 && num >= 1 && num <= 100 && num > maxCitNum) {
+        return ''
       }
       return _m
     }

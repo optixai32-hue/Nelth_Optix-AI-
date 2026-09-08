@@ -215,6 +215,10 @@ export function hasToolCalls(message: UIMessage | null): boolean {
 const FAKE_TOOL_PATTERNS = [
   /<tool_calls?\b[^>]*>[\s\S]*?(?:<\/tool_calls?\b[^>]*>|<\/invoke\b[^>]*>|(?=<tool_calls?\b)|$)/gi,
   /<tool_call\b[^>]*>[\s\S]*?(?:<\/tool_call\b[^>]*>|<\/invoke\b[^>]*>|(?=<tool_calls?\b)|$)/gi,
+  // Dots/Laguna style: <dots_function_call>…</dots_function_call> (and any
+  // *_function_call variant the model may emit instead of native tool calls).
+  /<[^>]*function_call[^>]*>[\s\S]*?<\/?[^>]*function_call[^>]*>/gi,
+  /<\/?[^>]*function_call[^>]*\/?>/gi,
   // <invoke> / <function> only strip CLOSED blocks or attribute-carrying calls
   // (<invoke name="search">…). A bare unclosed tag is often legitimate prose
   // ("the <function> keyword") — deleting to end-of-answer would nuke a
@@ -418,6 +422,7 @@ export class StreamTextSanitizer {
       this.buffer.includes('</tool_calls>') ||
       this.buffer.includes('</function>') ||
       this.buffer.includes('</tool-search>') ||
+      this.buffer.includes('function_call') ||
       this.buffer.includes('<tool_call>') ||
       this.buffer.includes('<tool_calls>') ||
       this.buffer.includes('<tool-search>') ||
@@ -440,7 +445,8 @@ export class StreamTextSanitizer {
       this.buffer.includes('<function') ||
       this.buffer.includes('</function') ||
       this.buffer.includes('<tool-search') ||
-      this.buffer.includes('</tool-search')
+      this.buffer.includes('</tool-search') ||
+      this.buffer.includes('function_call')
 
     if (hasOpenToolTag) {
       // If buffer is growing very large (> 300 chars) or has double newline, flush cleaned
@@ -467,7 +473,8 @@ export class StreamTextSanitizer {
         '<function'.startsWith(potentialTag) ||
         '</function'.startsWith(potentialTag) ||
         '<tool-search'.startsWith(potentialTag) ||
-        '</tool-search'.startsWith(potentialTag)
+        '</tool-search'.startsWith(potentialTag) ||
+        'function_call'.startsWith(potentialTag.replace(/^</, ''))
 
       if (matchesPotential) {
         // Emit everything before the partial tag, hold partial tag in buffer
