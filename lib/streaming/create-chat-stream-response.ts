@@ -566,6 +566,17 @@ export async function createChatStreamResponse(
       // are emitted — so these stay null. The fallback below reads directly
       // from `connectorPreloadCalls` instead.
 
+      // DEBUG: log preload state before stream starts
+      if (connectorPreloadCalls.length > 0) {
+        console.log(
+          `[Stream] connectorPreloadCalls populated: ${connectorPreloadCalls.length} calls`,
+          connectorPreloadCalls.map(
+            c =>
+              `${c.service}(state=${c.output.state}, hasBody=${typeof (c.output as any).body === 'string'}, itemCount=${Array.isArray((c.output as any).items) ? (c.output as any).items.length : 0})`
+          )
+        )
+      }
+
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
           try {
@@ -778,6 +789,11 @@ export async function createChatStreamResponse(
               ).toUIMessageStream()
             }
 
+            // DEBUG: trace model output after stream completes
+            console.log(
+              `[Stream] post-pump state: wroteContent=${wroteContent}, wroteToolPart=${wroteToolPart}, writtenPartCount=${writtenPartCount}, connectorPreloadCalls=${connectorPreloadCalls.length}`
+            )
+
             // Silent-empty guard: the weak model sometimes answers with ONLY
             // fake <tool_call> XML, which the sanitizer strips down to
             // nothing — no text, no tool parts, no error. The client would
@@ -953,6 +969,9 @@ export async function createChatStreamResponse(
                   fallbackDelta ??
                   emptyResponseText(conversationLanguage?.lang)
               } as unknown as Parameters<typeof writer.write>[0])
+              console.log(
+                `[Stream] fallback injected: "${(fallbackDelta ?? '').slice(0, 120)}" (length=${(fallbackDelta ?? '').length})`
+              )
               wroteContent = true
               writtenPartCount++
             }
