@@ -7,6 +7,7 @@ import {
   driveSearch,
   githubRecentRepos,
   githubSearch,
+  gmailRead,
   gmailSearch,
   notionSearch
 } from './service-clients'
@@ -330,6 +331,30 @@ export async function runConnectorPreloadStructured(
         return { call: null, section: null }
       }
       if (r.value.items.length === 0) return { call: null, section: null }
+      // "lire mon dernier mail" → fetch full body of the most recent message
+      // so the weak model has the actual content, not just the snippet.
+      const foldedQ = foldText(query)
+      const isLireIntent =
+        /\blire\b|\bread\b|\bouvrir\b|\bvoir\b|\bdernier\b|\blast\b/i.test(
+          foldedQ
+        )
+      if (isLireIntent) {
+        const firstId = r.value.items[0].id
+        const full = await settle(gmailRead(userId, firstId))
+        if (full.ok) {
+          return {
+            call: {
+              service: 'gmail' as const,
+              input: { action: 'read', messageId: firstId },
+              output: { state: 'complete' as const, ...full.value }
+            },
+            section: clipSection(
+              'GMAIL FULL MESSAGE:',
+              `Subject: ${full.value.subject}\nFrom: ${full.value.from}\nDate: ${full.value.date}\n\n${full.value.body}`
+            )
+          }
+        }
+      }
       return {
         call: {
           service: 'gmail' as const,
