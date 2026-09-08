@@ -707,20 +707,20 @@ export async function createChatStreamResponse(
                   typeof part.delta === 'string'
                 ) {
                   const cleanDelta = sanitizer.process(part.delta)
-                  if (cleanDelta) {
+                  // Only write VISIBLE text to the client. Whitespace-only
+                  // deltas (e.g. "\n\n" from the Dots model after connector
+                  // data) must NOT be streamed — the user would see nothing
+                  // and the empty-response fallback would not trigger because
+                  // wroteContent stays false. The sanitizer still buffers
+                  // whitespace internally for its own processing; we just
+                  // prevent it from leaking to the user.
+                  if (cleanDelta && cleanDelta.trim()) {
                     writer.write({
                       ...part,
                       delta: cleanDelta
                     } as unknown as Parameters<typeof writer.write>[0])
                     writtenPartCount++
-                    // Only count VISIBLE text as content. Whitespace-only
-                    // deltas (e.g. "\n\n" from the weak model after connector
-                    // data) are written to the client but must NOT prevent the
-                    // empty-response fallback from triggering — the user would
-                    // see nothing and wonder why the AI didn't answer.
-                    if (cleanDelta.trim()) {
-                      markContent()
-                    }
+                    markContent()
                   }
                   continue
                 }
