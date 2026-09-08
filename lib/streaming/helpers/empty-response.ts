@@ -13,7 +13,13 @@ export function shouldInjectEmptyFallback(args: {
   wroteToolPart: boolean
   aborted: boolean
 }): boolean {
-  return !args.aborted && !args.wroteContent && !args.wroteToolPart
+  // Data tools (search, gmail, drive, calendar, github, notion) are NOT the
+  // answer — the model must still produce text after them. An empty text
+  // with only data tools is still an empty answer and needs the fallback.
+  // Only pure artifact turns (generateImage, document) where the tool output
+  // IS the answer should keep tool-only as non-empty, but those are rare and
+  // the fallback text there is harmless (the image/doc still shows).
+  return !args.aborted && !args.wroteContent
 }
 
 /**
@@ -29,12 +35,10 @@ export function shouldRetryEmptyAttempt(args: {
   maxAttempts: number
   aborted: boolean
 }): boolean {
-  return (
-    !args.aborted &&
-    !args.hasContent &&
-    !args.hasTools &&
-    args.attempt < args.maxAttempts
-  )
+  // Like the fallback, a data-tool-only empty turn (e.g. gmail read with no
+  // following text) is still empty and should be retried. Only the abort
+  // and maxAttempts guard the loop.
+  return !args.aborted && !args.hasContent && args.attempt < args.maxAttempts
 }
 
 export function emptyResponseText(lang: string | null | undefined): string {
