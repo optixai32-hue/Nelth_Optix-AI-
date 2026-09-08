@@ -713,7 +713,14 @@ export async function createChatStreamResponse(
                       delta: cleanDelta
                     } as unknown as Parameters<typeof writer.write>[0])
                     writtenPartCount++
-                    markContent()
+                    // Only count VISIBLE text as content. Whitespace-only
+                    // deltas (e.g. "\n\n" from the weak model after connector
+                    // data) are written to the client but must NOT prevent the
+                    // empty-response fallback from triggering — the user would
+                    // see nothing and wonder why the AI didn't answer.
+                    if (cleanDelta.trim()) {
+                      markContent()
+                    }
                   }
                   continue
                 }
