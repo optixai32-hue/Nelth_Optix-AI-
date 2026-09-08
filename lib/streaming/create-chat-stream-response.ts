@@ -561,10 +561,12 @@ export async function createChatStreamResponse(
       let wroteContent = false
       let wroteToolPart = false
       let writtenPartCount = 0
-      // For "lire mon dernier mail" fallback: keep the last Gmail read body
+      // For "lire mon dernier mail" fallback: keep the last Gmail read/search
       // so an empty model answer can be replaced with the actual mail content
       // instead of a generic "Désolé...".
       let lastGmailRead: { subject?: string; from?: string; body?: string } | null =
+        null
+      let lastGmailSearch: { items?: Array<{ subject?: string; from?: string; snippet?: string }> } | null =
         null
 
       const stream = createUIMessageStream({
@@ -740,7 +742,7 @@ export async function createChatStreamResponse(
                   part.type.startsWith('tool-')
                 ) {
                   markTools()
-                  // Capture Gmail read body for empty-answer fallback.
+                  // Capture Gmail data for empty-answer fallback.
                   if (
                     part.type === 'tool-gmail' &&
                     (part as any).state === 'output-available'
@@ -749,6 +751,11 @@ export async function createChatStreamResponse(
                       body?: string
                       subject?: string
                       from?: string
+                      items?: Array<{
+                        subject?: string
+                        from?: string
+                        snippet?: string
+                      }>
                     } | undefined
                     if (out?.body) {
                       lastGmailRead = {
@@ -756,6 +763,9 @@ export async function createChatStreamResponse(
                         from: out.from,
                         body: out.body
                       }
+                    }
+                    if (Array.isArray(out?.items) && out.items.length > 0) {
+                      lastGmailSearch = { items: out.items }
                     }
                   }
                 }
@@ -820,6 +830,15 @@ export async function createChatStreamResponse(
                   ? `*De : ${lastGmailRead.from}*\n\n`
                   : ''
                 fallbackDelta = `**${subj}**\n${from}${lastGmailRead.body}`
+              } else if (lastGmailSearch?.items?.length) {
+                const lines = lastGmailSearch.items
+                  .slice(0, 3)
+                  .map(
+                    (m, i) =>
+                      `${i + 1}. **${m.subject || 'Sans objet'}** — ${m.from || ''}\n   ${m.snippet || ''}`
+                  )
+                  .join('\n\n')
+                fallbackDelta = `Voici vos derniers mails :\n\n${lines}`
               } else {
                 const preloadGmailRead = connectorPreloadCalls.find(
                   c =>
@@ -836,6 +855,28 @@ export async function createChatStreamResponse(
                   const subj = out.subject || 'Mail'
                   const from = out.from ? `*De : ${out.from}*\n\n` : ''
                   fallbackDelta = `**${subj}**\n${from}${out.body}`
+                } else {
+                  const gmailSearchCall = connectorPreloadCalls.find(
+                    c =>
+                      c.service === 'gmail' &&
+                      Array.isArray((c.output as any)?.items) &&
+                      (c.output as any).items.length > 0
+                  )
+                  if (gmailSearchCall) {
+                    const items = (gmailSearchCall.output as any).items as Array<{
+                      subject?: string
+                      from?: string
+                      snippet?: string
+                    }>
+                    const lines = items
+                      .slice(0, 3)
+                      .map(
+                        (m, i) =>
+                          `${i + 1}. **${m.subject || 'Sans objet'}** — ${m.from || ''}\n   ${m.snippet || ''}`
+                      )
+                      .join('\n\n')
+                    fallbackDelta = `Voici vos derniers mails :\n\n${lines}`
+                  }
                 }
               }
               writer.write({
