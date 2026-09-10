@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const BASE_URL =
-  process.env.IMAGE_EDIT_API_BASE_URL || 'https://nelth.space-z.ai'
+  process.env.IMAGE_EDIT_API_BASE_URL || 'https://nelth-v2.space-z.ai'
 
 export async function POST(req: NextRequest) {
   try {

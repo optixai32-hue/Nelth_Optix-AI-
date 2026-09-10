@@ -26,7 +26,8 @@ const HIDREAM_SPACE_ID =
 // (e.g. an uploaded selfie to restyle), we route to nelth.space-z.ai instead of
 // the text-only ERNIE Space. Override the base with NELTH_API_BASE if needed.
 const NELTH_BASE =
-  process.env.NELTH_API_BASE?.replace(/\/+$/, '') || 'https://nelth.space-z.ai'
+  process.env.NELTH_API_BASE?.replace(/\/+$/, '') ||
+  'https://nelth-v2.space-z.ai'
 const NELTH_EDIT_URL = `${NELTH_BASE}/api/edit-image`
 
 // System prompt used to rewrite / enrich the user prompt before TEXT-TO-IMAGE
@@ -441,7 +442,7 @@ async function enhanceViaNelth(
   try {
     const resp = await axios.post(
       `${NELTH_BASE}/api/enhance-prompt`,
-      { prompt, protectFace },
+      { prompt, protectFace, mode: 'auto' },
       {
         headers: { 'Content-Type': 'application/json' },
         responseType: 'json'
@@ -469,7 +470,7 @@ async function editViaNelth(
 ): Promise<{ imageUrl: string; revisedPrompt: string }> {
   const resp = await axios.post(
     NELTH_EDIT_URL,
-    { imageData, prompt, size, protectFace },
+    { imageData, prompt, size, protectFace, guidanceScale: 1.5 },
     {
       headers: { 'Content-Type': 'application/json' },
       responseType: 'json'

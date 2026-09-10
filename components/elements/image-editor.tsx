@@ -76,7 +76,7 @@ export function ImageEditor({ className }: { className?: string }) {
           const enh = await fetch('/api/enhance-prompt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, protectFace })
+            body: JSON.stringify({ prompt, protectFace, mode: 'auto' })
           })
           const enhData = await enh.json()
           if (enhData?.enhancedPrompt) finalPrompt = enhData.enhancedPrompt
@@ -88,7 +88,12 @@ export function ImageEditor({ className }: { className?: string }) {
       const edit = await fetch('/api/edit-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData, prompt: finalPrompt, size })
+        body: JSON.stringify({
+          imageData,
+          prompt: finalPrompt,
+          size,
+          guidanceScale: 1.5
+        })
       })
       const editData = await edit.json()
       if (editData?.editedImage) {
