@@ -89,4 +89,51 @@ describe('detectRequestCapabilities — all languages', () => {
       expect(caps.needsSearch, `query: ${q}`).toBe(true)
     }
   })
+
+  it('detects real-world questions even without explicit word recherche', async () => {
+    for (const q of [
+      'Quelle est la date de sortie de GTA 6 ?',
+      'Qui a créé OpenAI ?',
+      'Comment fonctionne l’inflation ?',
+      'Quels sont les tarifs de Starlink ?',
+      'Pourquoi le cours de l’or augmente ?'
+    ]) {
+      const caps = await detectRequestCapabilities(q)
+      expect(caps.needsSearch, `query: ${q}`).toBe(true)
+    }
+  })
+
+  it('preserves search intent across conversation continuations', async () => {
+    const historyWithSearch = [
+      {
+        id: '1',
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: 'Qui est Elon Musk ?' }]
+      },
+      {
+        id: '2',
+        role: 'assistant' as const,
+        parts: [
+          {
+            type: 'text' as const,
+            text: 'Elon Musk est le patron de Tesla et SpaceX[1](#tool-search).'
+          }
+        ]
+      }
+    ]
+
+    const capsFollowUp = await detectRequestCapabilities(
+      'Et son fils ?',
+      [],
+      historyWithSearch
+    )
+    expect(capsFollowUp.needsSearch).toBe(true)
+
+    const capsContinue = await detectRequestCapabilities(
+      'Continue',
+      [],
+      historyWithSearch
+    )
+    expect(capsContinue.needsSearch).toBe(true)
+  })
 })

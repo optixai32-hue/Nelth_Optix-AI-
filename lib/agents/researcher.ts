@@ -993,7 +993,14 @@ export async function createResearcher({
     const affirmativeLayer = affirmativeHint
       ? `\n\nAFFIRMATIVE CONTINUATION — NON-NEGOTIABLE:\n${affirmativeHint}\nDo NOT greet again. Continue the exact previous topic immediately.`
       : ''
-    let instructions = `${CORE_DIRECTIVE}${affirmativeLayer}\n\n${buildLanguageLayer(conversationLanguage ?? null)}${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${connectorLayer ? connectorLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
+    const nonThinkingReinforcementLayer = isNonThinking
+      ? `\n\nNON-THINKING MODEL INSTRUCTIONS (Nelth-3.5) — MANDATORY & NON-NEGOTIABLE:
+- You are answering directly to the user in clean Markdown.
+- NEVER emit any fake tool call syntax: DO NOT write <search">, <search>, <tool_call>, <invoke>, <function>, or JSON blocks intended as tool calls. You do NOT execute tools yourself — all tools and web searches are handled server-side.
+- If web search results were provided above in SERVER-PROVIDED WEB RESULTS, synthesize your answer directly from these verified results and conversation history. Add inline [n] citations next to supported factual claims.
+- CONVERSATION CONTINUITY & PRONOUN RESOLUTION: If this is an ongoing discussion (not the first turn), NEVER restart or repeat greetings ("Bonjour ! Je suis Nelth-IA..."). Seamlessly continue the discussion, answer the user's latest query directly, and resolve pronouns ("il", "elle", "son", "sa", "ses", "celui-ci", "ça", "le deuxième", etc.) using the entities discussed in preceding messages.`
+      : ''
+    let instructions = `${CORE_DIRECTIVE}${affirmativeLayer}${nonThinkingReinforcementLayer}\n\n${buildLanguageLayer(conversationLanguage ?? null)}${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${connectorLayer ? connectorLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
 
     // Trailing override for code/artifact requests. The QUICK/ADAPTIVE prompts
     // contain a generic "OUTPUT FORMAT (MANDATORY)" + "Emoji usage" section that

@@ -1,3 +1,5 @@
+import type { UIMessage } from 'ai'
+
 import { getSkillRegistry } from './registry'
 import { routeSkills } from './router'
 import { foldText, intentRe } from './text-fold'
@@ -56,8 +58,14 @@ export const DOCUMENT_INTENT_RE = intentRe(
     '|فاتورة|فواتير|تقرير|تقارير|عقد|عقود|وثيقة|وثائق|مستند|مستندات|ملف|ملفات|عرض\\s+تقديمي|شرائح|جدول|发票|报告|合同|文档|文件|演示|幻灯片|表格|документ|документы|файл|файлы|договор|договоры|презентация|слайды|таблица|счет'
 )
 const CURRENT_INFO_RE = intentRe(
-  'search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualites?|news|prix|price|prices|meteo|weather|current|recent|recents?|recentes?|latest|dernier[es]*|dernieres?|hier|yesterday|today|aujourd.hui|demain|tomorrow|ce\\s+jour|ce\\s+matin|ce\\s+soir|cette\\s+semaine|ce\\s+mois|cette\\s+annee|en\\s+direct|live|score|match|resultats?|classement|gagnant|vainqueur|events?|evenements?|annonces?|announcements?|wwdc|qui\\s+est|who\\s+is|c.est\\s+quoi|what\\s+is|qu.est[-\\s]ce\\s+qui|2026|2025|2024' +
-    '|president|presidents?|pr[eé]sident[es]?|premier\\s+ministre|gouvernement|ministre|ministres|election|elections?|[eé]lection[s]?|dirigeant|dirigeants|qui\\s+gouverne|qui\\s+dirige|qui\\s+commande|qui\\s+a\\s+gagn[eé]|qui\\s+est\\s+le|qui\\s+est\\s+la|qui\\s+sont|est-ce\\s+que|est-ce\\s+vrai|vrai\\s+ou\\s+faux|vrai\\s+que|actuel|actuelle|actuellement|pouvoir|madagascar' +
+  'search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualites?|news|prix|price|prices|meteo|weather|current|recent|recents?|recentes?|latest|dernier[es]*|dernieres?|hier|yesterday|today|aujourd.hui|demain|tomorrow|ce\\s+jour|ce\\s+matin|ce\\s+soir|cette\\s+semaine|ce\\s+mois|cette\\s+annee|en\\s+direct|live|score|match|resultats?|classement|gagnant|vainqueur|events?|evenements?|annonces?|announcements?|wwdc|2026|2025|2024' +
+    '|president|presidents?|pr[eé]sident[es]?|premier\\s+ministre|prime\\s+minister|gouvernement|government|ministre|ministres|minister|ministers|election|elections?|[eé]lection[s]?|dirigeant|dirigeants|leader|leaders|chef\\s+d.etat|head\\s+of\\s+state|qui\\s+gouverne|qui\\s+dirige|qui\\s+commande|qui\\s+a\\s+gagn[eé]|qui\\s+est\\s+le|qui\\s+est\\s+la|qui\\s+sont|who\\s+is|who\\s+are|est-ce\\s+que|est-ce\\s+vrai|is\\s+it\\s+true|fact\\s*check|vrai\\s+ou\\s+faux|vrai\\s+que|verifie|verifies|verifier|check|actuel|actuelle|actuellement|currently|present|incumbent|pouvoir|madagascar' +
+    // Questions seeking information / definitions / explanations
+    '|qui\\s+est|who\\s+is|c.est\\s+quoi|what\\s+is|c.est\\s+qui|who.s|qu.est[-\\s]ce\\s+qu|qu.est[-\\s]ce\\s+qui|qui\\s+a|qui\\s+a\\s+fait|qui\\s+a\\s+cree|qui\\s+a\\s+invente|quel\\s+est|quelle\\s+est|quels\\s+sont|quelles\\s+sont|what\\s+are|which\\s+is|where\\s+is|ou\\s+se\\s+trouve|ou\\s+est|comment\\s+fonctionne|how\\s+does|pourquoi|why\\s+is|combien\\s+coute|combien\\s+vaut|how\\s+much|how\\s+many' +
+    // Releases, dates, technology, companies, models
+    '|date\\s+de\\s+sortie|release\\s+date|sortie|sorti|sortira|disponible|disponibilite|version|modele|entreprise|societe|startup|compagnie|marque|intelligence\\s+artificielle|deepseek|chatgpt|openai|grok|claude|mistral|gemini|apple|google|microsoft|tesla|nvidia|starlink|spacex' +
+    // Current affairs, geography, economics, politics
+    '|championnat|ligue|tournoi|guerre|crise|politique|bourse|action|actions|crypto|bitcoin|inflation|taux|monnaie|population|superficie|capitale|maire|habitant|habitants' +
     // Weather asked the French way: "quel temps fait-il ?", "temps à Paris".
     // Bare "temps" alone is NOT matched (duration/cooking-time false
     // positives like "combien de temps", "temps de cuisson").
@@ -107,16 +115,46 @@ function isWebImageSearch(q: string | undefined | null): boolean {
   )
 }
 
+const FOLLOW_UP_PRONOUN_RE = intentRe(
+  'leur|leurs|son|sa|ses|ca|ce|cet|cette|ces|eux|elle|elles|il|ils|lui|it|its|they|their|them|this|that|these|those|qui|quoi|ou|quand|comment|pourquoi|combien|et\\s+pour|et\\s+son|et\\s+sa|et\\s+ses|et\\s+le|et\\s+la|et\\s+les|continue|suite|approfondis|developpe|raconte|plus|davantage|d.autre'
+)
+
+function isConversationContinuation(
+  query: string,
+  history: UIMessage[] = []
+): boolean {
+  if (!query || history.length <= 1) return false
+  const qf = foldText(query.trim())
+  const words = qf.split(/\s+/)
+  // Short questions (<= 6 words) or messages containing pronouns/follow-up markers
+  const isFollowUpStructure = words.length <= 6 || FOLLOW_UP_PRONOUN_RE.test(qf)
+  if (!isFollowUpStructure) return false
+
+  // Check if any recent assistant message in history had citations or search results
+  const lastAssistant = [...history].reverse().find(m => m.role === 'assistant')
+  if (!lastAssistant) return false
+
+  const hasSearchInLastAssistant = lastAssistant.parts.some(
+    part =>
+      part.type === 'tool-search' ||
+      (part.type === 'text' && /\[\s*\d+\s*\]\(#|\[\d+\]/.test(part.text))
+  )
+  return hasSearchInLastAssistant
+}
+
 /**
  * Detect whether a request requires any skill or external tool.
  *
- * @param query            latest user message text
- * @param attachmentFormats file types present on the message (e.g. 'pdf',
- *                           'image/png'); an uploaded document forces its skill.
+ * @param query             latest user message text
+ * @param attachmentFormats  file types present on the message (e.g. 'pdf',
+ *                            'image/png'); an uploaded document forces its skill.
+ * @param history           full prior messages in the conversation (to preserve
+ *                            search intent across follow-up turns).
  */
 export async function detectRequestCapabilities(
   query: string,
-  attachmentFormats: string[] = []
+  attachmentFormats: string[] = [],
+  history: UIMessage[] = []
 ): Promise<RequestCapabilities> {
   const registry = await getSkillRegistry()
   const candidateSkillSlugs = registry.length
@@ -156,8 +194,10 @@ export async function detectRequestCapabilities(
     Boolean(query && DOCUMENT_INTENT_RE.test(qf)) ||
     attachmentFormats.some(f => DOC_FORMATS.has(f.toLowerCase()))
 
+  const isFollowUp = isConversationContinuation(query, history)
+
   const needsSearch = query
-    ? (CURRENT_INFO_RE.test(qf) || webImageSearch) &&
+    ? (CURRENT_INFO_RE.test(qf) || webImageSearch || isFollowUp) &&
       !founderPhoto &&
       !isInternalKnowledge
     : false

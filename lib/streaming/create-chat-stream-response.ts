@@ -48,6 +48,7 @@ import {
   extractFakeSearchQuery,
   getImageAttachmentUrl,
   getTextFromParts,
+  isPureGreeting,
   resolveContextualSearchQuery,
   StreamTextSanitizer,
   stripFakeToolCallXmlFromMessage
@@ -214,7 +215,11 @@ export async function createChatStreamResponse(
       // whether this request needs any skill or external tool BEFORE we spend time
       // routing/loading skills or arming the research agent. Falls back to an empty
       // context when nothing matches so the model streams immediately.
-      const caps = await detectRequestCapabilities(userQuery, attachmentFormats)
+      const caps = await detectRequestCapabilities(
+        userQuery,
+        attachmentFormats,
+        messagesToModel
+      )
 
       // Nelth-3.5 (dots-studio/dots-3-note-preview:free) is a non-thinking model: the Kilo gateway
       // ALWAYS returns a `reasoning` field (reasoning_tokens is never 0, and no
@@ -248,22 +253,6 @@ export async function createChatStreamResponse(
       // Effective image intent: explicit text intent OR an attached image.
       const needsImageEff = caps.needsImage || Boolean(imageAttachment)
 
-      const trivial =
-        !caps.needsSearch &&
-        !needsImageEff &&
-        !caps.needsDocument &&
-        !caps.founderPhoto &&
-        !skillNeeded
-
-      // Preloaded search: the weak non-thinking model cannot emit a valid native
-      // tool call — it outputs a fake <tool_call> XML block and the agent retries
-      // in a loop. So we fetch results server-side and feed them as text. To still
-      // show citations, we ALSO surface these results as a synthetic `tool-search`
-      // UI part in the stream (see below), which drives the Sources panel and the
-      // Preloaded search: when the request requires web search (caps.needsSearch
-      // is true), we fetch results server-side and provide them directly to the model.
-      // We ALSO surface these results as synthetic tool chunks in the stream so the
-      // UI displays the search process, Sources panel, and inline citations.
       // Connector-first: when the turn targets the user's OWN connected apps
       // (Gmail, Drive, Calendar, GitHub, Notion), a web search is the wrong
       // move — the answer lives in their accounts, not on the public web.
@@ -282,8 +271,29 @@ export async function createChatStreamResponse(
         isConnectorFollowUp(userQuery ?? '', initialChat?.messages)
       const connectorIntent = rawConnectorIntent || connectorFollowUp
       const connectorDataIntent = connectorIntent && hasVault
+
+      // Non-thinking model (Nelth-3.5) CANNOT emit native JSON tool calls reliably.
+      // Therefore, any request that is not a pure greeting, connector query,
+      // image generation, document creation, or internal knowledge MUST get
+      // preloaded search so the model has real-world factual grounding and citations.
+      const isPureChitChat = isPureGreeting(userQuery ?? '')
       const shouldPreloadSearch =
-        Boolean(caps.needsSearch) && !connectorDataIntent
+        !connectorDataIntent &&
+        !caps.founderPhoto &&
+        (Boolean(caps.needsSearch) ||
+          (isNonThinkingModel &&
+            !isPureChitChat &&
+            !needsImageEff &&
+            !caps.needsDocument &&
+            !caps.founderPhoto))
+
+      const trivial =
+        !caps.needsSearch &&
+        !shouldPreloadSearch &&
+        !needsImageEff &&
+        !caps.needsDocument &&
+        !caps.founderPhoto &&
+        !skillNeeded
       let preloadedSearchContext: string | undefined
       let preloadedSearchQuery: string | undefined
       let searchResultsForCitation:
@@ -735,20 +745,31 @@ export async function createChatStreamResponse(
                 ) {
                   accumulatedRawModelText += part.delta
                   const cleanDelta = sanitizer.process(part.delta)
-                  // Only write VISIBLE text to the client. Whitespace-only
-                  // deltas (e.g. "\n\n" from the Dots model after connector
-                  // data) must NOT be streamed — the user would see nothing
-                  // and the empty-response fallback would not trigger because
-                  // wroteContent stays false. The sanitizer still buffers
-                  // whitespace internally for its own processing; we just
-                  // prevent it from leaking to the user.
-                  if (cleanDelta && cleanDelta.trim()) {
-                    writer.write({
-                      ...part,
-                      delta: cleanDelta
-                    } as unknown as Parameters<typeof writer.write>[0])
-                    writtenPartCount++
-                    markContent()
+                  // Only write VISIBLE text to the client before content begins.
+                  // Whitespace-only deltas (e.g. leading "\n\n") must NOT trigger
+                  // wroteContent prematurely. But once real content has started,
+                  // all clean deltas (including word spaces " " and newlines)
+                  // MUST be streamed to preserve word spacing and markdown formatting.
+                  if (cleanDelta) {
+                    if (!wroteContent) {
+                      if (cleanDelta.trim()) {
+                        const trimmedLead = cleanDelta.replace(/^\s+/, '')
+                        if (trimmedLead) {
+                          writer.write({
+                            ...part,
+                            delta: trimmedLead
+                          } as unknown as Parameters<typeof writer.write>[0])
+                          writtenPartCount++
+                          markContent()
+                        }
+                      }
+                    } else {
+                      writer.write({
+                        ...part,
+                        delta: cleanDelta
+                      } as unknown as Parameters<typeof writer.write>[0])
+                      writtenPartCount++
+                    }
                   }
                   continue
                 }

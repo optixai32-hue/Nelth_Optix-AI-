@@ -30,6 +30,7 @@ import { search as runWebSearch } from '@/lib/tools/search'
 import {
   getImageAttachmentUrl,
   getTextFromParts,
+  isPureGreeting,
   resolveContextualSearchQuery,
   StreamTextSanitizer,
   stripFakeToolCallXmlFromMessage
@@ -128,7 +129,11 @@ export async function createEphemeralChatStreamResponse(
       // routing/loading skills or arming the research agent. Falls back to an empty
       // context when nothing matches so the model streams immediately. Mirrors the
       // authenticated chat path so guests get the same lazy architecture.
-      const caps = await detectRequestCapabilities(userQuery, attachmentFormats)
+      const caps = await detectRequestCapabilities(
+        userQuery,
+        attachmentFormats,
+        historyMessages
+      )
 
       // Nelth-3.5 (dots-studio/dots-3-note-preview:free) is a non-thinking model that cannot emit valid
       // native tool calls — it outputs fake <tool_call> XML blocks. So for this model
@@ -159,21 +164,27 @@ export async function createEphemeralChatStreamResponse(
       // Effective image intent: explicit text intent OR an attached image.
       const needsImageEff = caps.needsImage || Boolean(imageAttachment)
 
+      // Non-thinking model (Nelth-3.5) CANNOT emit native JSON tool calls reliably.
+      // Therefore, any request that is not a pure greeting, image generation,
+      // document creation, or internal knowledge MUST get preloaded search so the
+      // model has real-world factual grounding and citations.
+      const isPureChitChat = isPureGreeting(userQuery ?? '')
+      const shouldPreloadSearch =
+        !caps.founderPhoto &&
+        (Boolean(caps.needsSearch) ||
+          (isNonThinkingModel &&
+            !isPureChitChat &&
+            !needsImageEff &&
+            !caps.needsDocument &&
+            !caps.founderPhoto))
+
       const trivial =
         !caps.needsSearch &&
+        !shouldPreloadSearch &&
         !needsImageEff &&
         !caps.needsDocument &&
         !caps.founderPhoto &&
         !skillNeeded
-
-      // Preloaded search: the weak non-thinking model cannot emit a valid native
-      // tool call — it outputs a fake <tool_call> XML block and the agent retries
-      // in a loop. So we fetch results server-side and feed them as text. To still
-      // show citations, we ALSO surface these results as a synthetic `tool-search`
-      // UI part in the stream (see below), which drives the Sources panel and the
-      // Preloaded search: when the request requires web search (caps.needsSearch
-      // is true), we fetch results server-side and provide them directly to the model.
-      const shouldPreloadSearch = Boolean(caps.needsSearch)
       let preloadedSearchContext: string | undefined
       let preloadedSearchQuery: string | undefined
       let searchResultsForCitation:
