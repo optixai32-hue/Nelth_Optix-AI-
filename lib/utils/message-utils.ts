@@ -362,8 +362,9 @@ const SELF_INTRO_PARAGRAPH_RE =
  * "c'est qui X ?" (about someone else) must NOT count as identity.
  */
 export function isIdentityQuery(query: string): boolean {
-  return /\b(qui\s+(es|êtes)[- ]?tu|who\s+are\s+you|t['’]es\s+qui|présente[- ]?toi|ton\s+nom|your\s+name|dis[- ]?moi\s+qui\s+tu\s+es|parle[- ]?moi\s+de\s+toi|iza\s+ianao|ianao\s+iza|ahoana\s+ny\s+anaranao)\b/i.test(
-    query || ''
+  if (!query) return false
+  return /\b(qui\s+(es|est|êtes)[- ]?tu|tu\s+(es|est)\s+qui|t['’]es\s+qui|qui\s+t['’]es|qui\s+êtes[- ]?vous|vous\s+êtes\s+qui|who\s+are\s+you|what\s+are\s+you|who\s+made\s+you|who\s+created\s+you|what\s+is\s+your\s+name|whats\s+your\s+name|ton\s+nom|votre\s+nom|comment\s+tu\s+t['’]appelles|comment\s+vous\s+vous\s+appelez|qui\s+t['’]a\s+(créé|cree|conçu|concu|développé|developpe|fait)|qui\s+est\s+ton\s+créateur|qui\s+est\s+ton\s+createur|présente[- ]?toi|presente[- ]?toi|présentez[- ]?vous|presentez[- ]?vous|dis[- ]?moi\s+qui\s+tu\s+(es|est)|parle[- ]?moi\s+de\s+toi|c['’]est\s+quoi\s+nelth|qui\s+est\s+nelth|c['’]est\s+quoi\s+optix|qui\s+est\s+optix|iza\s+ianao|ianao\s+iza|inona\s+ianao|iza\s+no\s+namorona\s+anao|ahoana\s+ny\s+anaranao|inona\s+ny\s+anaranao)\b/i.test(
+    query
   )
 }
 

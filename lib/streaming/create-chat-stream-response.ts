@@ -48,6 +48,7 @@ import {
   extractFakeSearchQuery,
   getImageAttachmentUrl,
   getTextFromParts,
+  isIdentityQuery,
   isPureGreeting,
   resolveContextualSearchQuery,
   StreamTextSanitizer,
@@ -280,6 +281,7 @@ export async function createChatStreamResponse(
       const shouldPreloadSearch =
         !connectorDataIntent &&
         !caps.founderPhoto &&
+        !isIdentityQuery(userQuery ?? '') &&
         (Boolean(caps.needsSearch) ||
           (isNonThinkingModel &&
             !isPureChitChat &&

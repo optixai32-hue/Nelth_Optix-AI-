@@ -136,4 +136,19 @@ describe('detectRequestCapabilities — all languages', () => {
     )
     expect(capsContinue.needsSearch).toBe(true)
   })
+
+  it('never triggers web search for identity queries like "qui est tu" or "qui es-tu"', async () => {
+    for (const q of [
+      'qui est tu',
+      'qui es-tu ?',
+      'tu es qui ?',
+      'présente-toi',
+      "c'est quoi ton nom ?",
+      'who are you',
+      "qui t'a créé ?"
+    ]) {
+      const caps = await detectRequestCapabilities(q)
+      expect(caps.needsSearch, `query: ${q}`).toBe(false)
+    }
+  })
 })

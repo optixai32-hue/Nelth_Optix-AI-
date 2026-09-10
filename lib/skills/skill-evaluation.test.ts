@@ -297,7 +297,7 @@ describe('Skill routing behavioral contract (no model needed)', () => {
   })
 
   it('harness instructions carry execution constraints + invisible-systems directive', async () => {
-    const instr = await buildInstructions(PROMPT_REACT_TS)
+    const instr = await buildInstructions(PROMPT_REACT_TS, true, 'full')
     expect(instr).toContain('MANDATORY EXECUTION REQUIREMENTS')
     expect(instr).toContain('INTERNAL SYSTEMS ARE INVISIBLE')
     expect(instr).toContain('ACTIVE SKILL EXECUTION PROTOCOL')

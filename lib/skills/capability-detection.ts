@@ -61,7 +61,7 @@ const CURRENT_INFO_RE = intentRe(
   'search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualites?|news|prix|price|prices|meteo|weather|current|recent|recents?|recentes?|latest|dernier[es]*|dernieres?|hier|yesterday|today|aujourd.hui|demain|tomorrow|ce\\s+jour|ce\\s+matin|ce\\s+soir|cette\\s+semaine|ce\\s+mois|cette\\s+annee|en\\s+direct|live|score|match|resultats?|classement|gagnant|vainqueur|events?|evenements?|annonces?|announcements?|wwdc|2026|2025|2024' +
     '|president|presidents?|pr[eé]sident[es]?|premier\\s+ministre|prime\\s+minister|gouvernement|government|ministre|ministres|minister|ministers|election|elections?|[eé]lection[s]?|dirigeant|dirigeants|leader|leaders|chef\\s+d.etat|head\\s+of\\s+state|qui\\s+gouverne|qui\\s+dirige|qui\\s+commande|qui\\s+a\\s+gagn[eé]|qui\\s+est\\s+le|qui\\s+est\\s+la|qui\\s+sont|who\\s+is|who\\s+are|est-ce\\s+que|est-ce\\s+vrai|is\\s+it\\s+true|fact\\s*check|vrai\\s+ou\\s+faux|vrai\\s+que|verifie|verifies|verifier|check|actuel|actuelle|actuellement|currently|present|incumbent|pouvoir|madagascar' +
     // Questions seeking information / definitions / explanations
-    '|qui\\s+est|who\\s+is|c.est\\s+quoi|what\\s+is|c.est\\s+qui|who.s|qu.est[-\\s]ce\\s+qu|qu.est[-\\s]ce\\s+qui|qui\\s+a|qui\\s+a\\s+fait|qui\\s+a\\s+cree|qui\\s+a\\s+invente|quel\\s+est|quelle\\s+est|quels\\s+sont|quelles\\s+sont|what\\s+are|which\\s+is|where\\s+is|ou\\s+se\\s+trouve|ou\\s+est|comment\\s+fonctionne|how\\s+does|pourquoi|why\\s+is|combien\\s+coute|combien\\s+vaut|how\\s+much|how\\s+many' +
+    '|qui\\s+est(?!\\s+tu\\b)|who\\s+is(?!\\s+you\\b)|c.est\\s+quoi|what\\s+is|c.est\\s+qui|who.s|qu.est[-\\s]ce\\s+qu|qu.est[-\\s]ce\\s+qui|qui\\s+a|qui\\s+a\\s+fait|qui\\s+a\\s+cree|qui\\s+a\\s+invente|quel\\s+est|quelle\\s+est|quels\\s+sont|quelles\\s+sont|what\\s+are|which\\s+is|where\\s+is|ou\\s+se\\s+trouve|ou\\s+est|comment\\s+fonctionne|how\\s+does|pourquoi|why\\s+is|combien\\s+coute|combien\\s+vaut|how\\s+much|how\\s+many' +
     // Releases, dates, technology, companies, models
     '|date\\s+de\\s+sortie|release\\s+date|sortie|sorti|sortira|disponible|disponibilite|version|modele|entreprise|societe|startup|compagnie|marque|intelligence\\s+artificielle|deepseek|chatgpt|openai|grok|claude|mistral|gemini|apple|google|microsoft|tesla|nvidia|starlink|spacex' +
     // Current affairs, geography, economics, politics
@@ -75,6 +75,15 @@ const CURRENT_INFO_RE = intentRe(
 )
 
 const DOC_FORMATS = new Set(['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'ppt'])
+
+const IDENTITY_QUERY_RE = intentRe(
+  'qui\\s+(es|est|etes)[-\\s]?tu|tu\\s+(es|est)\\s+qui|t.es\\s+qui|qui\\s+t.es|qui\\s+etes[-\\s]?vous|vous\\s+etes\\s+qui' +
+    '|who\\s+are\\s+you|what\\s+are\\s+you|who\\s+made\\s+you|who\\s+created\\s+you|what\\s+is\\s+your\\s+name|whats\\s+your\\s+name' +
+    '|qui\\s+t.a\\s+(cree|concu|developpe|fait)|qui\\s+est\\s+ton\\s+createur|qui\\s+vous\\s+a\\s+cree' +
+    '|presente[-\\s]?toi|presentez[-\\s]?vous|ton\\s+nom|votre\\s+nom|comment\\s+tu\\s+t.appelles|comment\\s+vous\\s+vous\\s+appelez' +
+    '|c.est\\s+quoi\\s+nelth|qui\\s+est\\s+nelth|c.est\\s+quoi\\s+optix|qui\\s+est\\s+optix' +
+    '|iza\\s+ianao|ianao\\s+iza|inona\\s+ianao|iza\\s+no\\s+namorona\\s+anao|ahoana\\s+ny\\s+anaranao|inona\\s+ny\\s+anaranao'
+)
 
 // Internal knowledge subjects (Nelcia, Yannick, Optix AI, Nelth AI, founders).
 // These are part of core identity and must NEVER trigger external web search or generateImage.
@@ -165,9 +174,10 @@ export async function detectRequestCapabilities(
   // diacritics) so all languages match identically.
   const qf = foldText(query ?? '')
 
+  const isIdentity = IDENTITY_QUERY_RE.test(qf)
   const isInternalKnowledge =
     query !== undefined && query !== null
-      ? INTERNAL_KNOWLEDGE_SUBJECT_RE.test(query)
+      ? INTERNAL_KNOWLEDGE_SUBJECT_RE.test(query) || isIdentity
       : false
 
   // Founder-photo request: present the official photos directly. Force

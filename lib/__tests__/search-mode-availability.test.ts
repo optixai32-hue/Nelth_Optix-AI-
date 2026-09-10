@@ -7,7 +7,7 @@ import {
 } from '@/lib/search-mode-availability'
 
 describe('search mode availability', () => {
-  it('requires auth for adaptive mode only for cloud guests', () => {
+  it('requires auth for adaptive mode for guests', () => {
     expect(
       requiresAdaptiveModeAuth({
         isGuest: true,
@@ -25,7 +25,7 @@ describe('search mode availability', () => {
         isGuest: true,
         isCloudDeployment: false
       })
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('blocks adaptive mode sends for cloud guests', () => {

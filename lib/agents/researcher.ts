@@ -32,6 +32,7 @@ import { normalizeToolCall } from '../tools/runtime/normalize-tool-call'
 import { createSearchTool } from '../tools/search'
 import { createTodoTools } from '../tools/todo'
 import { SearchMode } from '../types/search'
+import { isIdentityQuery } from '../utils/message-utils'
 import { getModel, isNonThinkingModelId } from '../utils/registry'
 import { isTracingEnabled } from '../utils/telemetry'
 
@@ -800,10 +801,11 @@ export async function createResearcher({
       }
     }
 
-    // INTERNAL KNOWLEDGE & FOUNDER PHOTO: answer directly from internal knowledge.
+    // INTERNAL KNOWLEDGE, IDENTITY & FOUNDER PHOTO: answer directly from internal knowledge.
     // Do NOT run web search and do NOT invoke generateImage.
     if (
       capabilities?.founderPhoto ||
+      isIdentityQuery(userQuery ?? '') ||
       INTERNAL_KNOWLEDGE_SUBJECT_RE.test(userQuery ?? '')
     ) {
       activeToolsList = []

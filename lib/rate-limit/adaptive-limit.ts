@@ -48,7 +48,19 @@ async function checkAdaptiveLimit(
   const dateKey = new Date().toISOString().split('T')[0]
   const key = `rl:adaptive:${userId}:${dateKey}`
 
-  return incrementFirestoreRateLimit(key, limit)
+  try {
+    return await incrementFirestoreRateLimit(key, limit)
+  } catch (err) {
+    console.error('[AdaptiveLimit] Counter failed, failing open:', err)
+    return {
+      allowed: true,
+      used: 0,
+      remaining: limit,
+      resetAt: 0,
+      limit,
+      enforced: false
+    }
+  }
 }
 
 /**

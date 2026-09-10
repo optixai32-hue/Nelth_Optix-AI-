@@ -32,6 +32,13 @@ export async function deleteAccount(): Promise<{
     return { success: false, error: 'User not authenticated' }
   }
 
+  let auth: ReturnType<typeof getAuth>
+  try {
+    auth = getAuth()
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) }
+  }
+
   try {
     const deleteChatsResult = await dbActions.deleteUserChats(user.uid)
     if (!deleteChatsResult.success) {
@@ -70,7 +77,13 @@ export async function deleteAccount(): Promise<{
 
     await deleteUserObjects(user.uid)
 
-    await getAuth().deleteUser(user.uid)
+    const authResult = (await auth.deleteUser(user.uid)) as any
+    if (authResult?.error) {
+      return {
+        success: false,
+        error: authResult.error.message || 'Auth deletion failed'
+      }
+    }
 
     revalidateTag('chat', 'max')
     await trackAccountDeleted(user.uid)

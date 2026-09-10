@@ -35,19 +35,26 @@ const NELTH_EDIT_URL = `${NELTH_BASE}/api/edit-image`
 // and returns JSON: { "rewritten_prompt": string }.
 const HIDREAM_MASTER_SYSTEM = `Tu es un expert prompt engineer pour le modèle de génération d'images HiDream-I1-Dev. Ta mission : transformer le prompt brut de l'utilisateur en un prompt descriptif MASTER, précis et naturel, qui exploite tout le potentiel du modèle.
 
+!!! RÈGLE FONDAMENTALE — FIDÉLITÉ ABSOLUE AU SUJET !!!
+Le SUJET demandé par l'utilisateur est SACRÉ et INTOUCHABLE.
+- Si l'utilisateur demande "Elon Musk" → le prompt réécrit DOIT décrire Elon Musk.
+- Si l'utilisateur demande "un chat" → le prompt réécrit DOIT décrire un chat.
+- Si l'utilisateur demande "la Tour Eiffel" → le prompt réécrit DOIT décrire la Tour Eiffel.
+- Tu ne dois JAMAIS remplacer, substituer, dériver, ou ignorer le sujet.
+- EXEMPLE INTERDIT : l'utilisateur demande "Elon Musk" et tu écris un prompt sur un bol en céramique, une table vide, ou un paysage sans rapport. C'est un ÉCHEC CRITIQUE.
+- Le nom exact du sujet (personne, lieu, marque, objet) DOIT apparaître TEXTUELLEMENT dans le rewritten_prompt.
+
 RÈGLES ABSOLUES :
 - Écris TOUJOURS le prompt final en ANGLAIS, quelle que soit la langue du prompt d'entrée : traduis fidèlement chaque détail en anglais sans rien perdre, et garde les noms propres (personnes, lieux, marques) tels quels.
 - Description naturelle et précise — JAMAIS d'empilement de mots-clés type "masterpiece, best quality, ultra quality".
 - Adapte la composition à l'orientation donnée par width/height (portrait, paysage ou carré).
 - Si le prompt d'entrée est déjà riche, préserve TOUTES ses intentions sans rien abandonner.
 - Si l'utilisateur demande du texte visible dans l'image, décris ce texte intégralement, sans l'omettre.
-- Si le prompt ne donne qu'une idée vague, instancie concrètement les détails manquants (décor, lumière, matières) au lieu de rester abstrait.
+- Si le prompt ne donne qu'une idée vague, instancie concrètement les détails manquants (décor, lumière, matières) au lieu de rester abstrait — MAIS le sujet principal reste le même.
 - Si un sujet précis est nommé (personnage, lieu, objet connu), garde son nom tel quel.
-- FIDÉLITÉ ABSOLUE AU SUJET PRINCIPAL : Tu ne dois JAMAIS dériver, remplacer ou substituer le sujet demandé par l'utilisateur. Si l'utilisateur demande une personne réelle ou célèbre (ex. Elon Musk), un personnage, un objet, un véhicule ou une scène précise, CE SUJET EXACT DOIT OBLIGATOIREMENT ÊTRE LE SUJET CENTRAL ET PRINCIPAL du prompt réécrit.
-- IL EST FORMELLEMENT INTERDIT de remplacer le sujet demandé par une nature morte, un bol en céramique, une table vide ou toute autre scène minimaliste sans rapport avec la requête.
 
 STRUCTURE MASTER à suivre :
-[SUJET], [APPARENCE ET CARACTÉRISTIQUES DÉTAILLÉES],
+[SUJET EXACT DE L'UTILISATEUR], [APPARENCE ET CARACTÉRISTIQUES DÉTAILLÉES],
 [POSE OU ACTION], dans [ENVIRONNEMENT ET ARRIÈRE-PLAN].
 
 Composition [TYPE DE COMPOSITION], vue depuis [ANGLE / PERSPECTIVE],
@@ -219,7 +226,7 @@ function checkSubjectPreservation(original: string, enhanced: string): boolean {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .split(/[^a-z0-9]+/)
-    .filter(w => w.length >= 3 && !stopWords.has(w))
+    .filter(w => w.length >= 2 && !stopWords.has(w))
 
   if (words.length === 0) return true
 
@@ -230,7 +237,11 @@ function checkSubjectPreservation(original: string, enhanced: string): boolean {
 
   const matched = words.filter(w => normEnhanced.includes(w))
   const matchRatio = matched.length / words.length
-  return words.length <= 2 ? matched.length === words.length : matchRatio >= 0.5
+  // Short prompts (≤5 meaningful words) require ALL subject words to appear
+  // in the enhanced prompt — this prevents the enhancer from drifting when
+  // the user gives a brief subject like "Elon Musk" or "Tour Eiffel".
+  if (words.length <= 5) return matched.length === words.length
+  return matchRatio >= 0.5
 }
 
 async function enhancePrompt(prompt: string, size: string): Promise<string> {
@@ -269,7 +280,9 @@ async function enhancePrompt(prompt: string, size: string): Promise<string> {
       console.warn(
         `[ImageGeneration] Prompt enhancer drifted from subject "${prompt}". Falling back to safe enhanced prompt.`
       )
-      return `${prompt}, highly detailed, professional photography, cinematic lighting, realistic textures, 8k resolution`
+      // Build a safe enhanced prompt that GUARANTEES subject presence:
+      // start with the original subject, then add quality descriptors.
+      return `${prompt}, highly detailed, professional photography, cinematic lighting, realistic textures, sharp focus, 8k resolution`
     }
 
     return rewritten

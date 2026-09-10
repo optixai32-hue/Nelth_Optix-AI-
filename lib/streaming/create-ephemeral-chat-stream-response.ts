@@ -30,6 +30,7 @@ import { search as runWebSearch } from '@/lib/tools/search'
 import {
   getImageAttachmentUrl,
   getTextFromParts,
+  isIdentityQuery,
   isPureGreeting,
   resolveContextualSearchQuery,
   StreamTextSanitizer,
@@ -171,6 +172,7 @@ export async function createEphemeralChatStreamResponse(
       const isPureChitChat = isPureGreeting(userQuery ?? '')
       const shouldPreloadSearch =
         !caps.founderPhoto &&
+        !isIdentityQuery(userQuery ?? '') &&
         (Boolean(caps.needsSearch) ||
           (isNonThinkingModel &&
             !isPureChitChat &&
