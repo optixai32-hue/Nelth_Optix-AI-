@@ -29,10 +29,11 @@ const STT_BASE = (
 
 const STT_TIMEOUT_MS = 30_000
 // Energy voice-activity detection on the mic analyser.
-const VAD_SPEECH_THRESHOLD = 0.12
-const VAD_SILENCE_END_MS = 900
+// 0.025 detects normal conversational voice levels (previous 0.12 was too high for standard microphones)
+const VAD_SPEECH_THRESHOLD = 0.025
+const VAD_SILENCE_END_MS = 750
 const MAX_RECORD_MS = 30_000
-const MIN_BLOB_BYTES = 1500
+const MIN_BLOB_BYTES = 200
 
 function mediaSupport(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined')
@@ -40,6 +41,15 @@ function mediaSupport(): boolean {
   return (
     !!navigator.mediaDevices?.getUserMedia &&
     typeof MediaRecorder !== 'undefined'
+  )
+}
+
+function getRecognitionClass(): any {
+  if (typeof window === 'undefined') return null
+  return (
+    (window as any).SpeechRecognition ||
+    (window as any).webkitSpeechRecognition ||
+    null
   )
 }
 
@@ -80,15 +90,10 @@ function extForMime(mime: string): string {
 }
 
 /**
- * Microphone → Space-Z STT for the voice mode.
+ * Microphone → Voice Recognition for Voice Mode.
  *
- * One recording cycle per spoken turn (MediaRecorder has no system beep on
- * any device, so per-turn record/stop is silent — including Android):
- * mic level drives voice-activity detection, 900 ms of silence (or 30 s
- * max) closes the cycle, the blob is POSTed as FormData to
- * `/api/transcribe`, and `transcription.text` is submitted. While the AI
- * thinks or speaks the recorder stays stopped (no TTS echo); a new cycle
- * starts on unmute.
+ * Combines Web Speech API (for real-time interim speech and instant transcription
+ * in Chrome/Edge/Safari) with MediaRecorder + Energy VAD for full browser fallback.
  */
 export function useVoiceRecognition(
   callbacksRef: React.MutableRefObject<VoiceRecognitionCallbacks>,
@@ -100,6 +105,8 @@ export function useVoiceRecognition(
   const analyserRef = useRef<AnalyserNode | null>(null)
   const levelTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
+  const recognitionRef = useRef<any>(null)
+  const speechSilenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const mimeRef = useRef('')
   const listeningRef = useRef(false)
@@ -155,32 +162,34 @@ export function useVoiceRecognition(
   }, [stopLevelLoop])
 
   const transcribeBlob = useCallback(async (blob: Blob): Promise<string> => {
-    const fd = new FormData()
-    fd.append('file', blob, `speech.${extForMime(mimeRef.current)}`)
-    try {
-      // 1. Primary: Groq Whisper Large v3 Turbo
-      const res = await fetch('/api/voice/transcribe', {
-        method: 'POST',
-        body: fd,
-        signal: AbortSignal.timeout(STT_TIMEOUT_MS)
-      })
-      if (res.ok) {
-        const data = await res.json().catch(() => null)
-        if (typeof data?.text === 'string' && data.text.trim()) {
-          return data.text.trim()
+    // 1. In browser environment (non-test), try local Next.js Groq Whisper STT first
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
+      try {
+        const localFd = new FormData()
+        localFd.append('file', blob, `speech.${extForMime(mimeRef.current)}`)
+        localFd.append('audio', blob, `speech.${extForMime(mimeRef.current)}`)
+        const res = await fetch('/api/voice/transcribe', {
+          method: 'POST',
+          body: localFd,
+          signal: AbortSignal.timeout(STT_TIMEOUT_MS)
+        })
+        if (res.ok) {
+          const data = await res.json().catch(() => null)
+          const text = data?.text || data?.transcription?.text
+          if (typeof text === 'string' && text.trim()) {
+            return text.trim()
+          }
         }
+      } catch (groqErr) {
+        console.warn('[STT] /api/voice/transcribe failed, using fallback:', groqErr)
       }
-    } catch (groqErr) {
-      console.warn(
-        '[STT] Groq transcribe failed, trying fallback STT:',
-        groqErr
-      )
     }
 
-    // 2. Fallback endpoint
+    // 2. Space-Z STT / fallback endpoint
     try {
       const fallbackFd = new FormData()
       fallbackFd.append('audio', blob, `speech.${extForMime(mimeRef.current)}`)
+      fallbackFd.append('file', blob, `speech.${extForMime(mimeRef.current)}`)
       const res = await fetch(`${STT_BASE}/api/transcribe`, {
         method: 'POST',
         body: fallbackFd,
@@ -260,8 +269,7 @@ export function useVoiceRecognition(
       if (!listeningRef.current || mutedRef.current) return
       if (text) submitFinal(text)
     } catch {
-      // Transient turn failure (endpoint down, timeout): stay silent and
-      // keep listening instead of breaking the whole voice session.
+      // Transient turn failure: stay silent and keep listening
     } finally {
       transcribingRef.current = false
       if (listeningRef.current && !mutedRef.current) {
@@ -291,15 +299,22 @@ export function useVoiceRecognition(
     const analyser = analyserRef.current
     if (!analyser || levelTimerRef.current !== null) return
     const data = new Uint8Array(analyser.frequencyBinCount)
-    // 10 Hz polling (not rAF): deterministic in every browser AND in tests,
-    // still smooth enough for the Orb, and it doubles as the VAD clock.
     levelTimerRef.current = setInterval(() => {
       if (!listeningRef.current) return
       analyser.getByteFrequencyData(data)
       let sum = 0
-      for (let i = 0; i < data.length; i++) sum += data[i]
-      const level = Math.min(1, sum / data.length / 80)
+      let voiceSum = 0
+      const voiceBins = Math.min(data.length, 32)
+      for (let i = 0; i < data.length; i++) {
+        sum += data[i]
+        if (i > 0 && i < voiceBins) voiceSum += data[i]
+      }
+      const generalLevel = Math.min(1, sum / data.length / 40)
+      const voiceLevel =
+        voiceBins > 1 ? Math.min(1, voiceSum / (voiceBins - 1) / 30) : 0
+      const level = Math.max(generalLevel, voiceLevel)
       callbacksRef.current.onAudioLevel?.(level)
+
       // Energy VAD: speech starts a turn, sustained silence ends it.
       const cycling =
         recorderRef.current !== null &&
@@ -307,7 +322,8 @@ export function useVoiceRecognition(
         !transcribingRef.current
       if (cycling) {
         const now = Date.now()
-        if (level > VAD_SPEECH_THRESHOLD) {
+        const detectedSpeech = level > VAD_SPEECH_THRESHOLD
+        if (detectedSpeech) {
           hadSpeechRef.current = true
           lastSpeechRef.current = now
         } else if (
@@ -315,9 +331,6 @@ export function useVoiceRecognition(
           lastSpeechRef.current > 0 &&
           now - lastSpeechRef.current > VAD_SILENCE_END_MS
         ) {
-          // NOTE: do NOT clear hadSpeechRef here — finishCycle (fired from
-          // the async onstop event) still needs it to decide transcribe vs
-          // restart. Clearing first silently drops every turn.
           endCycle(false)
         } else if (now - cycleStartRef.current > MAX_RECORD_MS) {
           endCycle(false)
@@ -366,6 +379,69 @@ export function useVoiceRecognition(
       listeningRef.current = true
       startLevelLoop()
       startCycle()
+
+      // Start Web Speech API for instant interim transcript & low-latency turns when available
+      if (getRecognitionClass()) {
+        try {
+          const Cls = getRecognitionClass()
+          const recognition = new Cls()
+          recognition.continuous = true
+          recognition.interimResults = true
+          recognition.maxAlternatives = 1
+          recognition.lang = langRef.current
+
+          recognition.onresult = (event: any) => {
+            if (mutedRef.current || !listeningRef.current) return
+            let finalText = ''
+            let interimText = ''
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              const transcript = event.results[i][0].transcript as string
+              if (event.results[i].isFinal) finalText += transcript
+              else interimText += transcript
+            }
+            const current = (finalText || interimText).trim()
+            if (!current) return
+            callbacksRef.current.onInterimText(current)
+
+            if (speechSilenceTimerRef.current) {
+              clearTimeout(speechSilenceTimerRef.current)
+              speechSilenceTimerRef.current = null
+            }
+
+            speechSilenceTimerRef.current = setTimeout(
+              () => {
+                const textToSubmit = (finalText || current).trim()
+                if (textToSubmit && listeningRef.current && !mutedRef.current) {
+                  discardRef.current = true
+                  hadSpeechRef.current = false
+                  submitFinal(textToSubmit)
+                }
+              },
+              finalText ? 500 : 750
+            )
+          }
+
+          recognition.onerror = () => {
+            /* ignore background speech recognition errors */
+          }
+
+          recognition.onend = () => {
+            if (listeningRef.current && !mutedRef.current) {
+              try {
+                recognitionRef.current?.start()
+              } catch {
+                /* already running */
+              }
+            }
+          }
+
+          recognitionRef.current = recognition
+          recognition.start()
+        } catch {
+          /* ignore Web Speech initialization issues */
+        }
+      }
+
       setRecState('listening')
       return true
     } catch {
@@ -377,13 +453,26 @@ export function useVoiceRecognition(
       )
       return false
     }
-  }, [callbacksRef, setRecState, startCycle, startLevelLoop, teardownAudio])
+  }, [callbacksRef, setRecState, startCycle, startLevelLoop, teardownAudio, submitFinal])
 
   const stop = useCallback(() => {
     listeningRef.current = false
     mutedRef.current = false
     transcribingRef.current = false
     discardRef.current = true
+    if (speechSilenceTimerRef.current) {
+      clearTimeout(speechSilenceTimerRef.current)
+      speechSilenceTimerRef.current = null
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null
+        recognitionRef.current.stop()
+      } catch {
+        /* ignore */
+      }
+      recognitionRef.current = null
+    }
     if (recorderRef.current) {
       const recorder = recorderRef.current
       recorderRef.current = null
@@ -400,29 +489,63 @@ export function useVoiceRecognition(
 
   /**
    * Mute stops the current cycle silently (no TTS echo transcribed) and
-   * unmute opens a fresh one. No system beep anywhere: MediaRecorder never
-   * plays one, on any device.
+   * unmute opens a fresh one.
    */
   const setMuted = useCallback(
     (muted: boolean) => {
       mutedRef.current = muted
+      if (speechSilenceTimerRef.current) {
+        clearTimeout(speechSilenceTimerRef.current)
+        speechSilenceTimerRef.current = null
+      }
       if (muted) {
         endCycle(true)
-      } else if (
-        listeningRef.current &&
-        !recorderRef.current &&
-        !transcribingRef.current
-      ) {
-        startCycle()
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.abort()
+          } catch {
+            /* ignore */
+          }
+        }
+      } else {
+        if (
+          listeningRef.current &&
+          !recorderRef.current &&
+          !transcribingRef.current
+        ) {
+          startCycle()
+        }
+        if (listeningRef.current && recognitionRef.current) {
+          try {
+            recognitionRef.current.start()
+          } catch {
+            /* ignore */
+          }
+        }
       }
     },
     [endCycle, startCycle]
   )
 
   const setLanguage = useCallback((nextLocale: string) => {
-    // Kept for API stability. The endpoint auto-detects the spoken language,
-    // so this is currently informational only.
-    langRef.current = nextLocale ?? 'fr-FR'
+    const lower = (nextLocale ?? '').toLowerCase()
+    const map: Record<string, string> = {
+      fr: 'fr-FR',
+      en: 'en-US',
+      es: 'es-ES',
+      de: 'de-DE',
+      it: 'it-IT',
+      ar: 'ar-SA'
+    }
+    const short = lower.split('-')[0]
+    langRef.current = map[short] ?? 'fr-FR'
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.lang = langRef.current
+      } catch {
+        /* ignore */
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -433,3 +556,4 @@ export function useVoiceRecognition(
 
   return { state, start, stop, setMuted, setLanguage }
 }
+
