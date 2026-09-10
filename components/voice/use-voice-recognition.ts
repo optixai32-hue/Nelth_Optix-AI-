@@ -156,20 +156,43 @@ export function useVoiceRecognition(
 
   const transcribeBlob = useCallback(async (blob: Blob): Promise<string> => {
     const fd = new FormData()
-    fd.append('audio', blob, `speech.${extForMime(mimeRef.current)}`)
-    const res = await fetch(`${STT_BASE}/api/transcribe`, {
-      method: 'POST',
-      body: fd,
-      signal: AbortSignal.timeout(STT_TIMEOUT_MS)
-    })
-    if (!res.ok) throw new Error(`STT HTTP ${res.status}`)
-    const data = (await res.json().catch(() => null)) as {
-      success?: unknown
-      transcription?: { text?: unknown }
-    } | null
-    if (!data?.success) return ''
-    const text = data.transcription?.text
-    return typeof text === 'string' ? text.trim() : ''
+    fd.append('file', blob, `speech.${extForMime(mimeRef.current)}`)
+    try {
+      // 1. Primary: Groq Whisper Large v3 Turbo
+      const res = await fetch('/api/voice/transcribe', {
+        method: 'POST',
+        body: fd,
+        signal: AbortSignal.timeout(STT_TIMEOUT_MS)
+      })
+      if (res.ok) {
+        const data = await res.json().catch(() => null)
+        if (typeof data?.text === 'string' && data.text.trim()) {
+          return data.text.trim()
+        }
+      }
+    } catch (groqErr) {
+      console.warn(
+        '[STT] Groq transcribe failed, trying fallback STT:',
+        groqErr
+      )
+    }
+
+    // 2. Fallback endpoint
+    try {
+      const fallbackFd = new FormData()
+      fallbackFd.append('audio', blob, `speech.${extForMime(mimeRef.current)}`)
+      const res = await fetch(`${STT_BASE}/api/transcribe`, {
+        method: 'POST',
+        body: fallbackFd,
+        signal: AbortSignal.timeout(STT_TIMEOUT_MS)
+      })
+      if (!res.ok) throw new Error(`STT HTTP ${res.status}`)
+      const data = (await res.json().catch(() => null)) as any
+      const text = data?.transcription?.text || data?.text
+      return typeof text === 'string' ? text.trim() : ''
+    } catch {
+      return ''
+    }
   }, [])
 
   const startCycle = useCallback(() => {
