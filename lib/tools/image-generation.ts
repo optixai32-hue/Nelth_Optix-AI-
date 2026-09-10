@@ -43,6 +43,8 @@ RÈGLES ABSOLUES :
 - Si l'utilisateur demande du texte visible dans l'image, décris ce texte intégralement, sans l'omettre.
 - Si le prompt ne donne qu'une idée vague, instancie concrètement les détails manquants (décor, lumière, matières) au lieu de rester abstrait.
 - Si un sujet précis est nommé (personnage, lieu, objet connu), garde son nom tel quel.
+- FIDÉLITÉ ABSOLUE AU SUJET PRINCIPAL : Tu ne dois JAMAIS dériver, remplacer ou substituer le sujet demandé par l'utilisateur. Si l'utilisateur demande une personne réelle ou célèbre (ex. Elon Musk), un personnage, un objet, un véhicule ou une scène précise, CE SUJET EXACT DOIT OBLIGATOIREMENT ÊTRE LE SUJET CENTRAL ET PRINCIPAL du prompt réécrit.
+- IL EST FORMELLEMENT INTERDIT de remplacer le sujet demandé par une nature morte, un bol en céramique, une table vide ou toute autre scène minimaliste sans rapport avec la requête.
 
 STRUCTURE MASTER à suivre :
 [SUJET], [APPARENCE ET CARACTÉRISTIQUES DÉTAILLÉES],
@@ -173,9 +175,67 @@ async function enhanceWithNvidia(
   return content.trim()
 }
 
+function checkSubjectPreservation(original: string, enhanced: string): boolean {
+  if (!original.trim()) return true
+  const stopWords = new Set([
+    'generer',
+    'générer',
+    'genere',
+    'génère',
+    'faire',
+    'fais',
+    'dessine',
+    'dessiner',
+    'cree',
+    'crée',
+    'creer',
+    'créer',
+    'image',
+    'photo',
+    'picture',
+    'drawing',
+    'illustration',
+    'draw',
+    'generate',
+    'create',
+    'make',
+    'une',
+    'des',
+    'pour',
+    'avec',
+    'dans',
+    'sur',
+    'the',
+    'and',
+    'with',
+    'for',
+    'about',
+    'from',
+    'style'
+  ])
+
+  const words = original
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter(w => w.length >= 3 && !stopWords.has(w))
+
+  if (words.length === 0) return true
+
+  const normEnhanced = enhanced
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  const matched = words.filter(w => normEnhanced.includes(w))
+  const matchRatio = matched.length / words.length
+  return words.length <= 2 ? matched.length === words.length : matchRatio >= 0.5
+}
+
 async function enhancePrompt(prompt: string, size: string): Promise<string> {
   const apiKey = process.env.NVIDIA_API_KEY
-  if (!apiKey) return prompt
+  if (!apiKey || !prompt.trim()) return prompt
 
   try {
     const { width, height } = parseSize(size)
@@ -200,7 +260,19 @@ async function enhancePrompt(prompt: string, size: string): Promise<string> {
       return null
     }
 
-    return extract(enhanced) ?? prompt
+    const rewritten = extract(enhanced)
+    if (!rewritten) return prompt
+
+    // Anti-drift check: ensure the model did not replace the requested subject
+    // (e.g. replacing "Elon Musk" with an unrelated "ceramic bowl on table")
+    if (!checkSubjectPreservation(prompt, rewritten)) {
+      console.warn(
+        `[ImageGeneration] Prompt enhancer drifted from subject "${prompt}". Falling back to safe enhanced prompt.`
+      )
+      return `${prompt}, highly detailed, professional photography, cinematic lighting, realistic textures, 8k resolution`
+    }
+
+    return rewritten
   } catch (error) {
     console.error('NVIDIA prompt enhancement error:', error)
     return prompt
@@ -572,13 +644,25 @@ export function createImageGenerationTool(opts?: { runtimeImage?: string }) {
     inputSchema: z.object({
       prompt: z
         .string()
+        .optional()
+        .default('')
         .describe('Detailed text description of the image to generate'),
+      description: z.string().optional().describe('Alias for prompt'),
+      query: z.string().optional().describe('Alias for prompt'),
+      text: z.string().optional().describe('Alias for prompt'),
+      caption: z.string().optional().describe('Alias for prompt'),
+      image_prompt: z.string().optional().describe('Alias for prompt'),
+      prompt_text: z.string().optional().describe('Alias for prompt'),
+      subject: z.string().optional().describe('Alias for prompt'),
+      content: z.string().optional().describe('Alias for prompt'),
       image: z
         .string()
         .optional()
         .describe(
           'Optional reference image for image-to-image editing. Provide a URL (http/https) or a base64 data URL of the photo to transform. When given, the backend preserves the subject (e.g. facial likeness) while applying the style in `prompt`. Omit for pure text-to-image generation.'
         ),
+      image_url: z.string().optional().describe('Alias for image'),
+      imageUrl: z.string().optional().describe('Alias for image'),
       protectFace: z
         .boolean()
         .optional()
@@ -602,9 +686,43 @@ export function createImageGenerationTool(opts?: { runtimeImage?: string }) {
         )
     }),
     async *execute(
-      { prompt, size = '1024x1024', seed = -1, image, protectFace = true },
+      args: {
+        prompt?: string
+        description?: string
+        query?: string
+        text?: string
+        caption?: string
+        image_prompt?: string
+        prompt_text?: string
+        subject?: string
+        content?: string
+        size?: string
+        seed?: number
+        image?: string
+        image_url?: string
+        imageUrl?: string
+        protectFace?: boolean
+      },
       { toolCallId }
     ) {
+      const {
+        size = '1024x1024',
+        seed = -1,
+        protectFace = true
+      } = args
+      const prompt = (
+        args.prompt ||
+        args.description ||
+        args.query ||
+        args.text ||
+        args.caption ||
+        args.image_prompt ||
+        args.prompt_text ||
+        args.subject ||
+        args.content ||
+        ''
+      ).trim()
+      const image = args.image || args.image_url || args.imageUrl
       // Normalize the size (mapped to the closest HiDream aspect ratio) and
       // the seed (-1 = random each call).
       const normalizedSize = normalizeSize(size)

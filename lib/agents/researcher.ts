@@ -655,7 +655,13 @@ export async function createResearcher({
   connectorIntentOverride?: boolean
 }) {
   try {
-    const currentDate = new Date().toLocaleString()
+    const now = new Date()
+    const daysFr = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
+    const monthsFr = [
+      'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+      'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+    ]
+    const currentDate = `${daysFr[now.getDay()]} ${now.getDate()} ${monthsFr[now.getMonth()]} ${now.getFullYear()} (${now.toISOString().split('T')[0]})`
 
     // Create model-specific tools with proper typing
     const originalSearchTool = createSearchTool(model)
@@ -903,8 +909,10 @@ export async function createResearcher({
     // and answered generically. Quality first: full instructions for all.
     const CORE_DIRECTIVE = FULL_CORE_DIRECTIVE
 
-    const TOOL_CALL_PROTOCOL = `TOOL CALL PROTOCOL — NON-NEGOTIABLE:
-- When current or external information is needed, invoke the native \`search\` tool immediately.
+    const TOOL_CALL_PROTOCOL = `TOOL CALL PROTOCOL — GEMINI GRADE & NON-NEGOTIABLE:
+- Real-time & Freshness Grounding: Today is ${currentDate}. Current year: ${now.getFullYear()}.
+- When the user asks for news, current events, recent developments, updates, rankings, prices, weather, scores, or uses relative temporal expressions ("aujourd'hui", "ce jour", "cette semaine", "ce mois-ci", "hier", "demain", "dernières nouvelles", "actualités", "latest", "news", "récent"), invoke the native \`search\` tool immediately.
+- Formulate search queries with explicit temporal context: include "${now.getFullYear()}", the current month/date, or "latest"/"news" to ensure fresh real-time web results.
 - ONE search per question: run a single well-formed search, then ANSWER from its results. A second search is allowed ONLY if results came back empty or completely off-topic. NEVER fire parallel, repeat, or reformulated searches.
 - Never output <tool_call>, <function=search>, or a JSON object pretending to be a tool call in the assistant text.
 - The search tool input uses \`query\`, \`type\`, \`content_types\`, \`max_results\`, \`search_depth\`, \`include_domains\`, and \`exclude_domains\`. Do not use legacy fields such as \`topk\` or \`source\`.
@@ -1043,6 +1051,19 @@ Requirements for the artifact:
             }
           : {}),
       prepareStep: ({ steps }) => {
+        const hasImage = steps.some(step =>
+          (step.toolCalls ?? []).some(
+            (call: any) => call.toolName === 'generateImage'
+          )
+        )
+        if (hasImage) {
+          return {
+            activeTools: activeToolsList.filter(
+              toolName => toolName !== 'generateImage' && toolName !== 'search'
+            ),
+            toolChoice: 'none' as const
+          }
+        }
         if (!hasCompletedSearch(steps)) return {}
         return {
           activeTools: activeToolsList.filter(

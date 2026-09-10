@@ -556,6 +556,8 @@ export function resolveContextualSearchQuery(
   const q = userQuery.trim()
   if (!q) return ''
 
+  let baseQuery = q
+
   const hasPronounOrFollowUp =
     /\b(leur|leurs|son|sa|ses|ça|ce|cet|cette|ces|eux|elle|elles|il|ils|lui|it|its|they|their|them|this|that|these|those|images?|photos?|pictures?|prix|combien|caract[eé]ristiques?|izy|azy|io|izay|ity|ireo|inona|iza|ahoana|nahoana|ataovy|amboary|hazavao|tohizo|avereno|eny)\b/i.test(
       q
@@ -575,31 +577,46 @@ export function resolveContextualSearchQuery(
         // Never merge with a pure greeting: "bonjour" then "Elon Musk" must
         // search "Elon Musk", NOT "bonjour Elon Musk" / "bonjour images".
         if (isPureGreeting(prevText)) {
-          return q
-        }
-        const cleanPrev = prevText
-          .replace(
-            /\b(cherche|recherche|trouve|search|find|show|montre|donne|donne-moi|give|mitady|trouve|qu'est[- ]ce|what\s+is|what\s+did|tell\s+me|about)\b/gi,
-            ''
-          )
-          .replace(/[?!.]+$/, '')
-          .trim()
+          baseQuery = q
+        } else {
+          const cleanPrev = prevText
+            .replace(
+              /\b(cherche|recherche|trouve|search|find|show|montre|donne|donne-moi|give|mitady|trouve|qu'est[- ]ce|what\s+is|what\s+did|tell\s+me|about)\b/gi,
+              ''
+            )
+            .replace(/[?!.]+$/, '')
+            .trim()
 
-        if (/\b(images?|photos?|pictures?|illustrations?)\b/i.test(q)) {
-          // The query mentions images BUT may already carry its own subject
-          // (e.g. "montre-moi une image d'Elon Musk"). In that case keep the
-          // current query as-is — do NOT replace it with "<prev> images".
-          if (hasOwnImageSubject(q)) {
-            return q
+          if (/\b(images?|photos?|pictures?|illustrations?)\b/i.test(q)) {
+            // The query mentions images BUT may already carry its own subject
+            // (e.g. "montre-moi une image d'Elon Musk"). In that case keep the
+            // current query as-is — do NOT replace it with "<prev> images".
+            if (hasOwnImageSubject(q)) {
+              baseQuery = q
+            } else {
+              baseQuery = `${cleanPrev} images`
+            }
+          } else {
+            baseQuery = `${cleanPrev} ${q}`
           }
-          return `${cleanPrev} images`
         }
-        return `${cleanPrev} ${q}`
       }
     }
   }
 
-  return q
+  // Gemini-grade temporal grounding:
+  // If the query asks for news, recent events, or relative dates ("aujourd'hui", "latest", "actualités"),
+  // anchor with the current year (e.g. 2026) so fresh results are returned.
+  const currentYear = new Date().getFullYear().toString()
+  const isTemporalOrNews =
+    /\b(news|actualit[eé]s?|actu|latest|derni[eè]res?\s+nouvelles?|derni[eè]res?\s+infos?|aujourd'?hui|ce\s+jour|ce\s+matin|cette\s+semaine|ce\s+mois|r[eé]cent|breaking)\b/i.test(
+      baseQuery
+    )
+  if (isTemporalOrNews && !baseQuery.includes(currentYear)) {
+    return `${baseQuery} ${currentYear}`
+  }
+
+  return baseQuery
 }
 
 /**

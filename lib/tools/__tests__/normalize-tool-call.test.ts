@@ -100,3 +100,33 @@ describe('normalizeToolCall — connectors', () => {
     })
   })
 })
+
+describe('normalizeToolCall — generateImage', () => {
+  it('normalizes generateImage arguments with query/caption alias to prompt', () => {
+    const result = normalizeToolCall('id5', 'generateImage', {
+      query: 'Elon Musk',
+      size: '1024x1024'
+    })
+    expect(result?.name).toBe('generateImage')
+    expect(result?.arguments).toEqual({
+      query: 'Elon Musk',
+      size: '1024x1024',
+      prompt: 'Elon Musk'
+    })
+  })
+
+  it('normalizes generateImage arguments with description alias and image_url', () => {
+    const result = normalizeToolCall('id6', 'generateImage', {
+      description: 'portrait futuriste',
+      image_url: 'https://example.com/photo.jpg'
+    })
+    expect(result?.name).toBe('generateImage')
+    expect(result?.arguments).toEqual({
+      description: 'portrait futuriste',
+      image_url: 'https://example.com/photo.jpg',
+      prompt: 'portrait futuriste',
+      image: 'https://example.com/photo.jpg'
+    })
+  })
+})
+

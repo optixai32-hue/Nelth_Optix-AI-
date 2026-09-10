@@ -54,9 +54,14 @@ export function createSearchTool(fullModel: string) {
         'images?|pictures?|photos?|photograph|illustration|wallpaper|gifs?|meme|drawing|show\\s+me|visuel(?:le)?|dessin|apercu|montre[\\s-]?moi' +
           '|imagen|imagenes|foto|fotos|bild|bilder|immagine|immagini|imagem|imagens|sary|صورة|صور|图片|照片|图像|изображение|фото|картинка'
       )
+      const NEWS_INTENT_RE = intentRe(
+        'news|actualites?|actu|breaking|latest|dernieres?\\s+nouvelles?|dernieres?\\s+infos?|ce\\s+jour|aujourd\'?hui|ce\\s+matin|cette\\s+semaine|ce\\s+mois|recent|recents?|nouvelles?|faits?\\s+divers|match|score|direct|live'
+      )
+
       const requestedContentTypes = Array.isArray(content_types)
         ? [...content_types]
         : ['web']
+
       if (
         !requestedContentTypes.includes('image') &&
         IMAGE_INTENT_RE.test(foldText(filledQuery))
@@ -65,6 +70,19 @@ export function createSearchTool(fullModel: string) {
         if (!requestedContentTypes.includes('web')) {
           requestedContentTypes.push('web')
         }
+      }
+
+      const isNewsQuery = NEWS_INTENT_RE.test(foldText(filledQuery))
+      if (!requestedContentTypes.includes('news') && isNewsQuery) {
+        requestedContentTypes.push('news')
+      }
+
+      // Gemini-grade temporal grounding: if news or recency is asked and the query
+      // lacks the current year, append the current year (2026) for fresh results.
+      const currentYear = new Date().getFullYear().toString()
+      let searchTargetQuery = filledQuery
+      if (isNewsQuery && !filledQuery.includes(currentYear)) {
+        searchTargetQuery = `${filledQuery} ${currentYear}`
       }
 
       const providerType = resolveSearchProviderType()
@@ -76,7 +94,7 @@ export function createSearchTool(fullModel: string) {
         const searchProvider = createSearchProvider()
 
         searchResult = await searchProvider.search(
-          filledQuery,
+          searchTargetQuery,
           effectiveMaxResults,
           effectiveSearchDepth,
           include_domains,

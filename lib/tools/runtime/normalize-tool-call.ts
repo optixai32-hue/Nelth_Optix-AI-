@@ -80,9 +80,25 @@ function normalizeSearchArguments(
 function normalizeImageArguments(
   input: Record<string, unknown>
 ): Record<string, unknown> {
+  const prompt = String(
+    input.prompt ??
+      input.description ??
+      input.query ??
+      input.q ??
+      input.text ??
+      input.caption ??
+      input.image_prompt ??
+      input.prompt_text ??
+      input.user_prompt ??
+      input.subject ??
+      input.content ??
+      input.title ??
+      ''
+  ).trim()
+
   return {
     ...input,
-    prompt: String(input.prompt ?? input.description ?? '').trim(),
+    prompt,
     ...(input.image || input.image_url || input.imageUrl
       ? { image: input.image ?? input.image_url ?? input.imageUrl }
       : {})
