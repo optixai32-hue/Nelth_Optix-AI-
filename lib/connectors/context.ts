@@ -27,16 +27,16 @@ import { hasConnection, markConnectorAuthFailure } from './vault'
 // against foldText(query)). Strong signals that the user wants THEIR OWN
 // data, not a web search.
 const DATA_INTENT_RE = intentRe(
-  'gmail|google\\s?mail|courriel|courriers?|e-?mails?\\s?(?:recus?|envoyes?)?' +
+  'gmail|google\\s?mail|courriel|courriers?|e-?mails?|messages?\\s?(?:recus?|envoyes?)?' +
+    '|boite(\\s+de)?\\s+(mail|reception)|inbox|qui\\s+m[\'’]a\\s+(?:ecrit|envoye)|dernier\\s+(?:mail|message)|lire\\s+(?:mon|mes|le)\\s+(?:mail|message|courriel)' +
     '|drive|google\\s?(?:doc|sheet|slide|disque)|fichier\\s?(?:drive|partage|recent)' +
-    '|calendar|agenda|calendrier|rendez-?vous|reunions?(?:\\s?(?:a venir|prochain|demain|cette semaine))?' +
-    '|github|depot|pull\\s?request|commit' +
-    '|notion|page\\s?notion|base\\s?notion' +
-    // Possessive + up to 2 filler words ("mes DERNIERS mails", "my LATEST
-    // emails", "mon PROCHAIN agenda") — adjectives must not break detection.
-    '|m(?:es|on|a)\\s+(?:\\S+\\s+){0,2}(?:mails?|e-?mails?|fichiers?|documents?|evenements?|reunions?|agenda|calendrier|drive|github|notion|repos?)' +
-    '|my\\s+(?:\\S+\\s+){0,2}(?:mails?|e-?mails?|files?|documents?|events?|meetings?|repos?|agenda|calendar|drive|github|notion)' +
-    '|boite(\\s+de)?\\s+(mail|reception)|inbox'
+    '|calendar|agenda|calendrier|planning|emploi\\s+du\\s+temps|programme|rendez-?vous|rdv|reunions?(?:\\s?(?:a venir|prochain|demain|cette semaine|aujourd[\'’]hui))?' +
+    '|(?:quoi|qu[\'’]est-?ce\\s+que\\s+j[\'’]ai)\\s+(?:aujourd[\'’]hui|demain|cette\\s+semaine|prevu)|prochain\\s+(?:evenement|rdv|rendez-?vous|meeting)' +
+    '|github|depots?|repos?|repositories|pull\\s?requests?|prs?|commits?|issues?|tickets?' +
+    '|notion|pages?\\s+notion|base\\s+(?:de\\s+donnees\\s+)?notion|notes?\\s+notion|espace\\s+notion' +
+    // Possessive + up to 2 filler words ("mes DERNIERS mails", "mon PROCHAIN agenda", "mes rdv")
+    '|m(?:es|on|a)\\s+(?:\\S+\\s+){0,2}(?:mails?|e-?mails?|courriels?|messages?|fichiers?|documents?|docs?|evenements?|reunions?|rdv|rendez-?vous|agenda|calendrier|planning|programme|drive|github|notion|repos?|depots?|commits?|prs?|tickets?|notes?)' +
+    '|my\\s+(?:\\S+\\s+){0,2}(?:mails?|e-?mails?|messages?|files?|documents?|docs?|events?|meetings?|repos?|agenda|calendar|schedule|planning|drive|github|notion|commits?|prs?|tickets?|notes?)'
 )
 
 // "Is anything connected / how do I connect" — needs the status block but no

@@ -53,3 +53,50 @@ describe('normalizeToolCall — search', () => {
     ).toEqual(['web'])
   })
 })
+
+describe('normalizeToolCall — connectors', () => {
+  it('unwraps nested parameters and normalizes gmail call', () => {
+    const result = normalizeToolCall('id2', 'gmail', {
+      parameters: {
+        operation: 'list',
+        q: 'facture',
+        max_results: 3
+      }
+    })
+    expect(result?.name).toBe('gmail')
+    expect(result?.arguments).toEqual({
+      action: 'search',
+      query: 'facture',
+      maxResults: 3
+    })
+  })
+
+  it('normalizes drive tool call with fileName and action get', () => {
+    const result = normalizeToolCall('id3', 'drive', {
+      operation: 'get',
+      file_id: 'doc123'
+    })
+    expect(result?.name).toBe('drive')
+    expect(result?.arguments).toEqual({
+      action: 'read',
+      query: '',
+      maxResults: 10,
+      fileId: 'doc123'
+    })
+  })
+
+  it('normalizes calendar tool call with start and end', () => {
+    const result = normalizeToolCall('id4', 'calendar', {
+      start: '2026-09-10T00:00:00Z',
+      end: '2026-09-17T00:00:00Z',
+      q: 'dentiste'
+    })
+    expect(result?.name).toBe('calendar')
+    expect(result?.arguments).toMatchObject({
+      timeMin: '2026-09-10T00:00:00Z',
+      timeMax: '2026-09-17T00:00:00Z',
+      query: 'dentiste',
+      maxResults: 10
+    })
+  })
+})

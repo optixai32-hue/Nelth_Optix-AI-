@@ -806,7 +806,7 @@ export async function createResearcher({
       activeToolsList = []
     }
 
-    if (preloadedSearchContext || isNonThinking) {
+    if (preloadedSearchContext) {
       activeToolsList = activeToolsList.filter(
         toolName => toolName !== 'search' && toolName !== 'fetch'
       )
@@ -815,9 +815,8 @@ export async function createResearcher({
     // CONNECTORS (user-owned apps: Gmail, Drive, Calendar, GitHub, Notion).
     // Armed ONLY when the turn targets the user's own data — never for
     // greetings, code artifacts, or plain web research — so the 5 tool
-    // definitions don't bloat every prompt. Tool-capable models get native
-    // tools; the weak non-thinking model (tools stripped above) gets a
-    // server-side preload layer with the same data as injected text.
+    // definitions don't bloat every prompt. Both models get native tools
+    // with resilient schemas; preload layer is also attached if available.
     let connectorLayer = ''
     let connectorTools: ConnectorTools | null = null
     const connectorIntent =
@@ -835,10 +834,11 @@ export async function createResearcher({
         connectorLayer = ctx.text
         if (ctx.anyConnected) {
           let connectorPreloadAdded = false
-          if (!isNonThinking) {
-            connectorTools = createConnectorTools(userId)
-            activeToolsList.push(...CONNECTOR_TOOL_NAMES)
-          } else {
+          // Arm native connector tools for all models
+          connectorTools = createConnectorTools(userId)
+          activeToolsList.push(...CONNECTOR_TOOL_NAMES)
+
+          if (isNonThinking) {
             const preload = await runConnectorPreloadStructured(
               userId,
               userQuery ?? '',
@@ -910,6 +910,16 @@ export async function createResearcher({
 - The search tool input uses \`query\`, \`type\`, \`content_types\`, \`max_results\`, \`search_depth\`, \`include_domains\`, and \`exclude_domains\`. Do not use legacy fields such as \`topk\` or \`source\`.
 - Wait for the native tool result before writing the answer. Cite returned URLs inline using the tool call id.`
 
+    const CONNECTOR_CALL_PROTOCOL = `CONNECTOR TOOLS PROTOCOL — CRITICAL & NON-NEGOTIABLE:
+- You have direct access to the user's connected accounts and applications:
+  • \`gmail\`: For reading and searching the user's emails (actions: 'search', 'read').
+  • \`drive\`: For searching and reading Google Drive files/documents (actions: 'search', 'read').
+  • \`calendar\`: For listing agenda, schedule, events, meetings (timeMin, timeMax, query).
+  • \`github\`: For searching and reading repositories, commits, PRs, code (actions: 'search', 'read').
+  • \`notion\`: For searching and reading Notion workspace notes and pages (actions: 'search', 'read').
+- When the user asks about their personal emails, schedule, documents, repos, or notes, IMMEDIATELY call the appropriate connector tool natively.
+- Never guess or pretend to have access without calling the tool. Do not ask permission first — call the tool, then answer clearly based on the returned data.`
+
     // Hard rule placed at the VERY TOP so the weak non-thinking model sees it
     // before any skill wording. Skills (e.g. frontend-design) describe a
     // "brainstorm a plan, then build" workflow that assumes an internal
@@ -941,23 +951,18 @@ export async function createResearcher({
       preloadedSearchContext,
       preloadedSearchQuery
     )
-    // In preloaded (server-side search) mode the search tool is NOT available to
-    // the model — results are injected as text. Replacing the generic
-    // TOOL_CALL_PROTOCOL (which says "invoke the search tool immediately") with a
-    // preloaded variant stops the weak model from emitting an unresolvable search
-    // tool call (which would error the stream) and tells it to answer from the
-    // provided results instead.
+    const connectorProtocol = connectorTools ? `\n\n${CONNECTOR_CALL_PROTOCOL}` : ''
     const toolCallProtocol = preloadedSearchContext
       ? `TOOL CALL PROTOCOL — PRELOADED SEARCH:
 - Web search results are ALREADY provided to you above (SERVER-PROVIDED WEB RESULTS). Do NOT call any search/fetch tool — none is available in this mode.
 - Answer directly from the provided results. Cite them inline with [n] markers as instructed.
-- Do NOT emit any <tool_call>, <tool_calls>, <function>, <invoke>, or XML markup.`
-      : isNonThinking
+- Do NOT emit any <tool_call>, <tool_calls>, <function>, <invoke>, or XML markup.${connectorProtocol}`
+      : activeToolsList.length === 0
         ? `DIRECT CONVERSATIONAL RESPONSE PROTOCOL:
 - You are answering directly in natural markdown text.
 - Do NOT emit any <tool_call>, <tool_calls>, <function>, <invoke>, or XML markup.
 - Output your conversational answer directly.`
-        : TOOL_CALL_PROTOCOL
+        : `${TOOL_CALL_PROTOCOL}${connectorProtocol}`
     const affirmativeLayer = affirmativeHint
       ? `\n\nAFFIRMATIVE CONTINUATION — NON-NEGOTIABLE:\n${affirmativeHint}\nDo NOT greet again. Continue the exact previous topic immediately.`
       : ''
