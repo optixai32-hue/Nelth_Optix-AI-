@@ -615,7 +615,32 @@ export async function createChatStreamResponse(
               }
 
               while (true) {
-                const { done, value } = await attemptReader.read()
+                let done: boolean
+                let value: unknown
+                try {
+                  ;({ done, value } = await attemptReader.read())
+                } catch (readErr) {
+                  // The AI SDK throws "model output must contain either output
+                  // text or tool calls" when the model returns a completely
+                  // empty response. Treat this as a silent-empty attempt so
+                  // the retry / fallback pipeline handles it instead of
+                  // surfacing a raw SDK error to the user.
+                  const msg =
+                    readErr instanceof Error ? readErr.message : String(readErr)
+                  if (
+                    msg.includes('model output') ||
+                    msg.includes('output text') ||
+                    msg.includes('tool calls') ||
+                    msg.includes('cannot both be empty')
+                  ) {
+                    console.warn(
+                      `[Stream] SDK empty-output error caught in pumpAttempt (attempt ${attempt}) — treating as silent-empty:`,
+                      msg
+                    )
+                    return { content: attemptContent, tools: attemptTools }
+                  }
+                  throw readErr
+                }
                 if (done) {
                   const remaining = sanitizer.flush()
                   if (remaining) {
@@ -993,6 +1018,23 @@ export async function createChatStreamResponse(
           }
         },
         onError: (error: unknown) => {
+          const errMsg =
+            error instanceof Error ? error.message : String(error)
+          // Suppress the AI SDK's empty-output error: our pumpAttempt try-catch
+          // already handled it and either injected a fallback or retried. If
+          // content was written, we definitely suppress. If pumpAttempt caught
+          // the error internally it returns early so this path is a safety net.
+          if (
+            errMsg.includes('model output') ||
+            errMsg.includes('output text') ||
+            errMsg.includes('tool calls') ||
+            errMsg.includes('cannot both be empty')
+          ) {
+            console.warn(
+              '[Stream] SDK empty-output error suppressed in onError — already handled by pumpAttempt'
+            )
+            return wroteContent ? '' : emptyResponseText(conversationLanguage?.lang)
+          }
           console.error(
             'Stream response error (wroteContent=' +
               wroteContent +
