@@ -45,6 +45,7 @@ import {
   truncateMessages
 } from '../utils/context-window'
 import {
+  extractFakeSearchQuery,
   getImageAttachmentUrl,
   getTextFromParts,
   resolveContextualSearchQuery,
@@ -598,6 +599,7 @@ export async function createChatStreamResponse(
             // outcome feeds the internal-retry driver below; the shared
             // wroteContent/wroteToolPart/writtenPartCount accumulate across
             // attempts for the onError gate and the empty fallback.
+            let accumulatedRawModelText = ''
             const pumpAttempt = async (
               attemptReader: ReadableStreamDefaultReader<unknown>,
               sanitizer: StreamTextSanitizer,
@@ -731,6 +733,7 @@ export async function createChatStreamResponse(
                   part.type === 'text-delta' &&
                   typeof part.delta === 'string'
                 ) {
+                  accumulatedRawModelText += part.delta
                   const cleanDelta = sanitizer.process(part.delta)
                   // Only write VISIBLE text to the client. Whitespace-only
                   // deltas (e.g. "\n\n" from the Dots model after connector
@@ -773,10 +776,12 @@ export async function createChatStreamResponse(
                   part &&
                   typeof part.type === 'string' &&
                   part.type === 'text' &&
-                  typeof (part as any).text === 'string' &&
-                  (part as any).text.trim()
+                  typeof (part as any).text === 'string'
                 ) {
-                  markContent()
+                  accumulatedRawModelText += (part as any).text
+                  if ((part as any).text.trim()) {
+                    markContent()
+                  }
                 }
                 if (
                   part &&
@@ -847,6 +852,65 @@ export async function createChatStreamResponse(
                 connectorPreloadCalls.length
               )
               let fallbackDelta: string | null = null
+
+              // 0a) Web search results from preload: provide factual summary directly
+              if (
+                !fallbackDelta &&
+                searchResultsForCitation &&
+                searchResultsForCitation.results.length > 0
+              ) {
+                const topResults = searchResultsForCitation.results.slice(0, 4)
+                const summaries = topResults
+                  .map((r, i) => `**[${i + 1}] ${r.title}**\n${r.content}`)
+                  .join('\n\n')
+                fallbackDelta = `${summaries}`
+              }
+
+              // 0b) Model attempted a fake search XML call (e.g. <search"> query) that got stripped
+              if (!fallbackDelta) {
+                const fakeSearchQuery = extractFakeSearchQuery(
+                  accumulatedRawModelText
+                )
+                if (fakeSearchQuery) {
+                  try {
+                    const liveSearchResult = await runWebSearch(
+                      fakeSearchQuery,
+                      isNonThinkingModel ? 7 : 10,
+                      'basic',
+                      [],
+                      [],
+                      caps.webImageSearch ? ['image', 'web'] : ['web']
+                    )
+                    if (liveSearchResult.results.length > 0) {
+                      if (!searchChunksEmitted) {
+                        searchChunksEmitted = true
+                        writer.write({
+                          type: 'tool-call',
+                          toolCallId: 'call-search-fallback',
+                          toolName: 'search',
+                          args: { query: fakeSearchQuery }
+                        } as unknown as Parameters<typeof writer.write>[0])
+                        writer.write({
+                          type: 'tool-result',
+                          toolCallId: 'call-search-fallback',
+                          toolName: 'search',
+                          result: liveSearchResult
+                        } as unknown as Parameters<typeof writer.write>[0])
+                        writtenPartCount += 2
+                      }
+                      const topResults = liveSearchResult.results.slice(0, 4)
+                      fallbackDelta = topResults
+                        .map((r, i) => `**[${i + 1}] ${r.title}**\n${r.content}`)
+                        .join('\n\n')
+                    }
+                  } catch (err) {
+                    console.error(
+                      '[Stream] fallback search execution failed:',
+                      err
+                    )
+                  }
+                }
+              }
 
               // 1) Gmail read (body available) from preload
               const gmailReadCall = connectorPreloadCalls.find(

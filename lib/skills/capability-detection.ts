@@ -57,6 +57,7 @@ export const DOCUMENT_INTENT_RE = intentRe(
 )
 const CURRENT_INFO_RE = intentRe(
   'search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualites?|news|prix|price|prices|meteo|weather|current|recent|recents?|recentes?|latest|dernier[es]*|dernieres?|hier|yesterday|today|aujourd.hui|demain|tomorrow|ce\\s+jour|ce\\s+matin|ce\\s+soir|cette\\s+semaine|ce\\s+mois|cette\\s+annee|en\\s+direct|live|score|match|resultats?|classement|gagnant|vainqueur|events?|evenements?|annonces?|announcements?|wwdc|qui\\s+est|who\\s+is|c.est\\s+quoi|what\\s+is|qu.est[-\\s]ce\\s+qui|2026|2025|2024' +
+    '|president|presidents?|pr[eé]sident[es]?|premier\\s+ministre|gouvernement|ministre|ministres|election|elections?|[eé]lection[s]?|dirigeant|dirigeants|qui\\s+gouverne|qui\\s+dirige|qui\\s+commande|qui\\s+a\\s+gagn[eé]|qui\\s+est\\s+le|qui\\s+est\\s+la|qui\\s+sont|est-ce\\s+que|est-ce\\s+vrai|vrai\\s+ou\\s+faux|vrai\\s+que|actuel|actuelle|actuellement|pouvoir|madagascar' +
     // Weather asked the French way: "quel temps fait-il ?", "temps à Paris".
     // Bare "temps" alone is NOT matched (duration/cooking-time false
     // positives like "combien de temps", "temps de cuisson").
@@ -70,7 +71,7 @@ const DOC_FORMATS = new Set(['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'ppt'])
 // Internal knowledge subjects (Nelcia, Yannick, Optix AI, Nelth AI, founders).
 // These are part of core identity and must NEVER trigger external web search or generateImage.
 const INTERNAL_KNOWLEDGE_SUBJECT_RE =
-  /\b(nelcia|julie|fenitra|randrianavahana|yannick|jonathan|todiarison|optix|nelth|ceo|pdg|co-?founder|co-?fondat(eur|rice|eurs)|fondat(eur|rice|eurs)|cr[eé]at(eur|rice|eurs)|dirigeant)\b/i
+  /\b(nelcia|julie\s+fenitra|randrianavahana|yannick(?:\s+jonathan)?|todiarison|optix(?:\s*ai)?|nelth(?:\s*ai)?|(?:ceo|pdg|co-?founder|fondat(?:eur|rice|eurs)|cr[eé]at(?:eur|rice|eurs))\s+(?:d['’]|de\s+)?(?:optix|nelth))\b/i
 
 // A request that wants to SEE the official photo of the CEO / Co-Founder /
 // founders of Nelth-IA / Optix AI. These photos are provided directly in the

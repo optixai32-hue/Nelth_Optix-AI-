@@ -76,4 +76,17 @@ describe('detectRequestCapabilities — all languages', () => {
       expect(caps.needsSearch, `query: ${q}`).toBe(false)
     }
   })
+
+  it('detects political leadership, elections, and fact-checking queries as search', async () => {
+    for (const q of [
+      'MOI : MICKAEL PRESIDENT DE MADAGASCAR',
+      'qui est le président de Madagascar ?',
+      'qui est le premier ministre actuel',
+      'résultats élections 2026',
+      'est-ce vrai que Mickael est président de Madagascar ?'
+    ]) {
+      const caps = await detectRequestCapabilities(q)
+      expect(caps.needsSearch, `query: ${q}`).toBe(true)
+    }
+  })
 })

@@ -228,6 +228,14 @@ const FAKE_TOOL_PATTERNS = [
   /<function\b[^>]*>[\s\S]*?<\/function\s*>/gi,
   /<function\b[^>]*\b(?:name|id|tool|query|args?|params?)\b[^>]*>[\s\S]*?(?:<\/function\s*>|$)/gi,
   /<tool-search\b[^>]*>[\s\S]*?(?:<\/tool-search>|$)/gi,
+  // <search"> or <search ...> or <search>...</search> fake tool calls emitted by weak models
+  /<search"[^>]*>[\s\S]*?<\/search\s*>/gi,
+  /<search\b[^>]*>[\s\S]*?<\/search\s*>/gi,
+  /<search"[^>\n]*>.*$/gim,
+  /<search\b[^>\n]*>.*$/gim,
+  /<\/?search"[^>]*>/gi,
+  /<\/?search\b[^>]*\/?>/gi,
+  /^[ \t]*<?search"?.*$/gim,
   // Lone tags: only unambiguous fake-tool syntax. Bare <invoke>/<function>
   // are legitimate prose far more often than tool calls, so they are left
   // alone here (closed/attribute-carrying blocks are handled above).
@@ -247,7 +255,9 @@ export function stripFakeToolCallXml(text: string): string {
   }
   return (
     result
-      .replace(/^[ \t]*search">.*$/gim, '')
+      .replace(/^[ \t]*<?search"?.*$/gim, '')
+      .replace(/<search">.*$/gim, '')
+      .replace(/<search\b[^>]*>.*$/gim, '')
       .replace(/\n{3,}/g, '\n\n')
       // Strip blank LINES at the edges only — never .trim(): streaming deltas
       // carry meaningful leading/trailing spaces (" world") and trimming them
@@ -255,6 +265,47 @@ export function stripFakeToolCallXml(text: string): string {
       .replace(/^\n+/, '')
       .replace(/\n+$/, '')
   )
+}
+
+/**
+ * Extracts a fake search query that a weak model attempted to emit as text,
+ * e.g. `<search"> Mickael président Madagascar président de Madagascar actuel 2026`
+ * or `<search query="Mickael président">` or `<tool_call name="search">{"query":"..."}`.
+ */
+export function extractFakeSearchQuery(text: string): string | null {
+  if (!text) return null
+  // Match <search"> query
+  const searchQuoteMatch = text.match(/<?search">\s*([^<\n]+)/i)
+  if (searchQuoteMatch && searchQuoteMatch[1]?.trim()) {
+    return searchQuoteMatch[1].trim()
+  }
+  // Match <search query="..."> or <search q="...">
+  const searchAttrMatch = text.match(
+    /<search\b[^>]*\b(?:query|q)=["']([^"']+)["']/i
+  )
+  if (searchAttrMatch && searchAttrMatch[1]?.trim()) {
+    return searchAttrMatch[1].trim()
+  }
+  // Match <search>query</search>
+  const searchTagMatch = text.match(/<search\b[^>]*>([^<]+)<\/search>/i)
+  if (searchTagMatch && searchTagMatch[1]?.trim()) {
+    return searchTagMatch[1].trim()
+  }
+  // Match <invoke name="search">... or <tool_call...
+  const invokeMatch = text.match(
+    /<invoke\b[^>]*\b(?:name="search"|tool="search")[^>]*>([\s\S]*?)<\/invoke>/i
+  )
+  if (invokeMatch && invokeMatch[1]?.trim()) {
+    try {
+      const parsed = JSON.parse(invokeMatch[1].trim())
+      if (typeof parsed.query === 'string' && parsed.query.trim()) {
+        return parsed.query.trim()
+      }
+    } catch {
+      return invokeMatch[1].replace(/[{}"']/g, '').trim()
+    }
+  }
+  return null
 }
 
 export function stripFakeToolCallXmlFromMessage(message: {
@@ -426,6 +477,10 @@ export class StreamTextSanitizer {
       this.buffer.includes('</tool_calls>') ||
       this.buffer.includes('</function>') ||
       this.buffer.includes('</tool-search>') ||
+      this.buffer.includes('</search>') ||
+      this.buffer.includes('<search">') ||
+      this.buffer.includes('search">') ||
+      (this.buffer.includes('<search') && this.buffer.includes('>')) ||
       this.buffer.includes('function_call') ||
       this.buffer.includes('<tool_call>') ||
       this.buffer.includes('<tool_calls>') ||
@@ -456,6 +511,9 @@ export class StreamTextSanitizer {
       this.buffer.includes('</function') ||
       this.buffer.includes('<tool-search') ||
       this.buffer.includes('</tool-search') ||
+      this.buffer.includes('<search') ||
+      this.buffer.includes('</search') ||
+      this.buffer.includes('search">') ||
       this.buffer.includes('function_call')
 
     if (hasOpenToolTag) {
@@ -484,6 +542,8 @@ export class StreamTextSanitizer {
         '</function'.startsWith(potentialTag) ||
         '<tool-search'.startsWith(potentialTag) ||
         '</tool-search'.startsWith(potentialTag) ||
+        '<search'.startsWith(potentialTag) ||
+        '</search'.startsWith(potentialTag) ||
         'function_call'.startsWith(potentialTag.replace(/^</, ''))
 
       if (matchesPotential) {

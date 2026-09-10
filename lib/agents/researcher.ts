@@ -504,7 +504,7 @@ function detectArtifactIntent(text: string): {
  * a coding or image request additionally loads the matching heavy block.
  */
 const INTERNAL_KNOWLEDGE_SUBJECT_RE =
-  /\b(nelcia|julie|fenitra|randrianavahana|yannick|jonathan|todiarison|optix|nelth|ceo|pdg|co-?founder|co-?fondat(eur|rice|eurs)|fondat(eur|rice|eurs)|cr[eé]at(eur|rice|eurs)|dirigeant)\b/i
+  /\b(nelcia|julie\s+fenitra|randrianavahana|yannick(?:\s+jonathan)?|todiarison|optix(?:\s*ai)?|nelth(?:\s*ai)?|(?:ceo|pdg|co-?founder|fondat(?:eur|rice|eurs)|cr[eé]at(?:eur|rice|eurs))\s+(?:d['’]|de\s+)?(?:optix|nelth))\b/i
 
 function detectQuickIntent(
   text: string,
@@ -545,7 +545,7 @@ function detectQuickIntent(
   // Bare "temps" alone is NOT matched (duration/cooking-time false positives
   // like "combien de temps", "temps de cuisson").
   const hasCurrentInfoKeyword =
-    /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualit[eé]s?|news|prix|price|m[eé]t[eé]o|weather|current|recent|r[eé]cents?|r[eé]centes?|latest|last|dernier[es]*|derni[eè]res?|hier|yesterday|today|aujourd'hui|demain|tomorrow|quel\s+temps|temps\s+[aà]|temps\s+qu|temp[eé]rature|ce\s+jour|ce\s+matin|ce\s+soir|cette\s+semaine|ce\s+mois|cette\s+ann[eé]e|en\s+direct|live|score|match|r[eé]sultat|r[eé]sultats|classement|gagnant|vainqueur|events?|[eé]v[eé]nements?|annonces?|announcements?|wwdc|qui\s+est|who\s+is|c'est\s+quoi|what\s+is|qu'est[- ]ce\s+qui|2026|2025|2024)\b/i.test(
+    /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualit[eé]s?|news|prix|price|m[eé]t[eé]o|weather|current|recent|r[eé]cents?|r[eé]centes?|latest|last|dernier[es]*|derni[eè]res?|hier|yesterday|today|aujourd'hui|demain|tomorrow|quel\s+temps|temps\s+[aà]|temps\s+qu|temp[eé]rature|ce\s+jour|ce\s+matin|ce\s+soir|cette\s+semaine|ce\s+mois|cette\s+ann[eé]e|en\s+direct|live|score|match|r[eé]sultat|r[eé]sultats|classement|gagnant|vainqueur|events?|[eé]v[eé]nements?|annonces?|announcements?|wwdc|qui\s+est|who\s+is|c'est\s+quoi|what\s+is|qu'est[- ]ce\s+qui|2026|2025|2024|president|presidents?|pr[eé]sident[es]?|premier\s+ministre|prime\s+minister|gouvernement|government|ministre|ministres|minister|ministers|election|elections?|[eé]lection[s]?|dirigeant|dirigeants|leader|leaders|chef\s+d'etat|head\s+of\s+state|qui\s+gouverne|qui\s+dirige|qui\s+commande|qui\s+a\s+gagn[eé]|qui\s+est\s+le|qui\s+est\s+la|qui\s+sont|who\s+is|who\s+are|est-ce\s+que|est-ce\s+vrai|is\s+it\s+true|fact\s*check|vrai\s+ou\s+faux|vrai\s+que|verifie|verifies|verifier|check|actuel|actuelle|actuellement|currently|present|incumbent|pouvoir|madagascar)\b/i.test(
       text
     )
 
