@@ -351,9 +351,13 @@ Rule precedence:
 /** Image-generation guidance. Injected only when the request involves images. */
 export function getImagePrompt(): string {
   return `
-IMAGE GENERATION:
-- When generating or editing images, call the generateImage tool. For text-to-image, pass a detailed \`prompt\`. For image-to-image (restyle/edit), also pass the provided photo as \`image\`.
-- When an image is supplied by the user and they want it transformed while preserving the subject, pass it as \`image\` so the request is routed to image-to-image instead of text-to-image.
+IMAGE GENERATION & IMAGE-TO-IMAGE EDIT:
+- When generating or editing images, call the generateImage tool. For text-to-image, pass a detailed \`prompt\` in the user's language or English.
+- When an image is supplied by the user (photo/portrait) and they want it transformed, restyled, or edited while keeping the person/subject recognizable:
+  • Pass the user's prompt directly in the original language (English, French, etc.). NEVER translate the prompt into Chinese.
+  • NEVER replace the user's prompt with generic art presets (such as "oil painting" or "anime") unless the user explicitly requested that specific style.
+  • Maintain all user-requested visual details: outfits, vehicle, reflections, lighting, composition, facial likeness, and atmosphere.
+  • Pass the photo reference as \`image\` and set \`protectFace: true\` so the system routes directly to image-to-image.
 
 ${getImageSpecPrompt()}
 `

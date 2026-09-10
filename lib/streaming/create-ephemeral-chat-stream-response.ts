@@ -156,11 +156,14 @@ export async function createEphemeralChatStreamResponse(
       const lastUserMessage = [...historyMessages]
         .reverse()
         .find(m => m.role === 'user')
-      const imageAttachment = lastUserMessage?.parts
-        ? getImageAttachmentUrl(lastUserMessage.parts)
-        : undefined
+      const imageAttachment =
+        (lastUserMessage?.parts && getImageAttachmentUrl(lastUserMessage.parts)) ||
+        [...historyMessages]
+          .reverse()
+          .map(m => getImageAttachmentUrl((m as any).parts))
+          .find(Boolean)
       if (imageAttachment) {
-        console.log('[ImageEdit] reference image detected in guest message')
+        console.log('[ImageEdit] reference image detected in guest message or history')
       }
       // Effective image intent: explicit text intent OR an attached image.
       const needsImageEff = caps.needsImage || Boolean(imageAttachment)

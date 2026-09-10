@@ -485,12 +485,20 @@ async function editViaNelth(
 
   const buffer = Buffer.from(base64, 'base64')
   const imageUrl = await persistGeneratedImage(buffer, 'image/png')
-  // The backend echoes the prompt it actually used (after its own enhancement)
-  // in `promptUsed`; fall back to the prompt we sent if it's absent.
-  const revisedPrompt =
-    typeof resp.data?.promptUsed === 'string' && resp.data.promptUsed.trim()
-      ? resp.data.promptUsed
-      : prompt
+  // The backend echoes the prompt it actually used in `promptUsed`; fall back to
+  // the original prompt if it's absent or contains Chinese boilerplate.
+  let revisedPrompt = prompt
+  if (
+    typeof resp.data?.promptUsed === 'string' &&
+    resp.data.promptUsed.trim()
+  ) {
+    const backendPrompt = resp.data.promptUsed.trim()
+    const hasChinese = /[\u4e00-\u9fa5]/.test(backendPrompt)
+    const userHadChinese = /[\u4e00-\u9fa5]/.test(prompt)
+    if (!hasChinese || userHadChinese) {
+      revisedPrompt = backendPrompt
+    }
+  }
   return { imageUrl, revisedPrompt }
 }
 
@@ -768,15 +776,13 @@ export function createImageGenerationTool(opts?: { runtimeImage?: string }) {
           const compressed = await compressImageForNelth(
             Buffer.from(base64, 'base64')
           )
-          // Use the documented image-to-image architecture: first enhance the
-          // prompt via nelth's /api/enhance-prompt (passing protectFace), then
-          // apply the edit via /api/edit-image (also passing protectFace). This
-          // is the real model/architecture the API exposes, rather than relying
-          // on an assumed internal enhancement.
-          const enhancedPrompt = await enhanceViaNelth(prompt, protectFace)
+          // For image-to-image / image edit:
+          // The nelth-v2 edit-image API already has integrated prompt handling.
+          // We NEVER use our text-to-image prompt enhancer (enhancePrompt) for img2img.
+          // The user's prompt is passed directly to editViaNelth.
           const imageResult = await editViaNelth(
             compressed,
-            enhancedPrompt,
+            prompt,
             size,
             protectFace
           )

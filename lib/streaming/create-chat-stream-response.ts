@@ -245,11 +245,14 @@ export async function createChatStreamResponse(
       // is computed only AFTER `trivial`, an image upload is wrongly treated as a
       // trivial request and ALL tools (incl. generateImage) get disarmed — so the
       // model falls back to the web search tool.
-      const imageAttachment = message?.parts
-        ? getImageAttachmentUrl(message.parts)
-        : undefined
+      const imageAttachment =
+        (message?.parts && getImageAttachmentUrl(message.parts)) ||
+        [...messagesToModel]
+          .reverse()
+          .map(m => getImageAttachmentUrl((m as any).parts))
+          .find(Boolean)
       if (imageAttachment) {
-        console.log('[ImageEdit] reference image detected in chat message')
+        console.log('[ImageEdit] reference image detected in chat message or history')
       }
       // Effective image intent: explicit text intent OR an attached image.
       const needsImageEff = caps.needsImage || Boolean(imageAttachment)

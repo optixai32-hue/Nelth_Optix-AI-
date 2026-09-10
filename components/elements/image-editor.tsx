@@ -70,27 +70,12 @@ export function ImageEditor({ className }: { className?: string }) {
     try {
       const imageData = await fileToBase64(file)
 
-      let finalPrompt = prompt
-      if (prompt.trim()) {
-        try {
-          const enh = await fetch('/api/enhance-prompt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, protectFace, mode: 'auto' })
-          })
-          const enhData = await enh.json()
-          if (enhData?.enhancedPrompt) finalPrompt = enhData.enhancedPrompt
-        } catch {
-          // fall back to the raw prompt if enhancement fails
-        }
-      }
-
       const edit = await fetch('/api/edit-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageData,
-          prompt: finalPrompt,
+          prompt,
           size,
           guidanceScale: 1.5
         })
