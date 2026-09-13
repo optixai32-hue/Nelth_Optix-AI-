@@ -10,8 +10,8 @@ import {
 } from 'ai'
 
 import { researcher } from '@/lib/agents/researcher'
-import { isAffirmativeContinuation } from '@/lib/agents/researcher'
 import {
+  buildAffirmativeHint,
   buildConversationStateLayer,
   trackConversationState
 } from '@/lib/conversation/conversation-state'
@@ -315,31 +315,26 @@ export async function createEphemeralChatStreamResponse(
         ephemeralConversationState
       )
 
-      let ephemeralAffirmativeHint: string | undefined
-      if (ephemeralConversationState.pendingClarification) {
-        const options = ephemeralConversationState.offeredOptions
-          .map(o => `"${o}"`)
-          .join(' vs ')
-        ephemeralAffirmativeHint = `The user just replied "${userQuery.trim()}" but your previous message offered mutually exclusive options (${options}) without the user picking one. Ask ONE concise clarification question naming these options, staying on the user's active topic ("${ephemeralConversationState.activeTopic}"). Do NOT choose a branch yourself and do NOT switch back to an older topic.`
-      } else if (
-        isAffirmativeContinuation(userQuery) &&
-        historyMessages.some(m => m.role === 'assistant')
-      ) {
-        const lastAssistant = [...historyMessages]
-          .reverse()
-          .find(m => m.role === 'assistant')
-        let lastText = ''
+      // Affirmative continuation hint — same centralized builder as the main
+      // chat path (ambiguous options, no-topic-yet, exact-topic cases).
+      const ephemeralLastAssistant = [...historyMessages]
+        .reverse()
+        .find(m => m.role === 'assistant')
+      let ephemeralLastAssistantText: string | null = null
+      if (ephemeralLastAssistant) {
         try {
-          lastText = lastAssistant
-            ? getTextFromParts((lastAssistant as any).parts).slice(0, 180)
-            : ''
+          ephemeralLastAssistantText = getTextFromParts(
+            (ephemeralLastAssistant as any).parts
+          ).slice(0, 180)
         } catch {
-          lastText = ''
+          ephemeralLastAssistantText = ''
         }
-        ephemeralAffirmativeHint = lastText
-          ? `The user just replied "${userQuery.trim()}" confirming your previous message "${lastText}". Continue THAT exact topic immediately.`
-          : `The user just replied "${userQuery.trim()}" as a short affirmative continuation. Resolve it against the immediately preceding assistant message.`
       }
+      const ephemeralAffirmativeHint = buildAffirmativeHint({
+        userReply: userQuery,
+        lastAssistantText: ephemeralLastAssistantText,
+        state: ephemeralConversationState
+      })
 
       // Get the researcher agent with search mode. `imageAttachment` / `needsImageEff`
       // are already resolved above, before the `trivial` gate.

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildAffirmativeHint,
   buildConversationStateLayer,
   type ConversationTurnInput,
   extractOfferedOptions,
   extractTrailingQuestion,
   isFollowUpReference,
   isGreetingLike,
+  isGreetingOpener,
   isShortConfirmation,
   trackConversationState} from '@/lib/conversation/conversation-state'
 
@@ -136,6 +138,71 @@ describe('conversation continuity — azure → open-free → ok relapse', () =>
   })
 })
 
+describe('affirmative hint builder', () => {
+  const topicState = () =>
+    trackConversationState(
+      turns(
+        ['user', 'recherche l\u2019open free'],
+        ['assistant', ASSISTANT_OPEN_1]
+      )
+    )
+
+  it('continues the exact topic when one is established', () => {
+    const hint = buildAffirmativeHint({
+      userReply: 'ok',
+      lastAssistantText: 'Voici Whisper, Vosk et Moonshine.',
+      state: topicState()
+    })
+    expect(hint).toContain('Continue THAT exact topic immediately')
+  })
+
+  it('clarifies instead of continuing on ambiguous multi-option replies', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'je cherche un STT'],
+        ['assistant', 'Tu préfères Azure ou Open Source ?'],
+        ['user', 'vas-y']
+      )
+    )
+    const hint = buildAffirmativeHint({
+      userReply: 'vas-y',
+      lastAssistantText: 'Tu préfères Azure ou Open Source ?',
+      state
+    })
+    expect(hint).toContain('ONE concise clarification question')
+    expect(hint).not.toContain('Continue THAT exact topic')
+  })
+
+  it('returns undefined without an assistant message or for real requests', () => {
+    const state = topicState()
+    expect(
+      buildAffirmativeHint({ userReply: 'ok', lastAssistantText: null, state })
+    ).toBeUndefined()
+    expect(
+      buildAffirmativeHint({
+        userReply: 'recherche l\u2019open free',
+        lastAssistantText: 'Bonjour !',
+        state
+      })
+    ).toBeUndefined()
+  })
+
+  it('detects assistant greeting openers', () => {
+    expect(
+      isGreetingOpener(
+        'Bonjour ! 👋 Ravi de vous voir — une question ? Je vous écoute.'
+      )
+    ).toBe(true)
+    expect(
+      isGreetingOpener('Salut ! 👋 Ravi de vous voir, je suis là pour aider.')
+    ).toBe(true)
+    expect(isGreetingOpener('Voici Whisper, Vosk et Moonshine.')).toBe(false)
+    expect(
+      isGreetingOpener('Azure Speech-to-Text has a free tier: 5 hours/month.')
+    ).toBe(false)
+  })
+})
+
 describe('conversation state helpers', () => {
   it('detects short confirmations across FR/EN/MG', () => {
     for (const t of [
@@ -201,6 +268,40 @@ describe('conversation state helpers', () => {
       )
     ).toBe('')
     expect(buildConversationStateLayer(trackConversationState([]))).toBe('')
+    // Cold bare confirmation with zero history: nothing to steer yet.
+    expect(
+      buildConversationStateLayer(trackConversationState(turns(['user', 'ok'])))
+    ).toBe('')
+  })
+
+  it('BONJOUR → greeting → OUI never greets again (greeting relapse)', () => {
+    const greeting =
+      'Bonjour ! 👋 Ravi de vous voir — une question, un projet ou simplement une envie de discuter ? Je vous écoute.'
+    const state = trackConversationState(
+      turns(
+        ['user', 'BONJOUR'],
+        ['assistant', greeting],
+        ['user', 'OUI']
+      )
+    )
+    expect(state.lastUserIntent).toBe('confirmation')
+    expect(state.activeTopic).toBe('')
+    expect(state.hasAssistantMessage).toBe(true)
+    expect(state.lastAssistantWasGreeting).toBe(true)
+
+    const layer = buildConversationStateLayer(state)
+    expect(layer).toContain('Do NOT greet again')
+    expect(layer).toContain('ONE short sentence inviting their actual request')
+    // "Ravi de vous voir" may only appear inside the do-NOT list.
+    expect(layer).toContain('no "Ravi de vous voir"')
+
+    const hint = buildAffirmativeHint({
+      userReply: 'OUI',
+      lastAssistantText: greeting.slice(0, 180),
+      state
+    })
+    expect(hint).toContain('Do NOT greet again')
+    expect(hint).not.toContain('Continue THAT exact topic')
   })
 
   it('keeps follow-ups on the active topic', () => {

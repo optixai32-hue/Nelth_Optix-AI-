@@ -9,13 +9,13 @@ import {
 } from 'ai'
 
 import { researcher } from '@/lib/agents/researcher'
-import { isAffirmativeContinuation } from '@/lib/agents/researcher'
 import {
   type ConnectorPreloadCall,
   detectConnectorIntent,
   isConnectorFollowUp
 } from '@/lib/connectors/context'
 import {
+  buildAffirmativeHint,
   buildConversationStateLayer,
   trackConversationState
 } from '@/lib/conversation/conversation-state'
@@ -437,37 +437,28 @@ export async function createChatStreamResponse(
         buildConversationStateLayer(conversationState)
 
       // Affirmative continuation hint ("oui" after "Je peux te donner le
-      // parcours…"): the model must continue the exact previous topic instead
-      // of greeting-restarting. Injected near the top of the instructions so
-      // even the weak model cannot miss it.
-      let affirmativeHint: string | undefined
-      if (conversationState.pendingClarification) {
-        // Ambiguous short reply after a multi-option question: do NOT let the
-        // model pick a branch (or relapse to an older topic) — force ONE
-        // concise clarification question on the user's active topic.
-        const options = conversationState.offeredOptions
-          .map(o => `"${o}"`)
-          .join(' vs ')
-        affirmativeHint = `The user just replied "${userQuery.trim()}" but your previous message offered mutually exclusive options (${options}) without the user picking one. Ask ONE concise clarification question naming these options, staying on the user's active topic ("${conversationState.activeTopic}"). Do NOT choose a branch yourself and do NOT switch back to an older topic.`
-      } else if (
-        isAffirmativeContinuation(userQuery) &&
-        messagesToModel.some(m => m.role === 'assistant')
-      ) {
-        const lastAssistant = [...messagesToModel]
-          .reverse()
-          .find(m => m.role === 'assistant')
-        let lastText = ''
+      // parcours…"): centralized builder (see lib/conversation/) covering the
+      // ambiguous multi-option case AND the no-topic-yet case (bare "oui" on
+      // a greeting must invite the request, never greet again). Injected near
+      // the top of the instructions so even the weak model cannot miss it.
+      const lastAssistantForHint = [...messagesToModel]
+        .reverse()
+        .find(m => m.role === 'assistant')
+      let lastAssistantTextForHint: string | null = null
+      if (lastAssistantForHint) {
         try {
-          lastText = lastAssistant
-            ? getTextFromParts((lastAssistant as any).parts).slice(0, 180)
-            : ''
+          lastAssistantTextForHint = getTextFromParts(
+            (lastAssistantForHint as any).parts
+          ).slice(0, 180)
         } catch {
-          lastText = ''
+          lastAssistantTextForHint = ''
         }
-        affirmativeHint = lastText
-          ? `The user just replied "${userQuery.trim()}" confirming your previous message "${lastText}". Continue THAT exact topic immediately. Provide the content you offered.`
-          : `The user just replied "${userQuery.trim()}" as a short affirmative continuation. Resolve it against the immediately preceding assistant message and continue that exact topic.`
       }
+      const affirmativeHint = buildAffirmativeHint({
+        userReply: userQuery,
+        lastAssistantText: lastAssistantTextForHint,
+        state: conversationState
+      })
 
       // Connector preload sink: for the weak model the researcher fetches
       // Gmail/Drive/… server-side; the structured calls land here so they can

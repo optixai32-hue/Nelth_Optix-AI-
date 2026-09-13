@@ -53,6 +53,10 @@ export interface ConversationState {
   offeredOptions: string[]
   /** True when the assistant's last message ends with an open question. */
   awaitingChoice: boolean
+  /** True when at least one assistant turn exists in the thread. */
+  hasAssistantMessage: boolean
+  /** True when the last assistant message was itself a greeting/opener. */
+  lastAssistantWasGreeting: boolean
 }
 
 const MAX_TOPIC_CHARS = 160
@@ -152,6 +156,37 @@ export function isGreetingLike(text: string): boolean {
   const q = normalizeReply(text)
   if (!q || WORDS(q).length > MAX_WORDS_SHORT_REPLY) return false
   return GREETING_RE.test(q) && !CONFIRMATION_RE.test(q)
+}
+
+/**
+ * Detects a short affirmative continuation ("oui", "ok", "d'accord"…) that
+ * confirms the immediately preceding assistant offer/question. Moved here from
+ * lib/agents/researcher.ts (re-exported there) so the streaming orchestrators
+ * and this tracker share one definition without an import cycle.
+ * Intentionally narrow: ≤3 words, affirmative opener, not a greeting.
+ */
+export function isAffirmativeContinuation(query: string): boolean {
+  const q = (query ?? '').trim().toLowerCase()
+  if (!q) return false
+  if (q.split(/\s+/).filter(Boolean).length > 3) return false
+  return /^(oui|non|ok|d'accord|daccord|bien s[uû]r|bien sur|parfait|merci|yes|no|yeah|okay|sure|bien sûr)\b/.test(
+    q
+  )
+}
+
+/**
+ * Detects an assistant greeting / opener ("Bonjour ! 👋 Ravi de vous voir…",
+ * "Salut ! …je suis là pour vous aider"). Used to catch the greeting-relapse:
+ * a bare "oui"/"ok" answering a greeting must NEVER produce a second
+ * greeting — there is no topic yet, only an invitation to state one.
+ */
+const ASSISTANT_GREETING_RE =
+  /^(bonjour|bonsoir|salut|coucou|hello|hey|hi|yo|salama|bienvenue|👋|ravi(e)?\s+(de\s+(vous|te)\s+voir|de\s+faire\s+votre)|je\s+suis\s+nelth|enchant[eé])/i
+
+export function isGreetingOpener(text: string): boolean {
+  const t = (text ?? '').trim()
+  if (!t) return false
+  return ASSISTANT_GREETING_RE.test(t)
 }
 
 export function isFollowUpReference(text: string): boolean {
@@ -257,7 +292,9 @@ export function trackConversationState(
     lastUserText: '',
     lastAssistantQuestion: null,
     offeredOptions: [],
-    awaitingChoice: false
+    awaitingChoice: false,
+    hasAssistantMessage: false,
+    lastAssistantWasGreeting: false
   }
   if (!turns || turns.length === 0) return empty
 
@@ -267,6 +304,7 @@ export function trackConversationState(
   let lastUserIntent: LastUserIntent = 'none'
   let lastUserText = ''
   let lastAssistantText = ''
+  let hasAssistantMessage = false
 
   for (const turn of turns) {
     const text = collapse(turn.text ?? '')
@@ -282,6 +320,7 @@ export function trackConversationState(
       }
     } else if (turn.role === 'assistant') {
       lastAssistantText = text
+      hasAssistantMessage = true
     }
   }
 
@@ -307,6 +346,10 @@ export function trackConversationState(
         : `Open question awaiting the user: "${quote(lastAssistantQuestion ?? '')}"`
   }
 
+  const lastAssistantWasGreeting = hasAssistantMessage
+    ? isGreetingOpener(lastAssistantText)
+    : false
+
   return {
     activeTopic,
     activeGoal,
@@ -318,7 +361,9 @@ export function trackConversationState(
     lastUserText,
     lastAssistantQuestion,
     offeredOptions,
-    awaitingChoice
+    awaitingChoice,
+    hasAssistantMessage,
+    lastAssistantWasGreeting
   }
 }
 
@@ -328,7 +373,27 @@ export function trackConversationState(
  * first turn, plain new requests with no topic history).
  */
 export function buildConversationStateLayer(state: ConversationState): string {
-  if (!state || !state.activeTopic) return ''
+  if (!state) return ''
+
+  // Greeting-relapse guard: a bare confirmation ("oui", "ok") answering the
+  // assistant's own greeting — e.g. BONJOUR → greeting → OUI — carries NO
+  // topic yet. The model must NOT greet a second time; it invites the actual
+  // request in one short sentence.
+  if (
+    !state.activeTopic &&
+    (state.lastUserIntent === 'confirmation' ||
+      state.lastUserIntent === 'followup') &&
+    state.hasAssistantMessage &&
+    state.lastAssistantWasGreeting
+  ) {
+    return `<conversation_state>
+The user just replied "${quote(state.lastUserText)}" with no established topic yet — a bare confirmation of your greeting, NOT a new greeting.
+Do NOT greet again: no "Bonjour", "Salut", "Hello", "Coucou", no 👋, no self-introduction, no "Ravi de vous voir".
+Reply with ONE short sentence inviting their actual request (a question, a project, or a topic), in the user's language.
+</conversation_state>`
+  }
+
+  if (!state.activeTopic) return ''
   if (state.lastUserIntent === 'none' || state.lastUserIntent === 'greeting')
     return ''
 
@@ -379,4 +444,47 @@ Answer the new request directly; do not re-explain or re-ask about the old topic
   }
 
   return ''
+}
+
+/**
+ * Centralized affirmative-continuation hint builder shared by both streaming
+ * orchestrators (authenticated + guest). Single source of truth so the two
+ * paths can never drift apart again.
+ *
+ * @param userReply          latest user message text
+ * @param lastAssistantText  first ~180 chars of the previous assistant message,
+ *                           '' when it exists but has no text, null when there
+ *                           is no assistant message at all
+ * @param state              conversation state for this turn
+ * @returns the hint string, or undefined when no hint applies
+ */
+export function buildAffirmativeHint(input: {
+  userReply: string
+  lastAssistantText: string | null
+  state: ConversationState
+}): string | undefined {
+  const reply = (input.userReply ?? '').trim()
+  const lastText = input.lastAssistantText
+  const state = input.state
+  if (!reply || lastText === null || !state) return undefined
+
+  // Ambiguous multi-option confirmation → force ONE clarification question.
+  // Runs BEFORE the affirmative gate on purpose: replies like "vas-y" or
+  // "eny" are confirmations but not isAffirmativeContinuation() matches.
+  if (state.pendingClarification && state.offeredOptions.length >= 2) {
+    const options = state.offeredOptions.map(o => `"${o}"`).join(' vs ')
+    return `The user just replied "${reply}" but your previous message offered mutually exclusive options (${options}) without the user picking one. Ask ONE concise clarification question naming these options, staying on the user's active topic ("${state.activeTopic}"). Do NOT choose a branch yourself and do NOT switch back to an older topic.`
+  }
+
+  if (!isAffirmativeContinuation(reply)) return undefined
+
+  // No established topic yet (e.g. BONJOUR → greeting → OUI): inviting the
+  // request — never greeting again, never "continuing" the greeting itself.
+  if (!state.activeTopic) {
+    return `The user just replied "${reply}" with no established topic yet. Do NOT greet again (no "Bonjour", "Salut", "Hello", 👋) and do NOT re-introduce yourself. Reply with ONE short sentence inviting their actual request (a question, a project, or a topic), in the user's language.`
+  }
+
+  return lastText
+    ? `The user just replied "${reply}" confirming your previous message "${lastText}". Continue THAT exact topic immediately. Provide the content you offered.`
+    : `The user just replied "${reply}" as a short affirmative continuation. Resolve it against the immediately preceding assistant message and continue that exact topic.`
 }
