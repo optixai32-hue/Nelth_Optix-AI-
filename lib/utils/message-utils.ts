@@ -342,10 +342,13 @@ const GREETING_HOOK_PARAGRAPH_RE =
 /**
  * Leading greeting sentences inside an intro paragraph ("Salut ! 👋 Ravi de
  * vous revoir. Voici ..."). Stripped sentence by sentence (up to 2) so a
- * paragraph that continues with real content keeps that content.
+ * paragraph that continues with real content keeps that content. The 👋
+ * alternative also consumes an attached greeting sentence ("👋 Content de
+ * vous voir — Python.") so the strip does not stop right after the emoji and
+ * leave "Content de vous voir…" behind.
  */
 const LEADING_GREETING_SENTENCES_RE =
-  /^(?:\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b[^.!?…\n]*[.!?…]?|👋+\s*|(?:ravi(?:e)? de vous|content(?:e)? de vous|enchanté(?:e)?)[^.!?…\n]*[.!?…]+)\s*){1,2}/i
+  /^(?:\s*(?:(?:bonjour|bonsoir|salut|coucou|hello|hey|hi)\b[^.!?…\n]*[.!?…]?|👋+\s*(?:(?:ravi(?:e)? de vous|content(?:e)? de vous|enchanté(?:e)?)[^.!?…\n]*[.!?…]+)?|(?:ravi(?:e)? de vous|content(?:e)? de vous|enchanté(?:e)?)[^.!?…\n]*[.!?…]+)\s*){1,2}/i
 
 /**
  * Self-intro-led paragraph ("Qui suis-je ? 🤖", "Je suis Nelth-IA, ...") — the
@@ -378,17 +381,29 @@ export function isIdentityQuery(query: string): boolean {
  */
 export function stripLeadingIntroReset(
   text: string,
-  opts?: { keepSelfIntro?: boolean }
+  opts?: { keepSelfIntro?: boolean; dropPureGreeting?: boolean }
 ): string {
   const keepSelfIntro = !!opts?.keepSelfIntro
+  const dropPureGreeting = !!opts?.dropPureGreeting
   let out = text
   for (let i = 0; i < 4; i++) {
     const m = out.match(/^\s*([^\n]+(?:\n(?!\n)[^\n]*)*)/)
     if (!m) break
     const para = m[1]
     const rest = out.slice(m[0].length)
-    // Never remove the entire response — only a leading reset before real content.
-    if (rest.trim().length === 0) break
+    // Last (or only) paragraph: never nuke a real answer. A reply that is
+    // ENTIRELY greeting-reset fluff is kept by default (first-turn greetings
+    // are legit) but dropped when dropPureGreeting is set — mid-conversation
+    // with a non-greeting user message, showing it IS the reset bug, so the
+    // empty-fallback/retry machinery takes over instead.
+    if (rest.trim().length === 0) {
+      const isFluff =
+        para.length <= 600 &&
+        (GREETING_HOOK_PARAGRAPH_RE.test(para) ||
+          (!keepSelfIntro && SELF_INTRO_PARAGRAPH_RE.test(para)))
+      if (!isFluff || !dropPureGreeting) break
+      return ''
+    }
     if (para.length > 600) break
     if (GREETING_HOOK_PARAGRAPH_RE.test(para)) {
       // Greeting-led paragraph: strip only the leading greeting sentences so
@@ -419,6 +434,7 @@ export class StreamTextSanitizer {
   private buffer = ''
   private stripIntro: boolean
   private keepSelfIntro: boolean
+  private dropPureGreeting: boolean
   private introChecked = false
   private head = ''
 
@@ -426,9 +442,16 @@ export class StreamTextSanitizer {
     stripLeadingIntroReset?: boolean
     /** Raw user query: a legit identity question protects the self-intro. */
     userQuery?: string
+    /**
+     * Drop a reply that is ENTIRELY greeting-reset fluff (mid-conversation,
+     * non-greeting user message) instead of releasing it at flush. The
+     * orchestrators compute this from the conversation state.
+     */
+    dropPureGreeting?: boolean
   }) {
     this.stripIntro = !!opts?.stripLeadingIntroReset
     this.keepSelfIntro = isIdentityQuery(opts?.userQuery ?? '')
+    this.dropPureGreeting = !!opts?.dropPureGreeting
   }
 
   /**
@@ -450,7 +473,8 @@ export class StreamTextSanitizer {
         const decisive = this.head.includes('\n\n') || this.head.length >= 1200
         if (!decisive) return ''
         const stripped = stripLeadingIntroReset(this.head, {
-          keepSelfIntro: this.keepSelfIntro
+          keepSelfIntro: this.keepSelfIntro,
+          dropPureGreeting: this.dropPureGreeting
         })
         if (
           stripped === this.head &&
@@ -579,7 +603,8 @@ export class StreamTextSanitizer {
     this.buffer = ''
     if (this.stripIntro && !this.introChecked) {
       tail = stripLeadingIntroReset(this.head + tail, {
-        keepSelfIntro: this.keepSelfIntro
+        keepSelfIntro: this.keepSelfIntro,
+        dropPureGreeting: this.dropPureGreeting
       })
       this.head = ''
       this.introChecked = true

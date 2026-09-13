@@ -42,6 +42,7 @@ describe('core directive continuity', () => {
     )
     expect(CONVERSATION_CONTINUITY_POLICY).toContain('LOWEST PRIORITY')
     expect(CONVERSATION_CONTINUITY_POLICY).toContain('SELF-CONSISTENCY')
+    expect(CONVERSATION_CONTINUITY_POLICY).toContain('conditional offer')
   })
 
   it('search results are the source of truth over earlier thread answers (Bug B)', () => {

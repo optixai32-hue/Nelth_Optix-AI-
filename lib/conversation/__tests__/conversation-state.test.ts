@@ -5,6 +5,7 @@ import {
   buildConversationStateLayer,
   type ConversationTurnInput,
   extractOfferedOptions,
+  extractPendingOffer,
   extractTrailingQuestion,
   isFollowUpReference,
   isGreetingLike,
@@ -261,6 +262,24 @@ describe('conversation state helpers', () => {
     expect(extractTrailingQuestion('Voici Whisper, Vosk et Moonshine.')).toBeNull()
   })
 
+  it('extracts options from conditional offers without any question mark', () => {
+    expect(
+      extractPendingOffer(
+        'Si tu veux un lien vers une plateforme spécifique (Spotify, YouTube, TikTok…), ou si tu cherches un morceau en particulier, dis-moi tout !'
+      )?.options
+    ).toEqual(['Spotify', 'YouTube', 'TikTok'])
+    expect(
+      extractPendingOffer('Tu veux un exemple ou un script !')?.options
+    ).toHaveLength(2)
+    // Single implicit offer → signal found, but no separable options.
+    const single = extractPendingOffer('Si tu veux plus de détails, dis-moi !')
+    expect(single).not.toBeNull()
+    expect(single?.options).toEqual([])
+    // No offer signal at all.
+    expect(extractPendingOffer('J\u2019adore Python !')).toBeNull()
+    expect(extractPendingOffer('Voici Whisper, Vosk et Moonshine.')).toBeNull()
+  })
+
   it('emits no layer for greetings and first turns', () => {
     expect(
       buildConversationStateLayer(
@@ -304,6 +323,40 @@ describe('conversation state helpers', () => {
     expect(hint).not.toContain('Continue THAT exact topic')
   })
 
+  it('CODE DE PYTHON at turn 3 answers directly without any greeting', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'BONJOUR'],
+        ['assistant', 'Bonjour ! 👋 Ravi de vous voir — une question ?'],
+        ['user', 'OUI'],
+        ['assistant', 'Salut ! 👋 Ravi de vous voir — je suis tout à l\u2019écoute.'],
+        ['user', 'CODE DE PYTHON']
+      )
+    )
+    expect(state.lastUserIntent).toBe('new_request')
+    expect(state.activeTopic).toBe('CODE DE PYTHON')
+    expect(state.hasAssistantMessage).toBe(true)
+
+    const layer = buildConversationStateLayer(state)
+    expect(layer).toContain('NOT the first exchange')
+    expect(layer).toContain('Do NOT open with a greeting')
+    expect(layer).toContain('Answer it directly')
+  })
+
+  it('invites the request for bare confirmations even after a non-greeting assistant message', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'BONJOUR'],
+        ['assistant', 'De quoi voulez-vous parler ?'],
+        ['user', 'oui']
+      )
+    )
+    expect(state.lastAssistantWasGreeting).toBe(false)
+    const layer = buildConversationStateLayer(state)
+    expect(layer).toContain('Do NOT greet again')
+    expect(layer).toContain('ONE short sentence inviting their actual request')
+  })
+
   it('keeps follow-ups on the active topic', () => {
     const state = trackConversationState(
       turns(
@@ -345,8 +398,7 @@ describe('conversation state helpers', () => {
     expect(layer).toContain('recherche l')
   })
 
-  it('asks which option on "oui" after "Azure ou Open Source ?"', () => {
-    const state = trackConversationState(
+  it('asks which option on "oui" after "Azure ou Open Source ?"', () => {    const state = trackConversationState(
       turns(
         ['user', 'je cherche un STT'],
         ['assistant', 'Tu préfères Azure ou Open Source ?'],
@@ -359,6 +411,40 @@ describe('conversation state helpers', () => {
     const layer = buildConversationStateLayer(state)
     expect(layer).toContain('ONE concise clarification question')
     expect(layer).toContain('Do NOT choose a branch yourself')
+  })
+
+  it('Tilsal150: "oui" on a conditional offer clarifies instead of echoing', () => {
+    const assistantBio = [
+      'Tilsal150 est un artiste montant de la scène urbaine, connu pour ses flows mélodiques.',
+      'Si tu veux un lien vers une plateforme spécifique (Spotify, YouTube, TikTok…), ou si tu cherches un morceau en particulier, dis-moi tout !'
+    ].join('\n')
+    const state = trackConversationState(
+      turns(
+        ['user', 'Recherche-moi Tilsal150'],
+        ['assistant', assistantBio],
+        ['user', 'Oui']
+      )
+    )
+    // RULE 1 — continuity: the explicit topic is preserved.
+    expect(state.activeTopic.toLowerCase()).toContain('tilsal150')
+    expect(state.lastUserIntent).toBe('confirmation')
+    // RULE 2 — ambiguity: the conditional offer holds separable options.
+    expect(state.offeredOptions).toEqual(
+      expect.arrayContaining(['Spotify', 'YouTube', 'TikTok'])
+    )
+    expect(state.pendingClarification).toBe(true)
+
+    const layer = buildConversationStateLayer(state)
+    expect(layer).toContain('ONE concise clarification question')
+    expect(layer).toContain('Do NOT choose a branch yourself')
+    expect(layer).toContain('Spotify')
+
+    const hint = buildAffirmativeHint({
+      userReply: 'Oui',
+      lastAssistantText: assistantBio.slice(-180),
+      state
+    })
+    expect(hint).toContain('ONE concise clarification question')
   })
 
   it('drops the old topic cleanly on a voluntary switch (GitHub Copilot)', () => {

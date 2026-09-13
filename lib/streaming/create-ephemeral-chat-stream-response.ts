@@ -56,6 +56,7 @@ import {
   convertDataPart,
   mapFilePartsToDataParts
 } from './helpers/convert-data-part'
+import { emptyResponseText } from './helpers/empty-response'
 import { normalizeConversationHistory } from './helpers/normalize-conversation'
 import { stripSpecFromMessages } from './helpers/strip-spec-from-messages'
 import { BaseStreamConfig } from './types'
@@ -314,6 +315,11 @@ export async function createEphemeralChatStreamResponse(
       const ephemeralConversationStateLayer = buildConversationStateLayer(
         ephemeralConversationState
       )
+      // Greeting-reset backstop (same rule as the main chat path).
+      const ephemeralDropPureGreeting =
+        ephemeralConversationState.hasAssistantMessage &&
+        ephemeralConversationState.lastUserIntent !== 'greeting' &&
+        ephemeralConversationState.lastUserIntent !== 'none'
 
       // Affirmative continuation hint — same centralized builder as the main
       // chat path (ambiguous options, no-topic-yet, exact-topic cases).
@@ -423,7 +429,8 @@ export async function createEphemeralChatStreamResponse(
               stripLeadingIntroReset: modelMessages.some(
                 m => m.role === 'assistant'
               ),
-              userQuery
+              userQuery,
+              dropPureGreeting: ephemeralDropPureGreeting
             })
 
             while (true) {
@@ -524,6 +531,18 @@ export async function createEphemeralChatStreamResponse(
               ) {
                 streamErrorSuppression.wroteContent = true
               }
+            }
+
+            // Silent-empty guard (parity with the main chat path): when
+            // everything was stripped (fake XML, greeting reset…), never
+            // leave a blank bubble — inject an honest localized fallback.
+            if (!streamErrorSuppression.wroteContent) {
+              writer.write({
+                type: 'text-delta',
+                id: 'txt-0',
+                delta: emptyResponseText(conversationLanguage?.lang)
+              } as unknown as Parameters<typeof writer.write>[0])
+              streamErrorSuppression.wroteContent = true
             }
           } catch (streamErr) {
             console.error(

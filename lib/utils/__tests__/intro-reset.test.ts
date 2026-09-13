@@ -134,4 +134,53 @@ describe('StreamTextSanitizer intro reset', () => {
     const s = new StreamTextSanitizer()
     expect(s.process('Bonjour ! ')).toBe('Bonjour ! ')
   })
+
+  it('strips an emoji-attached greeting sentence in the same paragraph', () => {
+    const text = [
+      'Salut ! 👋 Content de vous voir — Python, c\u2019est un super langage.',
+      '',
+      'Que souhaitez-vous faire aujourd\u2019hui ?'
+    ].join('\n')
+    expect(stripLeadingIntroReset(text)).toBe(
+      'Que souhaitez-vous faire aujourd\u2019hui ?'
+    )
+  })
+
+  it('drops a pure-greeting reply only when dropPureGreeting is set', () => {
+    const text =
+      'Salut ! 👋 Ravi de vous voir — une question, une idée, un projet ? Je suis tout à l\u2019écoute.'
+    // Default: kept (first-turn greetings are legit).
+    expect(stripLeadingIntroReset(text)).toBe(text)
+    // Mid-conversation reset with a non-greeting user message: dropped so the
+    // retry/fallback machinery takes over instead of showing the reset.
+    expect(stripLeadingIntroReset(text, { dropPureGreeting: true })).toBe('')
+  })
+
+  it('keeps real answers untouched even with dropPureGreeting', () => {
+    const text =
+      'Python est un langage interprété très populaire pour le scripting.'
+    expect(stripLeadingIntroReset(text, { dropPureGreeting: true })).toBe(text)
+  })
+
+  it('sanitizer drops a pure-greeting stream when dropPureGreeting is set', () => {
+    const s = new StreamTextSanitizer({
+      stripLeadingIntroReset: true,
+      dropPureGreeting: true
+    })
+    const reply =
+      'Salut ! 👋 Ravi de vous voir — une question ? Je suis tout à l\u2019écoute.'
+    let out = ''
+    for (const chunk of reply.match(/.{1,7}/g) ?? []) out += s.process(chunk)
+    out += s.flush()
+    expect(out).toBe('')
+  })
+
+  it('sanitizer still releases a pure greeting without the flag', () => {
+    const s = new StreamTextSanitizer({ stripLeadingIntroReset: true })
+    const reply = 'Salut ! 👋 Ravi de vous voir.'
+    let out = ''
+    for (const chunk of reply.match(/.{1,7}/g) ?? []) out += s.process(chunk)
+    out += s.flush()
+    expect(out).toContain('Salut')
+  })
 })

@@ -49,6 +49,8 @@ export interface ConversationState {
   lastUserText: string
   /** Trailing open question of the last assistant message, if any. */
   lastAssistantQuestion: string | null
+  /** Closing offer of the last assistant message, if any (may end with !/.). */
+  lastAssistantOffer: string | null
   /** Mutually exclusive options detected in that question. */
   offeredOptions: string[]
   /** True when the assistant's last message ends with an open question. */
@@ -248,8 +250,99 @@ export function extractOfferedOptions(question: string): string[] {
   )
 }
 
+/**
+ * Offer signals in an assistant closing message: conditional offers
+ * ("Si tu veux X ou Y, dis-moi"), capability offers ("Je peux te donner X
+ * ou Y"), and direct questions ("Veux-tu X ou Y ?"). Exported for testing.
+ */
+const OFFER_SIGNAL_RE =
+  /\b(si tu veux|si vous voulez|tu veux|vous voulez|dis-?moi si|dites-?moi si|je peux (te|vous)|veux-?tu|voulez-?vous|n'h[eé]site pas|dis-?moi tout|dites-?moi tout)\b/i
+
+const OFFER_PREFIX_STRIP_RE =
+  /^(si tu veux|si vous voulez|je peux (te|vous) (donner|proposer|chercher|trouver|faire|lister|montrer)|tu veux|vous voulez|veux-tu|voulez-vous|dis-moi si tu veux|dites-moi si vous voulez)\s+/i
+
 function collapse(text: string): string {
   return (text ?? '').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Closing segments of an assistant message (last two ?/!-terminated chunks,
+ * plus a trailing period-terminated sentence when the tail lacks ?/!).
+ * Multi-option offers live in the closing — never scan the whole message,
+ * where an unrelated "ou" would create phantom options.
+ */
+function closingSegments(text: string): string[] {
+  const chunks = (text ?? '')
+    .split(/[?!\n]+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+  const out = chunks.slice(-2)
+  const tail = (text ?? '').trim()
+  if (tail && !/[?!]$/.test(tail)) {
+    const dotSegs = tail
+      .split(/\.\s+(?=[A-ZÀ-Þ0-9«"“])/)
+      .map(s => s.trim())
+      .filter(Boolean)
+    const lastDot = dotSegs[dotSegs.length - 1]?.replace(/\.\s*$/, '')
+    if (lastDot && !out.includes(lastDot)) out.push(lastDot)
+  }
+  return out.slice(-2)
+}
+
+function cleanOption(p: string): string {
+  const clean = p
+    .trim()
+    .replace(OFFER_PREFIX_STRIP_RE, '')
+    .replace(/[….\s!?]+$/, '')
+    .trim()
+  return clean.length > MAX_OPTION_CHARS
+    ? `${clean.slice(0, MAX_OPTION_CHARS - 1)}…`
+    : clean
+}
+
+/**
+ * Detects a pending multi-option OFFER in an assistant message even when it
+ * is NOT phrased as a direct question — e.g. "Si tu veux un lien vers une
+ * plateforme spécifique (Spotify, YouTube, TikTok…), ou si tu cherches un
+ * morceau en particulier, dis-moi tout !". Returns the offer sentence plus
+ * its options ([] when an offer signal exists but no separable options).
+ * Returns null when there is no offer signal at all.
+ */
+export function extractPendingOffer(
+  text: string
+): { sentence: string; options: string[] } | null {
+  const segs = closingSegments(text)
+  if (segs.length === 0) return null
+  const offerSeg =
+    [...segs].reverse().find(s => OFFER_SIGNAL_RE.test(s)) ?? null
+  if (!offerSeg) return null
+  const sentence =
+    offerSeg.length > MAX_QUESTION_CHARS
+      ? `${offerSeg.slice(0, MAX_QUESTION_CHARS - 1)}…`
+      : offerSeg
+
+  // 1. Parenthetical enumeration: "(Spotify, YouTube, TikTok…)".
+  const paren = offerSeg.match(/\(([^()]{2,160})\)/)
+  if (paren) {
+    const items = paren[1]
+      .split(/[,;/]/)
+      .map(s => s.trim().replace(/[….\s!?]+$/, ''))
+      .filter(s => s.length >= 2)
+    if (items.length >= 2) return { sentence, options: items.slice(0, 6) }
+  }
+
+  // 2. "ou"-separated branches — only on a short closing offer, never on a
+  // long narrative paragraph where "ou" is incidental.
+  if (offerSeg.length <= 280) {
+    const parts = offerSeg
+      .split(/\s+(?:ou|or)\s+|\s+vs\.?\s+|\s*\/\s*/i)
+      .map(cleanOption)
+      .filter(p => p.length >= 2)
+    if (parts.length >= 2 && !parts.some(p => p.length > MAX_OPTION_CHARS * 2))
+      return { sentence, options: parts }
+  }
+
+  return { sentence, options: [] }
 }
 
 function toTopicLabel(text: string): string {
@@ -291,6 +384,7 @@ export function trackConversationState(
     lastUserIntent: 'none',
     lastUserText: '',
     lastAssistantQuestion: null,
+    lastAssistantOffer: null,
     offeredOptions: [],
     awaitingChoice: false,
     hasAssistantMessage: false,
@@ -327,23 +421,36 @@ export function trackConversationState(
   const lastAssistantQuestion = lastAssistantText
     ? extractTrailingQuestion(lastAssistantText)
     : null
-  const offeredOptions = lastAssistantQuestion
+  let offeredOptions = lastAssistantQuestion
     ? extractOfferedOptions(lastAssistantQuestion)
     : []
-  const awaitingChoice = lastAssistantQuestion !== null
+  // Offers phrased as conditionals ("Si tu veux X ou Y, dis-moi tout !")
+  // carry options without any question mark — same ambiguity, same
+  // clarification duty (Tilsal150 case).
+  let lastAssistantOffer: string | null = null
+  if (offeredOptions.length < 2 && lastAssistantText) {
+    const offer = extractPendingOffer(lastAssistantText)
+    if (offer) {
+      lastAssistantOffer = offer.sentence
+      if (offer.options.length >= 2) offeredOptions = offer.options
+    }
+  }
+  const awaitingChoice =
+    lastAssistantQuestion !== null || offeredOptions.length >= 2
   const ambiguousConfirmation =
     lastUserIntent === 'confirmation' && offeredOptions.length >= 2
+  const offeredThing = lastAssistantQuestion ?? lastAssistantOffer
 
   let currentTask: string | null = null
   if (ambiguousConfirmation) {
     currentTask = `Disambiguate the pending choice: ${offeredOptions.map(o => `"${o}"`).join(' vs ')}`
-  } else if (lastUserIntent === 'confirmation' && lastAssistantQuestion) {
-    currentTask = `Deliver what was just offered ("${quote(lastAssistantQuestion)}") within the active topic`
+  } else if (lastUserIntent === 'confirmation' && offeredThing) {
+    currentTask = `Deliver what was just offered ("${quote(offeredThing)}") within the active topic`
   } else if (awaitingChoice && lastUserIntent !== 'confirmation') {
     currentTask =
       offeredOptions.length >= 2
         ? `Awaiting user decision: ${offeredOptions.map(o => `"${o}"`).join(' vs ')}`
-        : `Open question awaiting the user: "${quote(lastAssistantQuestion ?? '')}"`
+        : `Open question awaiting the user: "${quote(offeredThing ?? '')}"`
   }
 
   const lastAssistantWasGreeting = hasAssistantMessage
@@ -360,6 +467,7 @@ export function trackConversationState(
     lastUserIntent,
     lastUserText,
     lastAssistantQuestion,
+    lastAssistantOffer,
     offeredOptions,
     awaitingChoice,
     hasAssistantMessage,
@@ -375,21 +483,36 @@ export function trackConversationState(
 export function buildConversationStateLayer(state: ConversationState): string {
   if (!state) return ''
 
-  // Greeting-relapse guard: a bare confirmation ("oui", "ok") answering the
-  // assistant's own greeting — e.g. BONJOUR → greeting → OUI — carries NO
-  // topic yet. The model must NOT greet a second time; it invites the actual
-  // request in one short sentence.
+  // Greeting-relapse guard: a bare confirmation/follow-up with NO established
+  // topic yet (e.g. BONJOUR → greeting → OUI) must NEVER produce another
+  // greeting — it invites the actual request in one short sentence.
   if (
     !state.activeTopic &&
     (state.lastUserIntent === 'confirmation' ||
       state.lastUserIntent === 'followup') &&
-    state.hasAssistantMessage &&
-    state.lastAssistantWasGreeting
+    state.hasAssistantMessage
   ) {
+    const ofGreeting = state.lastAssistantWasGreeting ? ' of your greeting' : ''
     return `<conversation_state>
-The user just replied "${quote(state.lastUserText)}" with no established topic yet — a bare confirmation of your greeting, NOT a new greeting.
+The user just replied "${quote(state.lastUserText)}" with no established topic yet — a bare confirmation${ofGreeting}, NOT a new greeting.
 Do NOT greet again: no "Bonjour", "Salut", "Hello", "Coucou", no 👋, no self-introduction, no "Ravi de vous voir".
 Reply with ONE short sentence inviting their actual request (a question, a project, or a topic), in the user's language.
+</conversation_state>`
+  }
+
+  // No-reset guard for the FIRST real topic once the thread started (e.g.
+  // "CODE DE PYTHON" at turn 3, after greetings only): short requests
+  // otherwise fall into the ≤3-word greeting exception and re-greet. Answer
+  // directly instead. (A new_request always sets activeTopic, so the signal
+  // here is the ABSENT previousTopic combined with existing history.)
+  if (
+    state.lastUserIntent === 'new_request' &&
+    state.hasAssistantMessage &&
+    !state.previousTopic
+  ) {
+    return `<conversation_state>
+Ongoing conversation — this is NOT the first exchange. Do NOT open with a greeting ("Bonjour", "Salut", "Hello", "Coucou", 👋) and do NOT re-introduce yourself.
+The user's latest request starts a NEW topic: "${quote(state.activeTopic)}". Answer it directly, in the user's language.
 </conversation_state>`
   }
 

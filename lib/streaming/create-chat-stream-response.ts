@@ -435,6 +435,14 @@ export async function createChatStreamResponse(
       )
       const conversationStateLayer =
         buildConversationStateLayer(conversationState)
+      // Greeting-reset backstop: mid-conversation, when the user's message is
+      // not itself a greeting, a reply that is ENTIRELY greeting fluff is
+      // dropped by the sanitizer (empty → internal retry, then honest
+      // fallback) instead of being shown.
+      const dropPureGreeting =
+        conversationState.hasAssistantMessage &&
+        conversationState.lastUserIntent !== 'greeting' &&
+        conversationState.lastUserIntent !== 'none'
 
       // Affirmative continuation hint ("oui" after "Je peux te donner le
       // parcours…"): centralized builder (see lib/conversation/) covering the
@@ -644,7 +652,8 @@ export async function createChatStreamResponse(
                 stripLeadingIntroReset: modelMessages.some(
                   m => m.role === 'assistant'
                 ),
-                userQuery
+                userQuery,
+                dropPureGreeting
               })
 
             // Pumps ONE agent stream into the client writer. Per-attempt
