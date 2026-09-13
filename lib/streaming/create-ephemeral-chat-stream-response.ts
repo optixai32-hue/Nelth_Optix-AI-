@@ -13,7 +13,8 @@ import { researcher } from '@/lib/agents/researcher'
 import {
   buildAffirmativeHint,
   buildConversationStateLayer,
-  trackConversationState
+  trackConversationState,
+  verifyResponseContinuity
 } from '@/lib/conversation/conversation-state'
 import { needsFactVerification } from '@/lib/conversation/factual-gate'
 import {
@@ -163,13 +164,16 @@ export async function createEphemeralChatStreamResponse(
         .reverse()
         .find(m => m.role === 'user')
       const imageAttachment =
-        (lastUserMessage?.parts && getImageAttachmentUrl(lastUserMessage.parts)) ||
+        (lastUserMessage?.parts &&
+          getImageAttachmentUrl(lastUserMessage.parts)) ||
         [...historyMessages]
           .reverse()
           .map(m => getImageAttachmentUrl((m as any).parts))
           .find(Boolean)
       if (imageAttachment) {
-        console.log('[ImageEdit] reference image detected in guest message or history')
+        console.log(
+          '[ImageEdit] reference image detected in guest message or history'
+        )
       }
       // Effective image intent: explicit text intent OR an attached image.
       const needsImageEff = caps.needsImage || Boolean(imageAttachment)
@@ -414,6 +418,8 @@ export async function createEphemeralChatStreamResponse(
       // streamed to the client, a trailing stream error must NOT replace the
       // delivered answer with a generic failure message.
       const streamErrorSuppression = { wroteContent: false }
+      // Sanitized visible text, for the post-stream continuity guard below.
+      let ephemeralCleanText = ''
 
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
@@ -500,6 +506,7 @@ export async function createEphemeralChatStreamResponse(
               ) {
                 const cleanDelta = textSanitizer.process(part.delta)
                 if (cleanDelta) {
+                  ephemeralCleanText += cleanDelta
                   writer.write({
                     ...part,
                     delta: cleanDelta
@@ -531,6 +538,26 @@ export async function createEphemeralChatStreamResponse(
               ) {
                 streamErrorSuppression.wroteContent = true
               }
+            }
+
+            // Continuity guard (observability, same rule as the main path).
+            const ephemeralContinuityCheck = verifyResponseContinuity(
+              ephemeralCleanText,
+              ephemeralConversationState
+            )
+            if (!ephemeralContinuityCheck.ok) {
+              console.warn(
+                '[ContinuityGuard] violation (guest)',
+                JSON.stringify({
+                  intent: ephemeralConversationState.lastUserIntent,
+                  activeTopic: ephemeralConversationState.activeTopic.slice(
+                    0,
+                    80
+                  ),
+                  violations: ephemeralContinuityCheck.violations,
+                  responseHead: ephemeralCleanText.slice(0, 160)
+                })
+              )
             }
 
             // Silent-empty guard (parity with the main chat path): when

@@ -39,6 +39,8 @@ export interface ConversationState {
   activeGoal: string
   /** Topic replaced by the latest explicit request (historical context only). */
   previousTopic: string | null
+  /** Past active topics, oldest-first (capped) — enables explicit returns. */
+  previousTopics: string[]
   /** What should happen next (deliver an offer, await a choice, …). */
   currentTask: string | null
   /** True when the last user message is ambiguous AND options are pending. */
@@ -47,6 +49,8 @@ export interface ConversationState {
   ambiguousConfirmation: boolean
   lastUserIntent: LastUserIntent
   lastUserText: string
+  /** Cumulative user constraints still in force ("gratuit", "sans python"). */
+  constraints: string[]
   /** Trailing open question of the last assistant message, if any. */
   lastAssistantQuestion: string | null
   /** Closing offer of the last assistant message, if any (may end with !/.). */
@@ -79,9 +83,9 @@ function normalizeReply(text: string): string {
     .replace(/[.!…]+$/, '')
 }
 
-/** Short affirmative replies (FR/EN/MG): "oui", "ok", "d'accord", "vas-y", "continue", "eny", … */
+/** Short affirmative replies (FR/EN/MG): "oui", "ok", "d'accord", "vas-y", "continue", "eny", "fais-le", "exact", … */
 const CONFIRMATION_RE =
-  /^(ok|okay|oke|oké|oui|yes|yeah|yep|yup|sure|d'?accord|dac+|bien s[uû]r|parfait|avec plaisir|je veux bien|vas?-?y|vasy|continue?s?|allons?-?y|go|eny|marina)\b/
+  /^(ok|okay|oke|oké|oui|yes|yeah|yep|yup|sure|yes please|d'?accord|dac+|bien s[uû]r|bien sur|bien|parfait|super|exact|c'est [cç]a|avec plaisir|je veux bien|fais-?le|fais (ça|ca|moi ça)|poursuis|encore|vas?-?y|vasy|continue?s?|allons?-?y|go|eny|marina)\b/
 
 /** Short rejections: resolved against history, but they never change the topic. */
 const REJECTION_RE = /^(non|no|nope|pas vraiment|tsy|tsia|non merci)\b/
@@ -208,9 +212,7 @@ export function isFollowUpReference(text: string): boolean {
 export function isSubstantiveRequest(text: string): boolean {
   const q = (text ?? '').trim()
   if (!q) return false
-  return (
-    !isShortConfirmation(q) && !isShortRejection(q) && !isGreetingLike(q)
-  )
+  return !isShortConfirmation(q) && !isShortRejection(q) && !isGreetingLike(q)
 }
 
 /**
@@ -240,7 +242,12 @@ export function extractOfferedOptions(question: string): string[] {
   const core = question.trim().replace(/\?\s*$/, '')
   const parts = core
     .split(/\s+(?:ou|or)\s+|\s+vs\.?\s+|\s*\/\s*/i)
-    .map(p => p.trim().replace(/^tu veux\s+/i, '').replace(/^voulez-vous\s+/i, ''))
+    .map(p =>
+      p
+        .trim()
+        .replace(/^tu veux\s+/i, '')
+        .replace(/^voulez-vous\s+/i, '')
+    )
     .filter(p => p.length >= 2)
   if (parts.length < 2) return []
   // Not a clean option list (e.g. a full sentence accidentally split).
@@ -263,6 +270,102 @@ const OFFER_PREFIX_STRIP_RE =
 
 function collapse(text: string): string {
   return (text ?? '').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Strips explicit topic-setter / correction prefixes so the active topic is
+ * the entity itself, not the command sentence: "Recherche-moi Tilsal150" →
+ * "Tilsal150", "Parlons de Whisper" → "Whisper", "Revenons à Azure" →
+ * "Azure", "Non, je parle de Y" → "Y". Interrogative frames ("qui est…",
+ * "quel est…") are deliberately KEPT — they carry meaning. Returns the
+ * original text when nothing strips or stripping yields nothing.
+ */
+const TOPIC_SETTER_PREFIX_RE =
+  /^(recherche(-moi)?|rechercher|cherche(-moi)?|chercher|trouve(-moi)?|trouver|find( me)?|search( for)?|look up|revenons (à|en)|retour (à|en)|retournons (à|en)|reparlons de|parlons de|parle-moi de|parlez-moi de|je parle de|non,?\s+je parle de|je veux dire|je voulais dire|non,?\s+je veux dire|dis-moi (tout sur|sur)|dites-moi (tout sur|sur))\s+/i
+
+export function stripTopicSetterPrefix(text: string): string {
+  const clean = collapse(text)
+  if (!clean) return clean
+  const stripped = clean.replace(TOPIC_SETTER_PREFIX_RE, '').trim()
+  return stripped || clean
+}
+
+/** One-shot constraint signals detected in a user message (folded inside). */
+const CONSTRAINT_FREE_RE = /\bgratuit|gratis|\bfree\b|open source|open-source/
+const CONSTRAINT_FAST_RE = /\b(rapide|vite|vitesse|fast|speed)\b/
+const CONSTRAINT_CHEAP_RE = /\b(pas cher|cheap|abordable|affordable)\b/
+const CONSTRAINT_FRENCH_RE = /\bfran[çc]ais\b/
+const CONSTRAINT_LOCAL_RE = /\b(local|hors ligne|offline)\b/
+const CONSTRAINT_WITHOUT_RE = /\bsans\s+([a-zà-ÿ'’\- ]{1,30})/
+const CONSTRAINT_WITH_RE = /\bavec\s+([a-zà-ÿ'’\- ]{1,30})/
+/** Fillers that are NOT task constraints ("avec plaisir", "sans doute"). */
+const CONSTRAINT_FILLER_RE =
+  /^(plaisir|doute|blague|faute|souci|problemes?|questions?|plus|moins|mieux|toi|moi|lui|eux|nous|vous|ca|cela|sucre|sel)\b/
+
+function foldConstraints(text: string): string {
+  return (text ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+/**
+ * Extracts cumulative user constraints (§11): "gratuit", "sans Python",
+ * "rapide", "pas cher", "français", "local", "avec X". Canonical short
+ * labels, order of appearance.
+ */
+export function extractConstraints(text: string): string[] {
+  const q = foldConstraints(text)
+  if (!q) return []
+  const found: string[] = []
+  if (CONSTRAINT_FREE_RE.test(q)) found.push('gratuit')
+  if (CONSTRAINT_FAST_RE.test(q)) found.push('rapidité')
+  if (CONSTRAINT_CHEAP_RE.test(q)) found.push('pas cher')
+  if (CONSTRAINT_FRENCH_RE.test(q)) found.push('français')
+  if (CONSTRAINT_LOCAL_RE.test(q)) found.push('local')
+  const without = q.match(CONSTRAINT_WITHOUT_RE)
+  if (without) {
+    const x = without[1].trim().replace(/[?.!]+$/, '')
+    if (x && !CONSTRAINT_FILLER_RE.test(x)) found.push(`sans ${x}`)
+  }
+  const withMatch = q.match(CONSTRAINT_WITH_RE)
+  if (withMatch) {
+    const x = withMatch[1].trim().replace(/[?.!]+$/, '')
+    if (x && !CONSTRAINT_FILLER_RE.test(x)) found.push(`avec ${x}`)
+  }
+  return found
+}
+
+/**
+ * Merges fresh constraint signals into the running set (§11–12): follow-ups
+ * accumulate, a new explicit request restarts from its own markers, and
+ * "avec X" replaces a conflicting "sans X" (never keep both).
+ */
+export function updateConstraints(
+  prev: string[],
+  text: string,
+  intent: LastUserIntent
+): string[] {
+  const found = extractConstraints(text)
+  let next = intent === 'new_request' ? [] : [...prev]
+  for (const c of found) {
+    if (c.startsWith('avec ')) {
+      const base = c.slice(5).trim()
+      next = next.filter(
+        x => !(x.startsWith('sans ') && x.slice(5).trim() === base)
+      )
+      if (!next.includes(c)) next.push(c)
+    } else if (c.startsWith('sans ')) {
+      const base = c.slice(5).trim()
+      next = next.filter(
+        x => !(x.startsWith('avec ') && x.slice(5).trim() === base)
+      )
+      if (!next.includes(c)) next.push(c)
+    } else if (!next.includes(c)) {
+      next.push(c)
+    }
+  }
+  return next.slice(-8)
 }
 
 /**
@@ -355,7 +458,9 @@ function toTopicLabel(text: string): string {
 
 function quote(text: string): string {
   const clean = collapse(text)
-  return clean.length <= MAX_QUOTE_CHARS ? clean : `${clean.slice(0, MAX_QUOTE_CHARS - 1)}…`
+  return clean.length <= MAX_QUOTE_CHARS
+    ? clean
+    : `${clean.slice(0, MAX_QUOTE_CHARS - 1)}…`
 }
 
 function classifyUserMessage(text: string): Exclude<LastUserIntent, 'none'> {
@@ -378,11 +483,13 @@ export function trackConversationState(
     activeTopic: '',
     activeGoal: '',
     previousTopic: null,
+    previousTopics: [],
     currentTask: null,
     pendingClarification: false,
     ambiguousConfirmation: false,
     lastUserIntent: 'none',
     lastUserText: '',
+    constraints: [],
     lastAssistantQuestion: null,
     lastAssistantOffer: null,
     offeredOptions: [],
@@ -395,6 +502,8 @@ export function trackConversationState(
   let activeTopic = ''
   let activeGoal = ''
   let previousTopic: string | null = null
+  const previousTopics: string[] = []
+  let constraints: string[] = []
   let lastUserIntent: LastUserIntent = 'none'
   let lastUserText = ''
   let lastAssistantText = ''
@@ -408,10 +517,21 @@ export function trackConversationState(
       const intent = classifyUserMessage(text)
       lastUserIntent = intent
       if (intent === 'new_request') {
-        if (activeTopic) previousTopic = activeTopic
-        activeTopic = toTopicLabel(text)
+        if (activeTopic) {
+          previousTopic = activeTopic
+          if (!previousTopics.includes(activeTopic)) {
+            previousTopics.push(activeTopic)
+            while (previousTopics.length > 5) previousTopics.shift()
+          }
+        }
+        // The topic is the entity, not the command sentence.
+        activeTopic = toTopicLabel(stripTopicSetterPrefix(text))
         activeGoal = toTopicLabel(text)
+      } else if (intent === 'followup' && activeTopic) {
+        // Goal refinement on the same topic ("Et son âge ?" → age of X).
+        activeGoal = toTopicLabel(`${activeTopic} — ${text}`)
       }
+      constraints = updateConstraints(constraints, text, intent)
     } else if (turn.role === 'assistant') {
       lastAssistantText = text
       hasAssistantMessage = true
@@ -461,11 +581,13 @@ export function trackConversationState(
     activeTopic,
     activeGoal,
     previousTopic,
+    previousTopics,
     currentTask,
     pendingClarification: ambiguousConfirmation,
     ambiguousConfirmation,
     lastUserIntent,
     lastUserText,
+    constraints,
     lastAssistantQuestion,
     lastAssistantOffer,
     offeredOptions,
@@ -482,6 +604,14 @@ export function trackConversationState(
  */
 export function buildConversationStateLayer(state: ConversationState): string {
   if (!state) return ''
+
+  const historyNote = state.previousTopic
+    ? `\nOlder context (do NOT return to it unprompted): "${quote(state.previousTopic)}".`
+    : ''
+  const constraintsNote =
+    state.constraints.length > 0
+      ? `\nActive constraints (still in force, apply them): ${state.constraints.map(c => `"${c}"`).join(', ')}.`
+      : ''
 
   // Greeting-relapse guard: a bare confirmation/follow-up with NO established
   // topic yet (e.g. BONJOUR → greeting → OUI) must NEVER produce another
@@ -512,17 +642,13 @@ Reply with ONE short sentence inviting their actual request (a question, a proje
   ) {
     return `<conversation_state>
 Ongoing conversation — this is NOT the first exchange. Do NOT open with a greeting ("Bonjour", "Salut", "Hello", "Coucou", 👋) and do NOT re-introduce yourself.
-The user's latest request starts a NEW topic: "${quote(state.activeTopic)}". Answer it directly, in the user's language.
+The user's latest request starts a NEW topic: "${quote(state.activeTopic)}". Answer it directly, in the user's language.${constraintsNote}
 </conversation_state>`
   }
 
   if (!state.activeTopic) return ''
   if (state.lastUserIntent === 'none' || state.lastUserIntent === 'greeting')
     return ''
-
-  const historyNote = state.previousTopic
-    ? `\nOlder context (do NOT return to it unprompted): "${quote(state.previousTopic)}".`
-    : ''
 
   // Rule 2 — ambiguous short reply after a multi-option question: the model
   // must ask ONE concise clarification question, never pick a branch itself.
@@ -531,7 +657,7 @@ The user's latest request starts a NEW topic: "${quote(state.activeTopic)}". Ans
     return `<conversation_state>
 Active topic: "${quote(state.activeTopic)}". User's current goal: "${quote(state.activeGoal)}".
 The user just replied "${quote(state.lastUserText)}", but your previous message offered mutually exclusive options (${options}) without the user picking one.
-Ask ONE concise clarification question naming these options, staying on the active topic above. Do NOT choose a branch yourself and do NOT switch back to an older topic.${historyNote}
+Ask ONE concise clarification question naming these options, staying on the active topic above. Do NOT choose a branch yourself and do NOT switch back to an older topic.${historyNote}${constraintsNote}
 </conversation_state>`
   }
 
@@ -548,7 +674,7 @@ Ask ONE concise clarification question naming these options, staying on the acti
     return `<conversation_state>
 Active topic: "${quote(state.activeTopic)}". User's current goal: "${quote(state.activeGoal)}".
 The user just replied "${quote(state.lastUserText)}" — ${replyKind}.
-Continue the active topic immediately. Do NOT switch back to an older topic merely because you previously proposed it. Do NOT repeat previous explanations unless asked.${historyNote}
+Continue the active topic immediately. Do NOT switch back to an older topic merely because you previously proposed it. Do NOT repeat previous explanations unless asked.${historyNote}${constraintsNote}
 </conversation_state>`
   }
 
@@ -562,11 +688,69 @@ Continue the active topic immediately. Do NOT switch back to an older topic mere
     return `<conversation_state>
 The user's latest explicit request starts a NEW active topic: "${quote(state.activeTopic)}" (goal: "${quote(state.activeGoal)}").
 "${quote(state.previousTopic)}" is now historical context only — do NOT return to it unless the user explicitly asks.
-Answer the new request directly; do not re-explain or re-ask about the old topic.
+Answer the new request directly; do not re-explain or re-ask about the old topic.${constraintsNote}
 </conversation_state>`
   }
 
   return ''
+}
+
+/**
+ * Post-generation continuity guard (observability layer of the "final
+ * protection"): checks a streamed answer against the deterministic
+ * conversation state AFTER generation. The orchestrators log violations
+ * ([ContinuityGuard]) so residual model failures are visible in production
+ * traces instead of silent. Pure function — logging only, never blocks.
+ */
+export interface ContinuityViolation {
+  rule: string
+  detail: string
+}
+
+export function verifyResponseContinuity(
+  response: string,
+  state: ConversationState
+): { ok: boolean; violations: ContinuityViolation[] } {
+  const violations: ContinuityViolation[] = []
+  const text = (response ?? '').trim()
+  if (!text || !state) return { ok: true, violations }
+
+  // A pending multi-option clarification MUST be answered with a question
+  // naming the options — never an echo ("Tilsal150") or a blind pick.
+  if (state.pendingClarification && state.offeredOptions.length >= 2) {
+    if (!text.includes('?')) {
+      violations.push({
+        rule: 'clarification-must-ask',
+        detail:
+          'Ambiguous confirmation answered without asking the pending options.'
+      })
+    }
+    const lowered = text.toLowerCase()
+    const named = state.offeredOptions
+      .slice(0, 4)
+      .filter(o => o.length >= 3 && lowered.includes(o.toLowerCase()))
+    if (named.length === 0) {
+      violations.push({
+        rule: 'clarification-must-name-options',
+        detail: `None of [${state.offeredOptions.slice(0, 4).join(' | ')}] is named in the answer.`
+      })
+    }
+  }
+
+  // Any non-greeting turn with history must never open with a greeting.
+  if (
+    state.hasAssistantMessage &&
+    state.lastUserIntent !== 'none' &&
+    state.lastUserIntent !== 'greeting' &&
+    isGreetingOpener(text)
+  ) {
+    violations.push({
+      rule: 'no-greeting-reset',
+      detail: 'Answer opens with a greeting mid-conversation.'
+    })
+  }
+
+  return { ok: violations.length === 0, violations }
 }
 
 /**

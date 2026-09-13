@@ -4,6 +4,7 @@ import {
   buildAffirmativeHint,
   buildConversationStateLayer,
   type ConversationTurnInput,
+  extractConstraints,
   extractOfferedOptions,
   extractPendingOffer,
   extractTrailingQuestion,
@@ -11,7 +12,11 @@ import {
   isGreetingLike,
   isGreetingOpener,
   isShortConfirmation,
-  trackConversationState} from '@/lib/conversation/conversation-state'
+  stripTopicSetterPrefix,
+  trackConversationState,
+  updateConstraints,
+  verifyResponseContinuity
+} from '@/lib/conversation/conversation-state'
 
 /**
  * Regression test for the "branch relapse" bug:
@@ -125,7 +130,10 @@ describe('conversation continuity — azure → open-free → ok relapse', () =>
     const state = trackConversationState(
       turns(
         ['user', 'recherche l\u2019open free'],
-        ['assistant', 'Voici Whisper, Vosk et Moonshine en local, sans limite.'],
+        [
+          'assistant',
+          'Voici Whisper, Vosk et Moonshine en local, sans limite.'
+        ],
         ['user', 'ok']
       )
     )
@@ -218,9 +226,9 @@ describe('conversation state helpers', () => {
     ])
       expect(isShortConfirmation(t)).toBe(true)
     expect(isShortConfirmation('recherche l\u2019open free')).toBe(false)
-    expect(isShortConfirmation('oui, donne-moi les prix détaillés par région')).toBe(
-      false
-    )
+    expect(
+      isShortConfirmation('oui, donne-moi les prix détaillés par région')
+    ).toBe(false)
     expect(isShortConfirmation('non')).toBe(false)
   })
 
@@ -259,7 +267,9 @@ describe('conversation state helpers', () => {
     // Single yes/no question → no options.
     expect(extractOfferedOptions('Veux-tu que je continue ?')).toEqual([])
     // No question at all.
-    expect(extractTrailingQuestion('Voici Whisper, Vosk et Moonshine.')).toBeNull()
+    expect(
+      extractTrailingQuestion('Voici Whisper, Vosk et Moonshine.')
+    ).toBeNull()
   })
 
   it('extracts options from conditional offers without any question mark', () => {
@@ -297,11 +307,7 @@ describe('conversation state helpers', () => {
     const greeting =
       'Bonjour ! 👋 Ravi de vous voir — une question, un projet ou simplement une envie de discuter ? Je vous écoute.'
     const state = trackConversationState(
-      turns(
-        ['user', 'BONJOUR'],
-        ['assistant', greeting],
-        ['user', 'OUI']
-      )
+      turns(['user', 'BONJOUR'], ['assistant', greeting], ['user', 'OUI'])
     )
     expect(state.lastUserIntent).toBe('confirmation')
     expect(state.activeTopic).toBe('')
@@ -329,7 +335,10 @@ describe('conversation state helpers', () => {
         ['user', 'BONJOUR'],
         ['assistant', 'Bonjour ! 👋 Ravi de vous voir — une question ?'],
         ['user', 'OUI'],
-        ['assistant', 'Salut ! 👋 Ravi de vous voir — je suis tout à l\u2019écoute.'],
+        [
+          'assistant',
+          'Salut ! 👋 Ravi de vous voir — je suis tout à l\u2019écoute.'
+        ],
         ['user', 'CODE DE PYTHON']
       )
     )
@@ -395,10 +404,11 @@ describe('conversation state helpers', () => {
     expect(state.lastUserIntent).toBe('followup')
     expect(state.activeTopic.toLowerCase()).toMatch(/open|free/)
     const layer = buildConversationStateLayer(state)
-    expect(layer).toContain('recherche l')
+    expect(layer).toContain('open free')
   })
 
-  it('asks which option on "oui" after "Azure ou Open Source ?"', () => {    const state = trackConversationState(
+  it('asks which option on "oui" after "Azure ou Open Source ?"', () => {
+    const state = trackConversationState(
       turns(
         ['user', 'je cherche un STT'],
         ['assistant', 'Tu préfères Azure ou Open Source ?'],
@@ -464,5 +474,195 @@ describe('conversation state helpers', () => {
     const layer = buildConversationStateLayer(state)
     expect(layer).toContain('NEW active topic')
     expect(layer).toContain('historical context only')
+  })
+})
+
+describe('general continuity policy (§40)', () => {
+  it('Test 7 — explicit return restores the historical topic', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'Recherche-moi Tilsal150'],
+        ['assistant', 'Voici des informations sur Tilsal150.'],
+        ['user', 'Parlons de Whisper'],
+        ['assistant', 'Whisper est un modèle STT open source.'],
+        ['user', 'Revenons à Tilsal150']
+      )
+    )
+    expect(state.activeTopic.toLowerCase()).toContain('tilsal150')
+    expect(state.previousTopics.map(t => t.toLowerCase())).toContainEqual(
+      expect.stringContaining('whisper')
+    )
+  })
+
+  it('Test 8 — "Son âge ?" resolves against the active entity', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'Recherche-moi Tilsal150'],
+        ['assistant', 'Voici des informations sur Tilsal150.'],
+        ['user', 'Son âge ?']
+      )
+    )
+    expect(state.lastUserIntent).toBe('followup')
+    expect(state.activeTopic.toLowerCase()).toContain('tilsal150')
+    expect(state.activeGoal.toLowerCase()).toContain('tilsal150')
+  })
+
+  it('Test 9 — user correction wins instantly; bare "Non" keeps the topic', () => {
+    const corrected = trackConversationState(
+      turns(
+        ['user', 'Recherche X'],
+        ['assistant', 'Tu parles de X, c\u2019est bien ça ?'],
+        ['user', 'Non, je parle de Y']
+      )
+    )
+    expect(corrected.lastUserIntent).toBe('new_request')
+    expect(corrected.activeTopic).toBe('Y')
+
+    const denied = trackConversationState(
+      turns(
+        ['user', 'Recherche-moi Tilsal150'],
+        ['assistant', 'Tu veux son YouTube ?'],
+        ['user', 'Non.']
+      )
+    )
+    expect(denied.activeTopic.toLowerCase()).toContain('tilsal150')
+    expect(denied.pendingClarification).toBe(false)
+  })
+
+  it('Test 10 — constraints accumulate, modification replaces', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'Je veux un STT gratuit'],
+        ['assistant', 'Voici Whisper, Vosk et Moonshine.'],
+        ['user', 'Sans Python'],
+        ['assistant', 'Whisper demande Python ; Vosk et Moonshine non.'],
+        ['user', 'Le plus rapide possible']
+      )
+    )
+    expect(state.constraints).toEqual(
+      expect.arrayContaining(['gratuit', 'sans python', 'rapidité'])
+    )
+    const layer = buildConversationStateLayer(state)
+    expect(layer).toContain('Active constraints')
+
+    // §12 — "avec X" replaces a conflicting "sans X", never both.
+    expect(
+      updateConstraints(
+        ['gratuit', 'sans python'],
+        'Et finalement avec Python',
+        'followup'
+      )
+    ).toEqual(['gratuit', 'avec python'])
+    // A new explicit topic restarts from its own markers.
+    expect(
+      updateConstraints(
+        ['gratuit', 'sans python'],
+        'Combien coûte GitHub Copilot ?',
+        'new_request'
+      )
+    ).toEqual([])
+  })
+
+  it('single clear offer + "oui" executes without clarification', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'Recherche-moi Tilsal150'],
+        ['assistant', 'Je peux te donner le lien officiel de YouTube.'],
+        ['user', 'Oui']
+      )
+    )
+    expect(state.pendingClarification).toBe(false)
+    const layer = buildConversationStateLayer(state)
+    expect(layer).toContain('Continue the active topic immediately')
+    expect(layer).not.toContain('clarification question naming')
+  })
+
+  it('strips topic-setter prefixes for clean active topics', () => {
+    expect(stripTopicSetterPrefix('Recherche-moi Tilsal150')).toBe('Tilsal150')
+    expect(stripTopicSetterPrefix('Parlons de Whisper')).toBe('Whisper')
+    expect(stripTopicSetterPrefix('Revenons à Azure')).toBe('Azure')
+    expect(stripTopicSetterPrefix('Non, je parle de Y')).toBe('Y')
+    // Interrogative frames carry meaning — kept as-is.
+    expect(stripTopicSetterPrefix('quel est le prix ?')).toBe(
+      'quel est le prix ?'
+    )
+    expect(stripTopicSetterPrefix('combien coûte GitHub Copilot ?')).toBe(
+      'combien coûte GitHub Copilot ?'
+    )
+  })
+
+  it('extracts cumulative constraint signals', () => {
+    expect(extractConstraints('Je veux une solution gratuite')).toContain(
+      'gratuit'
+    )
+    expect(extractConstraints('Et sans Python ?')).toContain('sans python')
+    expect(extractConstraints('avec plaisir')).toEqual([])
+    expect(extractConstraints('bonjour')).toEqual([])
+  })
+})
+
+describe('response continuity guard', () => {
+  const clarifying = () =>
+    trackConversationState(
+      turns(
+        ['user', 'Recherche-moi Tilsal150'],
+        ['assistant', 'Tu veux YouTube, Spotify ou TikTok ?'],
+        ['user', 'Oui']
+      )
+    )
+
+  it('flags an echo instead of the required clarification', () => {
+    const check = verifyResponseContinuity('Tilsal150', clarifying())
+    expect(check.ok).toBe(false)
+    expect(check.violations.map(v => v.rule)).toContain(
+      'clarification-must-ask'
+    )
+  })
+
+  it('flags a blind pick that names no option', () => {
+    const check = verifyResponseContinuity(
+      'Voici ce que j\u2019ai trouvé pour toi.',
+      clarifying()
+    )
+    expect(check.ok).toBe(false)
+  })
+
+  it('accepts a proper clarification naming the options', () => {
+    const check = verifyResponseContinuity(
+      'Bien sûr 😊 Tu veux YouTube, Spotify ou TikTok ?',
+      clarifying()
+    )
+    expect(check.ok).toBe(true)
+  })
+
+  it('flags a greeting opener on a no-topic confirmation turn', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'BONJOUR'],
+        ['assistant', 'Bonjour ! 👋 Ravi de vous voir.'],
+        ['user', 'OUI']
+      )
+    )
+    const check = verifyResponseContinuity(
+      'Salut ! 👋 Ravi de vous voir — une question ?',
+      state
+    )
+    expect(check.ok).toBe(false)
+    expect(check.violations.map(v => v.rule)).toContain('no-greeting-reset')
+  })
+
+  it('accepts a normal topical answer', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'Recherche-moi Tilsal150'],
+        ['assistant', 'Voici des informations sur Tilsal150.'],
+        ['user', 'Et son âge ?']
+      )
+    )
+    const check = verifyResponseContinuity(
+      'Tilsal150 est né en 1998 à Saint-Denis.',
+      state
+    )
+    expect(check.ok).toBe(true)
   })
 })

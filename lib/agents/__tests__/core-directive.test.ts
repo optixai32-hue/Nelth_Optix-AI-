@@ -36,13 +36,18 @@ describe('core directive continuity', () => {
   })
 
   it('continuity policy forbids branch relapse and arbitrary branch picks', () => {
-    expect(CONVERSATION_CONTINUITY_POLICY).toContain('LATEST EXPLICIT REQUEST WINS')
+    expect(CONVERSATION_CONTINUITY_POLICY).toContain(
+      'LATEST EXPLICIT REQUEST WINS'
+    )
     expect(CONVERSATION_CONTINUITY_POLICY).toContain(
       'ONE concise clarification question'
     )
     expect(CONVERSATION_CONTINUITY_POLICY).toContain('LOWEST PRIORITY')
     expect(CONVERSATION_CONTINUITY_POLICY).toContain('SELF-CONSISTENCY')
     expect(CONVERSATION_CONTINUITY_POLICY).toContain('conditional offer')
+    expect(CONVERSATION_CONTINUITY_POLICY).toContain('ABSOLUTE PRIORITY')
+    expect(CONVERSATION_CONTINUITY_POLICY).toContain('CUMULATIVE CONSTRAINTS')
+    expect(CONVERSATION_CONTINUITY_POLICY).toContain('questionnaire')
   })
 
   it('search results are the source of truth over earlier thread answers (Bug B)', () => {

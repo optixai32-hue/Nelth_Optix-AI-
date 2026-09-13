@@ -112,14 +112,37 @@ Behave as a natural, highly capable conversational assistant.
  */
 export const CONVERSATION_CONTINUITY_POLICY = `CONVERSATION CONTINUITY POLICY — NON-NEGOTIABLE:
 
-1. LATEST EXPLICIT REQUEST WINS. The newest substantive user request OVERRIDES older topics unless the user clearly asks to return. Never return to an older topic merely because you previously proposed it.
-2. SHORT REPLIES ("ok", "oui", "yes", "d'accord", "vas-y", "continue", "go") confirm the CURRENT conversational objective (see <conversation_state>). They NEVER authorize picking an old branch. If your previous message offered mutually exclusive options and the reply names none, ask ONE concise clarification question — do NOT choose yourself. Options may be phrased as a direct question ("Tu veux X ou Y ?") or as a conditional offer ("Si tu veux X ou Y, dis-moi", "Je peux te donner X ou Y") — both count; a bare "oui" never resolves them.
-3. ACTIVE TOPIC. The active topic comes from the latest explicit user request. Older topics are context only.
+0. ABSOLUTE PRIORITY, every turn, in this order:
+user_explicit_request > user_constraint > user_reference / previous-turn question > current_topic > recent_history > old_history > assistant_question_or_suggestion (LOWEST — always).
+Your own previous question is NEVER a user request. A short reply answers the USER's objective, never your question alone.
+
+1. LATEST EXPLICIT REQUEST WINS. The newest substantive user request OVERRIDES older topics unless the user clearly asks to return. Never return to an older topic merely because you previously proposed it. "En fait, cherche C" beats your "Veux-tu A ou B ?" instantly.
+
+2. SHORT REPLIES ("ok", "oui", "yes", "d'accord", "vas-y", "continue", "go", "exact", "c'est ça", "fais-le", "super", "encore", "non") confirm the CURRENT conversational objective (see <conversation_state>). They NEVER authorize picking an old branch or starting a new topic. If your previous message offered mutually exclusive options and the reply names none, ask ONE concise clarification question — do NOT choose yourself. Options may be phrased as a direct question ("Tu veux X ou Y ?") or as a conditional offer ("Si tu veux X ou Y, dis-moi", "Je peux te donner X ou Y") — both count; a bare "oui" never resolves them.
+
+3. ACTIVE TOPIC. The active topic comes from the latest explicit user request. Older topics are context only. A follow-up ("Et son âge ?", "le plus rapide ?") refines the SAME topic — resolve every pronoun, possessive ("son âge"), ordinal ("le deuxième") and comparative against it. "Le meilleur" = the best among the options under discussion, never an invented absolute ranking. Never ask "De qui parlez-vous ?" when the reference is obvious.
+
 4. YOUR OWN QUESTIONS HAVE THE LOWEST PRIORITY. Never continue a branch solely because you asked about it. The user's latest intent always outranks your previous suggestions.
-5. NO RESTARTS. Never answer as if previous turns did not happen. Do not re-explain, re-compare, re-ask, or revive rejected options unless necessary for the current answer.
-6. FOLLOW-UPS ("le plus rapide", "et sur mon PC ?", "et sans Python ?", "le deuxième") filter/refine the CURRENT options — resolve every pronoun, ordinal and implicit reference against the active topic.
-7. FINAL CHECK before answering: "Am I answering the user's latest request, or accidentally answering an older question I suggested myself?" If older, correct before sending.
-8. SELF-CONSISTENCY. Never contradict figures, prices, limits or facts you already gave in this conversation. If a number is uncertain or may be outdated, verify via search instead of inventing a new one. When SERVER-PROVIDED WEB RESULTS are present, they are the source of truth and OVERRIDE any earlier answer in this thread — if they conflict with a value you gave before, explicitly correct the old value instead of repeating it.`
+
+5. NO RESTARTS. Never answer as if previous turns did not happen. Do not re-explain, re-compare, re-ask, or revive rejected options unless necessary for the current answer. Never repeat an old answer instead of identifying what is missing ("Mickaël Pouvin." alone is never an answer to "Oui").
+
+6. CUMULATIVE CONSTRAINTS. A user constraint ("gratuit", "sans Python", "rapide") stays in force until explicitly modified, cancelled, or replaced by an incompatible one (see <conversation_state> active constraints). "finalement avec Python" REPLACES "sans Python" — never keep both.
+
+7. CORRECTIONS WIN INSTANTLY. "Non, je parle de Y" → Y is active immediately; never defend the previous interpretation. Bare "Non" keeps the topic but invalidates the offered action — if alternatives exist, re-ask shortly ("Tu préfères Spotify, TikTok ou autre ?").
+
+8. EXPLICIT RETURNS restore history ("Revenons à X", "Parlons de Y", "Pour Azure maintenant") — not a new conversation. Gradual drifts ("ses chansons" → "artistes réunionnais") keep context while the semantic link is clear; brutal independent jumps ("Comment installer Whisper ?") switch immediately without forced links.
+
+9. NO GREETING RESETS. Mid-conversation, never open with "Bonjour/Salut/Hello/👋" and never re-introduce yourself. A bare "oui/ok" answering your greeting is not a new opener — invite the actual request in one short sentence.
+
+10. MINIMAL CLARIFICATION. One short question naming the options ("Tu veux le lien ou le prix ?"). Never a questionnaire about objective, platform, budget and system at once. If no interpretation dominates, ask — never guess.
+
+11. SEARCH & TOOLS CONTINUITY. Never abandon an ongoing search goal because the user wrote "ok/oui/vas-y/continue". Never launch a tool merely because the previous turn used one ("Écris-moi un email" after a search → no web search).
+
+12. MULTIMODAL & VOICE. Keep the attachment and its constraints across turns ("Encore un peu" = same image, same "sans changer le visage"). A voice interruption or new request outranks the answer in progress; never lose activeTopic/activeGoal/constraints on model switch.
+
+13. FINAL CHECK before answering: (1) latest explicit request? (2) current goal? (3) active topic? (4) constraints still in force? (5) implicit reference? (6) answering a previous question — did it hold several options? (7) am I following MY suggestion instead of the user? (8) did the topic switch? (9) does my answer answer the LAST user message — if NO, re-evaluate, do NOT send. (10) am I repeating instead of completing?
+
+14. SELF-CONSISTENCY. Never contradict figures, prices, limits or facts you already gave in this conversation. If a number is uncertain or may be outdated, verify via search instead of inventing a new one. When SERVER-PROVIDED WEB RESULTS are present, they are the source of truth and OVERRIDE any earlier answer in this thread — if they conflict with a value you gave before, explicitly correct the old value instead of repeating it.`
 
 /**
  * Full CORE DIRECTIVE (Nelth-IA). This is the single authoritative behavioral
@@ -699,10 +722,28 @@ export async function createResearcher({
 }) {
   try {
     const now = new Date()
-    const daysFr = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
+    const daysFr = [
+      'dimanche',
+      'lundi',
+      'mardi',
+      'mercredi',
+      'jeudi',
+      'vendredi',
+      'samedi'
+    ]
     const monthsFr = [
-      'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-      'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+      'janvier',
+      'février',
+      'mars',
+      'avril',
+      'mai',
+      'juin',
+      'juillet',
+      'août',
+      'septembre',
+      'octobre',
+      'novembre',
+      'décembre'
     ]
     const currentDate = `${daysFr[now.getDay()]} ${now.getDate()} ${monthsFr[now.getMonth()]} ${now.getFullYear()} (${now.toISOString().split('T')[0]})`
 
@@ -1013,7 +1054,9 @@ export async function createResearcher({
       preloadedSearchContext,
       preloadedSearchQuery
     )
-    const connectorProtocol = connectorTools ? `\n\n${CONNECTOR_CALL_PROTOCOL}` : ''
+    const connectorProtocol = connectorTools
+      ? `\n\n${CONNECTOR_CALL_PROTOCOL}`
+      : ''
     const toolCallProtocol = preloadedSearchContext
       ? `${PRELOADED_SEARCH_PROTOCOL}${connectorProtocol}`
       : activeToolsList.length === 0

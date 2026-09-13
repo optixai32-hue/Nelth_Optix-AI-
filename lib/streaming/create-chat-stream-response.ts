@@ -17,7 +17,8 @@ import {
 import {
   buildAffirmativeHint,
   buildConversationStateLayer,
-  trackConversationState
+  trackConversationState,
+  verifyResponseContinuity
 } from '@/lib/conversation/conversation-state'
 import { needsFactVerification } from '@/lib/conversation/factual-gate'
 import {
@@ -257,7 +258,9 @@ export async function createChatStreamResponse(
           .map(m => getImageAttachmentUrl((m as any).parts))
           .find(Boolean)
       if (imageAttachment) {
-        console.log('[ImageEdit] reference image detected in chat message or history')
+        console.log(
+          '[ImageEdit] reference image detected in chat message or history'
+        )
       }
       // Effective image intent: explicit text intent OR an attached image.
       const needsImageEff = caps.needsImage || Boolean(imageAttachment)
@@ -661,6 +664,9 @@ export async function createChatStreamResponse(
             // wroteContent/wroteToolPart/writtenPartCount accumulate across
             // attempts for the onError gate and the empty fallback.
             let accumulatedRawModelText = ''
+            // Sanitized visible text (what the user actually received). Used
+            // by the post-stream continuity guard below.
+            let accumulatedCleanText = ''
             const pumpAttempt = async (
               attemptReader: ReadableStreamDefaultReader<unknown>,
               sanitizer: StreamTextSanitizer,
@@ -802,6 +808,7 @@ export async function createChatStreamResponse(
                   // all clean deltas (including word spaces " " and newlines)
                   // MUST be streamed to preserve word spacing and markdown formatting.
                   if (cleanDelta) {
+                    accumulatedCleanText += cleanDelta
                     if (!wroteContent) {
                       if (cleanDelta.trim()) {
                         const trimmedLead = cleanDelta.replace(/^\s+/, '')
@@ -898,6 +905,26 @@ export async function createChatStreamResponse(
               ).toUIMessageStream()
             }
 
+            // Continuity guard (observability): verify the streamed answer
+            // against the deterministic conversation state. Logging only —
+            // the prompt layers + sanitizer + retry already enforce the hard
+            // failures; this makes any residual model miss visible in traces.
+            const continuityCheck = verifyResponseContinuity(
+              accumulatedCleanText,
+              conversationState
+            )
+            if (!continuityCheck.ok) {
+              console.warn(
+                '[ContinuityGuard] violation',
+                JSON.stringify({
+                  intent: conversationState.lastUserIntent,
+                  activeTopic: conversationState.activeTopic.slice(0, 80),
+                  violations: continuityCheck.violations,
+                  responseHead: accumulatedCleanText.slice(0, 160)
+                })
+              )
+            }
+
             // DEBUG: trace model output after stream completes
             console.log(
               `[Stream] post-pump state: wroteContent=${wroteContent}, wroteToolPart=${wroteToolPart}, writtenPartCount=${writtenPartCount}, connectorPreloadCalls=${connectorPreloadCalls.length}`
@@ -972,7 +999,9 @@ export async function createChatStreamResponse(
                       }
                       const topResults = liveSearchResult.results.slice(0, 4)
                       fallbackDelta = topResults
-                        .map((r, i) => `**[${i + 1}] ${r.title}**\n${r.content}`)
+                        .map(
+                          (r, i) => `**[${i + 1}] ${r.title}**\n${r.content}`
+                        )
                         .join('\n\n')
                     }
                   } catch (err) {
@@ -1063,7 +1092,10 @@ export async function createChatStreamResponse(
                   }>
                   const lines = items
                     .slice(0, 5)
-                    .map(m => `- **${m.summary || 'Sans titre'}** — ${m.start || ''}`)
+                    .map(
+                      m =>
+                        `- **${m.summary || 'Sans titre'}** — ${m.start || ''}`
+                    )
                     .join('\n')
                   fallbackDelta = `Voici vos prochains événements :\n\n${lines}`
                 }
@@ -1134,8 +1166,7 @@ export async function createChatStreamResponse(
                 type: 'text-delta',
                 id: 'txt-0',
                 delta:
-                  fallbackDelta ??
-                  emptyResponseText(conversationLanguage?.lang)
+                  fallbackDelta ?? emptyResponseText(conversationLanguage?.lang)
               } as unknown as Parameters<typeof writer.write>[0])
               console.log(
                 `[Stream] fallback injected: "${(fallbackDelta ?? '').slice(0, 120)}" (length=${(fallbackDelta ?? '').length})`
@@ -1154,8 +1185,7 @@ export async function createChatStreamResponse(
           }
         },
         onError: (error: unknown) => {
-          const errMsg =
-            error instanceof Error ? error.message : String(error)
+          const errMsg = error instanceof Error ? error.message : String(error)
           // Suppress the AI SDK's empty-output error: our pumpAttempt try-catch
           // already handled it and either injected a fallback or retried. If
           // content was written, we definitely suppress. If pumpAttempt caught
@@ -1169,7 +1199,9 @@ export async function createChatStreamResponse(
             console.warn(
               '[Stream] SDK empty-output error suppressed in onError — already handled by pumpAttempt'
             )
-            return wroteContent ? '' : emptyResponseText(conversationLanguage?.lang)
+            return wroteContent
+              ? ''
+              : emptyResponseText(conversationLanguage?.lang)
           }
           console.error(
             'Stream response error (wroteContent=' +
