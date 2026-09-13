@@ -163,7 +163,15 @@ describe('conversation state helpers', () => {
     expect(isFollowUpReference('le plus rapide')).toBe(true)
     expect(isFollowUpReference('et sur mon PC ?')).toBe(true)
     expect(isFollowUpReference('et sans Python ?')).toBe(true)
+    expect(isFollowUpReference('et le TTS ?')).toBe(true)
+    expect(isFollowUpReference('pourquoi ?')).toBe(true)
+    expect(isFollowUpReference('quel est le prix ?')).toBe(true)
     expect(isFollowUpReference('recherche l\u2019open free')).toBe(false)
+    // Self-contained new-domain questions must NOT be swallowed as follow-ups.
+    expect(isFollowUpReference('combien coûte GitHub Copilot ?')).toBe(false)
+    expect(isFollowUpReference('quel est le meilleur STT gratuit ?')).toBe(
+      false
+    )
   })
 
   it('extracts the trailing question and its options', () => {
@@ -207,5 +215,67 @@ describe('conversation state helpers', () => {
     expect(state.activeTopic.toLowerCase()).toMatch(/open|free/)
     const layer = buildConversationStateLayer(state)
     expect(layer).toContain('resolve pronouns')
+  })
+
+  it('filters previous options on "et sans Python ?" without switching topic', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'recherche l\u2019open free'],
+        ['assistant', ASSISTANT_OPEN_1],
+        ['user', 'et sans Python ?']
+      )
+    )
+    expect(state.lastUserIntent).toBe('followup')
+    expect(state.activeTopic.toLowerCase()).toMatch(/open|free/)
+    expect(state.pendingClarification).toBe(false)
+  })
+
+  it('links "et le TTS ?" to the ongoing voice context', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'recherche l\u2019open free'],
+        ['assistant', ASSISTANT_OPEN_1],
+        ['user', 'et le TTS ?']
+      )
+    )
+    expect(state.lastUserIntent).toBe('followup')
+    expect(state.activeTopic.toLowerCase()).toMatch(/open|free/)
+    const layer = buildConversationStateLayer(state)
+    expect(layer).toContain('recherche l')
+  })
+
+  it('asks which option on "oui" after "Azure ou Open Source ?"', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'je cherche un STT'],
+        ['assistant', 'Tu préfères Azure ou Open Source ?'],
+        ['user', 'oui']
+      )
+    )
+    expect(state.lastUserIntent).toBe('confirmation')
+    expect(state.pendingClarification).toBe(true)
+    expect(state.offeredOptions).toHaveLength(2)
+    const layer = buildConversationStateLayer(state)
+    expect(layer).toContain('ONE concise clarification question')
+    expect(layer).toContain('Do NOT choose a branch yourself')
+  })
+
+  it('drops the old topic cleanly on a voluntary switch (GitHub Copilot)', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'recherche l\u2019open source STT'],
+        ['assistant', ASSISTANT_OPEN_1],
+        ['user', 'ok'],
+        ['assistant', 'Parfait, dis-moi si tu veux un script.'],
+        ['user', 'combien coûte GitHub Copilot ?']
+      )
+    )
+    expect(state.lastUserIntent).toBe('new_request')
+    expect(state.activeTopic.toLowerCase()).toContain('copilot')
+    expect(state.previousTopic?.toLowerCase()).toMatch(/open|stt/)
+    expect(state.pendingClarification).toBe(false)
+    const layer = buildConversationStateLayer(state)
+    expect(layer).toContain('NEW active topic')
+    expect(layer).toContain('historical context only')
   })
 })

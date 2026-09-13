@@ -15,6 +15,7 @@ import {
   buildConversationStateLayer,
   trackConversationState
 } from '@/lib/conversation/conversation-state'
+import { needsFactVerification } from '@/lib/conversation/factual-gate'
 import {
   createPublicErrorResponse,
   serializePublicError
@@ -176,11 +177,20 @@ export async function createEphemeralChatStreamResponse(
       // Therefore, any request that is not a pure greeting, image generation,
       // document creation, or internal knowledge MUST get preloaded search so the
       // model has real-world factual grounding and citations.
+      // Fact-verification gate (Bug B — same rule as the main chat path):
+      // pricing / quota / limit / trial / version / "free" questions are
+      // answered from fresh web results, never from weights or old answers.
+      const factVerification =
+        !caps.founderPhoto &&
+        !isIdentityQuery(userQuery ?? '') &&
+        needsFactVerification(userQuery ?? '')
+      const needsSearchEff = caps.needsSearch || factVerification
+
       const isPureChitChat = isPureGreeting(userQuery ?? '')
       const shouldPreloadSearch =
         !caps.founderPhoto &&
         !isIdentityQuery(userQuery ?? '') &&
-        (Boolean(caps.needsSearch) ||
+        (Boolean(needsSearchEff) ||
           (isNonThinkingModel &&
             !isPureChitChat &&
             !needsImageEff &&
@@ -347,7 +357,7 @@ export async function createEphemeralChatStreamResponse(
         userQuery,
         capabilities: {
           trivial,
-          needsSearch: caps.needsSearch && !preloadedSearchContext,
+          needsSearch: needsSearchEff && !preloadedSearchContext,
           needsImage: needsImageEff
         }
       })

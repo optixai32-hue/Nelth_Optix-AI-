@@ -84,9 +84,53 @@ const REJECTION_RE = /^(non|no|nope|pas vraiment|tsy|tsia|non merci)\b/
 const GREETING_RE =
   /^(bonjour|bonsoir|salut|coucou|hello|hey|hi|yo|salama|merci|thanks|thank you|misaotra|à bientôt|a bientôt)\b/
 
-/** Openers that signal a follow-up to the ongoing thread. */
-const FOLLOWUP_OPENER_RE =
-  /^(et(\s+(si|pour|sur|sans|avec|chez|dans|par|que))?|mais|ou|sans|avec|pour|sur|chez|dans|par|plus|moins|combien|pourquoi|comment|quel(le|s)?s?|lequel|laquelle|lesquel(le)?s|celui|ceux|celle|celles|ce|cette|ces|mon|ma|mes|ton|ta|tes|son|sa|ses|le|la|les|l'|un|une|des|du|de|d'|what about|how about|which|what|and|but|without|with|also|faster|slower|cheaper|free(r)?)\b/
+/**
+ * True continuations: conjunctions / prepositions that attach the message to
+ * the ongoing thread ("et sans Python ?", "mais en local ?"). Question words
+ * (combien, pourquoi, quel…) are DELIBERATELY excluded: with their own clause
+ * ("combien coûte GitHub Copilot ?") the message is a self-contained request
+ * and must be allowed to switch the topic.
+ */
+const CONTINUATION_OPENER_RE =
+  /^(et(\s+(si|pour|sur|sans|avec|chez|dans|par|que))?|mais|ou|sans|avec|pour|sur|chez|dans|par|what about|how about|and|but|without|with|also)\b/
+
+/**
+ * Bare determiners ("le prix ?", "le plus rapide") attach to the thread only
+ * for short messages or with a comparative. Longer Det-led messages
+ * ("la météo demain") are treated as standalone requests.
+ */
+const DETERMINER_RE =
+  /^(le|la|les|l'|un|une|des|du|de|d'|ce|cette|ces|mon|ma|mes|ton|ta|tes|son|sa|ses|the|a|an|this|that|these|those|my|your|its|their)\b/
+
+/**
+ * Question words only signal a follow-up when (almost) alone
+ * ("pourquoi ?", "quel modèle ?"). Beyond 3 words the question carries its
+ * own clause ("combien coûte GitHub Copilot ?") → standalone request.
+ */
+const SHORT_QUESTION_RE =
+  /^(combien|pourquoi|comment|quel(le)?s?|lequel|laquelle|lesquel(le)?s|quoi|pour|why|how|what|which)\b/
+
+/** Comparatives / superlatives compare within the current option set. */
+const COMPARATIVE_RE =
+  /\b(plus|moins|mieux|meilleur|meilleure|pire|premier|premiere|dernier|derniere|deuxieme|second|rapide|lent|cher|simple|facile|puissant|faster|slower|cheaper|best|fastest)\b/
+
+/**
+ * Anaphoric noun phrases that REQUIRE an antecedent in the thread
+ * ("quel est le prix ?" = the price OF what we discuss). Deliberately narrow:
+ * "quel est le meilleur STT gratuit ?" (new domain named) must NOT match, so
+ * a voluntary topic switch is never swallowed.
+ */
+const ANAPHORIC_RE =
+  /\b(c'est combien|combien ca|[cç]a coute|[cç]a marche|le prix|quel prix|la suite|la fin|what is the price|how much is it)\b/
+
+/**
+ * Bare "quel est le X ?" with NO domain noun after X ("quel est le prix ?",
+ * "quel est le meilleur ?"). End-anchored on purpose: as soon as a domain is
+ * named ("quel est le meilleur STT gratuit ?") the message is self-contained
+ * and must be free to switch the topic.
+ */
+const ANAPHORIC_BARE_RE =
+  /\b(quel est le (prix|tarif|cout|meilleur|pire|lien|resultat|nom)|quelle est la (difference|suite|meilleure)|quels sont les (prix|meilleurs))\s*\??$/
 
 /** Deictic / ordinal references that point back to previous content. */
 const REFERENCE_RE =
@@ -112,9 +156,16 @@ export function isGreetingLike(text: string): boolean {
 
 export function isFollowUpReference(text: string): boolean {
   const q = (text ?? '').trim().toLowerCase()
-  if (!q || WORDS(q).length > MAX_WORDS_FOLLOWUP) return false
+  if (!q) return false
+  const n = WORDS(q).length
+  if (n > MAX_WORDS_FOLLOWUP) return false
   if (isShortConfirmation(text) || isGreetingLike(text)) return false
-  return FOLLOWUP_OPENER_RE.test(q) || REFERENCE_RE.test(q)
+  if (REFERENCE_RE.test(q)) return true
+  if (ANAPHORIC_RE.test(q) || ANAPHORIC_BARE_RE.test(q)) return true
+  if (CONTINUATION_OPENER_RE.test(q)) return true
+  if (SHORT_QUESTION_RE.test(q) && n <= 3) return true
+  if (DETERMINER_RE.test(q) && (n <= 6 || COMPARATIVE_RE.test(q))) return true
+  return false
 }
 
 export function isSubstantiveRequest(text: string): boolean {

@@ -19,6 +19,7 @@ import {
   buildConversationStateLayer,
   trackConversationState
 } from '@/lib/conversation/conversation-state'
+import { needsFactVerification } from '@/lib/conversation/factual-gate'
 import {
   createPublicErrorResponse,
   serializePublicError
@@ -284,12 +285,25 @@ export async function createChatStreamResponse(
       // Therefore, any request that is not a pure greeting, connector query,
       // image generation, document creation, or internal knowledge MUST get
       // preloaded search so the model has real-world factual grounding and citations.
+      // Fact-verification gate (Bug B — factual contradictions): pricing /
+      // quota / limit / trial / version / "free" questions MUST be answered
+      // from fresh web results, never from weights and never by quoting an
+      // earlier thread answer — even when the generic capability detector
+      // sees no search intent (e.g. "et les prix ?" after an unsearched
+      // answer). Forces the search path below for both model classes.
+      const factVerification =
+        !connectorDataIntent &&
+        !caps.founderPhoto &&
+        !isIdentityQuery(userQuery ?? '') &&
+        needsFactVerification(userQuery ?? '')
+      const needsSearchEff = caps.needsSearch || factVerification
+
       const isPureChitChat = isPureGreeting(userQuery ?? '')
       const shouldPreloadSearch =
         !connectorDataIntent &&
         !caps.founderPhoto &&
         !isIdentityQuery(userQuery ?? '') &&
-        (Boolean(caps.needsSearch) ||
+        (Boolean(needsSearchEff) ||
           (isNonThinkingModel &&
             !isPureChitChat &&
             !needsImageEff &&
@@ -481,7 +495,7 @@ export async function createChatStreamResponse(
         connectorIntentOverride: connectorFollowUp ? true : undefined,
         capabilities: {
           trivial,
-          needsSearch: caps.needsSearch && !preloadedSearchContext,
+          needsSearch: needsSearchEff && !preloadedSearchContext,
           needsImage: needsImageEff,
           needsDocument: caps.needsDocument
         }

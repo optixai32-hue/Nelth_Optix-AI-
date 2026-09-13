@@ -211,6 +211,7 @@ When web search is used:
 7. Clearly distinguish verified information from uncertainty.
 8. Include citations for factual claims obtained from the web.
 9. Do not claim that you searched the web unless a search was actually performed.
+10. Source of truth: these web results OVERRIDE any earlier answer in this conversation. If they conflict with a figure, price, limit, or fact given in a previous turn, explicitly correct the old value instead of repeating it.
 
 #### IMPORTANT BEHAVIOR
 

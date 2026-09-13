@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { getSearchDetailsPrompt } from '@/lib/agents/prompts/search-mode-prompts'
 import {
   CONVERSATION_CONTINUITY_POLICY,
   CONVERSATIONAL_BEHAVIOR,
   CORE_DIRECTIVE_TEXT,
-  FULL_CORE_DIRECTIVE
+  FULL_CORE_DIRECTIVE,
+  PRELOADED_SEARCH_PROTOCOL
 } from '@/lib/agents/researcher'
 
 /**
@@ -40,5 +42,14 @@ describe('core directive continuity', () => {
     )
     expect(CONVERSATION_CONTINUITY_POLICY).toContain('LOWEST PRIORITY')
     expect(CONVERSATION_CONTINUITY_POLICY).toContain('SELF-CONSISTENCY')
+  })
+
+  it('search results are the source of truth over earlier thread answers (Bug B)', () => {
+    expect(PRELOADED_SEARCH_PROTOCOL).toContain('SOURCE OF TRUTH')
+    expect(PRELOADED_SEARCH_PROTOCOL).toContain('OVERRIDE')
+    expect(PRELOADED_SEARCH_PROTOCOL).toContain(
+      'explicitly correct the earlier value'
+    )
+    expect(getSearchDetailsPrompt()).toContain('OVERRIDE any earlier answer')
   })
 })
