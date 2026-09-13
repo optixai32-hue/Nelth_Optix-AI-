@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  CONVERSATION_CONTINUITY_POLICY,
   CONVERSATIONAL_BEHAVIOR,
   CORE_DIRECTIVE_TEXT,
   FULL_CORE_DIRECTIVE
@@ -30,5 +31,14 @@ describe('core directive continuity', () => {
   it('conversational behavior covers thank-you turns', () => {
     expect(CONVERSATIONAL_BEHAVIOR).toContain('thanks')
     expect(CONVERSATIONAL_BEHAVIOR).toContain('NEVER deny access')
+  })
+
+  it('continuity policy forbids branch relapse and arbitrary branch picks', () => {
+    expect(CONVERSATION_CONTINUITY_POLICY).toContain('LATEST EXPLICIT REQUEST WINS')
+    expect(CONVERSATION_CONTINUITY_POLICY).toContain(
+      'ONE concise clarification question'
+    )
+    expect(CONVERSATION_CONTINUITY_POLICY).toContain('LOWEST PRIORITY')
+    expect(CONVERSATION_CONTINUITY_POLICY).toContain('SELF-CONSISTENCY')
   })
 })

@@ -9,11 +9,16 @@ import {
 } from 'ai'
 
 import { researcher } from '@/lib/agents/researcher'
+import { isAffirmativeContinuation } from '@/lib/agents/researcher'
 import {
   type ConnectorPreloadCall,
   detectConnectorIntent,
   isConnectorFollowUp
 } from '@/lib/connectors/context'
+import {
+  buildConversationStateLayer,
+  trackConversationState
+} from '@/lib/conversation/conversation-state'
 import {
   createPublicErrorResponse,
   serializePublicError
@@ -31,7 +36,6 @@ import {
   enforceSkillOutput,
   stripEmojiFromCodeInMessage
 } from '@/lib/skills/enforce-stream'
-import { isAffirmativeContinuation } from '@/lib/agents/researcher'
 import { resolveConversationLanguage } from '@/lib/skills/language-memory'
 import { isNonThinkingModelId } from '@/lib/utils/registry'
 import { isTracingEnabled } from '@/lib/utils/telemetry'
@@ -399,12 +403,39 @@ export async function createChatStreamResponse(
         userQuery
       )
 
+      // Conversation continuity state (deterministic, no LLM call): tracks the
+      // user's ACTIVE topic/goal across turns so short replies ("ok", "oui")
+      // continue the user's latest objective — never the assistant's own
+      // previous question (branch-relapse fix). Rendered as a
+      // <conversation_state> block near the top of the instructions.
+      const conversationState = trackConversationState(
+        messagesToModel.map(m => {
+          let text = ''
+          try {
+            text = getTextFromParts((m as any).parts)
+          } catch {
+            text = ''
+          }
+          return { role: (m as any).role ?? '', text }
+        })
+      )
+      const conversationStateLayer =
+        buildConversationStateLayer(conversationState)
+
       // Affirmative continuation hint ("oui" after "Je peux te donner le
       // parcours…"): the model must continue the exact previous topic instead
       // of greeting-restarting. Injected near the top of the instructions so
       // even the weak model cannot miss it.
       let affirmativeHint: string | undefined
-      if (
+      if (conversationState.pendingClarification) {
+        // Ambiguous short reply after a multi-option question: do NOT let the
+        // model pick a branch (or relapse to an older topic) — force ONE
+        // concise clarification question on the user's active topic.
+        const options = conversationState.offeredOptions
+          .map(o => `"${o}"`)
+          .join(' vs ')
+        affirmativeHint = `The user just replied "${userQuery.trim()}" but your previous message offered mutually exclusive options (${options}) without the user picking one. Ask ONE concise clarification question naming these options, staying on the user's active topic ("${conversationState.activeTopic}"). Do NOT choose a branch yourself and do NOT switch back to an older topic.`
+      } else if (
         isAffirmativeContinuation(userQuery) &&
         messagesToModel.some(m => m.role === 'assistant')
       ) {
@@ -440,6 +471,7 @@ export async function createChatStreamResponse(
         preloadedSearchQuery,
         conversationLanguage,
         affirmativeHint,
+        conversationStateLayer,
         imageAttachment,
         userQuery,
         userId,

@@ -10,6 +10,11 @@ import {
 } from 'ai'
 
 import { researcher } from '@/lib/agents/researcher'
+import { isAffirmativeContinuation } from '@/lib/agents/researcher'
+import {
+  buildConversationStateLayer,
+  trackConversationState
+} from '@/lib/conversation/conversation-state'
 import {
   createPublicErrorResponse,
   serializePublicError
@@ -24,7 +29,6 @@ import {
   extractAttachmentFormats
 } from '@/lib/skills/document-runtime'
 import { stripEmojiFromCodeInMessage } from '@/lib/skills/enforce-stream'
-import { isAffirmativeContinuation } from '@/lib/agents/researcher'
 import { resolveConversationLanguage } from '@/lib/skills/language-memory'
 import { search as runWebSearch } from '@/lib/tools/search'
 import {
@@ -283,8 +287,31 @@ export async function createEphemeralChatStreamResponse(
         userQuery
       )
 
+      // Conversation continuity state (same rule as the main chat path):
+      // short replies continue the user's active objective, never the
+      // assistant's own previous question (branch-relapse fix).
+      const ephemeralConversationState = trackConversationState(
+        historyMessages.map(m => {
+          let text = ''
+          try {
+            text = getTextFromParts((m as any).parts)
+          } catch {
+            text = ''
+          }
+          return { role: (m as any).role ?? '', text }
+        })
+      )
+      const ephemeralConversationStateLayer = buildConversationStateLayer(
+        ephemeralConversationState
+      )
+
       let ephemeralAffirmativeHint: string | undefined
-      if (
+      if (ephemeralConversationState.pendingClarification) {
+        const options = ephemeralConversationState.offeredOptions
+          .map(o => `"${o}"`)
+          .join(' vs ')
+        ephemeralAffirmativeHint = `The user just replied "${userQuery.trim()}" but your previous message offered mutually exclusive options (${options}) without the user picking one. Ask ONE concise clarification question naming these options, staying on the user's active topic ("${ephemeralConversationState.activeTopic}"). Do NOT choose a branch yourself and do NOT switch back to an older topic.`
+      } else if (
         isAffirmativeContinuation(userQuery) &&
         historyMessages.some(m => m.role === 'assistant')
       ) {
@@ -315,6 +342,7 @@ export async function createEphemeralChatStreamResponse(
         preloadedSearchQuery,
         conversationLanguage,
         affirmativeHint: ephemeralAffirmativeHint,
+        conversationStateLayer: ephemeralConversationStateLayer,
         imageAttachment,
         userQuery,
         capabilities: {

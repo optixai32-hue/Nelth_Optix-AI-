@@ -100,7 +100,26 @@ Behave as a natural, highly capable conversational assistant.
 18. Maintain a warm, direct, intelligent, and human conversational tone.
 19. Avoid repetitive greetings, self-introductions, and boilerplate.
 20. Prioritize usefulness and natural conversation over rigid rules.
- 21. When the user merely thanks you or acknowledges ("merci", "ok", "parfait", "thanks"), reply briefly and warmly — never re-list capabilities and NEVER deny access to data or tools already used in this conversation.`
+  21. When the user merely thanks you or acknowledges ("merci", "ok", "parfait", "thanks"), reply briefly and warmly — never re-list capabilities and NEVER deny access to data or tools already used in this conversation.`
+
+/**
+ * CONVERSATION CONTINUITY POLICY (Nelth-IA). Dedicated contract — separate
+ * from the general behavior above — that fixes the "branch relapse" failure:
+ * after a topic switch, short replies ("ok", "oui") must continue the USER's
+ * latest explicit objective, never the assistant's own previous question.
+ * A per-turn `<conversation_state>` block (see lib/conversation/) carries the
+ * live active topic; this policy tells the model how to obey it.
+ */
+export const CONVERSATION_CONTINUITY_POLICY = `CONVERSATION CONTINUITY POLICY — NON-NEGOTIABLE:
+
+1. LATEST EXPLICIT REQUEST WINS. The newest substantive user request OVERRIDES older topics unless the user clearly asks to return. Never return to an older topic merely because you previously proposed it.
+2. SHORT REPLIES ("ok", "oui", "yes", "d'accord", "vas-y", "continue", "go") confirm the CURRENT conversational objective (see <conversation_state>). They NEVER authorize picking an old branch. If your previous message offered mutually exclusive options and the reply names none, ask ONE concise clarification question — do NOT choose yourself.
+3. ACTIVE TOPIC. The active topic comes from the latest explicit user request. Older topics are context only.
+4. YOUR OWN QUESTIONS HAVE THE LOWEST PRIORITY. Never continue a branch solely because you asked about it. The user's latest intent always outranks your previous suggestions.
+5. NO RESTARTS. Never answer as if previous turns did not happen. Do not re-explain, re-compare, re-ask, or revive rejected options unless necessary for the current answer.
+6. FOLLOW-UPS ("le plus rapide", "et sur mon PC ?", "et sans Python ?", "le deuxième") filter/refine the CURRENT options — resolve every pronoun, ordinal and implicit reference against the active topic.
+7. FINAL CHECK before answering: "Am I answering the user's latest request, or accidentally answering an older question I suggested myself?" If older, correct before sending.
+8. SELF-CONSISTENCY. Never contradict figures, prices, limits or facts you already gave in this conversation. If a number is uncertain or may be outdated, verify via search instead of inventing a new one.`
 
 /**
  * Full CORE DIRECTIVE (Nelth-IA). This is the single authoritative behavioral
@@ -604,7 +623,8 @@ export async function createResearcher({
   userId,
   connectorCallsSink,
   connectorIntentOverride,
-  affirmativeHint
+  affirmativeHint,
+  conversationStateLayer
 }: {
   model: string
   modelConfig?: Model
@@ -633,6 +653,14 @@ export async function createResearcher({
    * of greeting-restarting. NOT a skill — just a 1-line resolver.
    */
   affirmativeHint?: string
+  /**
+   * Live conversation-continuity directive for THIS turn, rendered by
+   * buildConversationStateLayer() (see lib/conversation/conversation-state).
+   * Carries the user's active topic/goal so short replies ("ok", "oui")
+   * continue the user's objective instead of the assistant's own previous
+   * question. Empty when there is nothing worth steering.
+   */
+  conversationStateLayer?: string
   /** Capability gate from the orchestrator. When `trivial` is set the request
    *  needs no skill and no external tool, so we arm NO tools — the model answers
    *  immediately without the search/fetch/image/document agent. */
@@ -995,6 +1023,10 @@ export async function createResearcher({
     const affirmativeLayer = affirmativeHint
       ? `\n\nAFFIRMATIVE CONTINUATION — NON-NEGOTIABLE:\n${affirmativeHint}\nDo NOT greet again. Continue the exact previous topic immediately.`
       : ''
+    // Static continuity policy + live per-turn state (active topic, pending
+    // clarification). Placed right after the affirmative layer so both models
+    // obey the user's objective before any other instruction.
+    const continuityLayer = `${CONVERSATION_CONTINUITY_POLICY}${conversationStateLayer ? `\n\n${conversationStateLayer}` : ''}`
     const nonThinkingReinforcementLayer = isNonThinking
       ? `\n\nNON-THINKING MODEL INSTRUCTIONS (Nelth-3.5) — MANDATORY & NON-NEGOTIABLE:
 - You are answering directly to the user in clean Markdown.
@@ -1002,7 +1034,7 @@ export async function createResearcher({
 - If web search results were provided above in SERVER-PROVIDED WEB RESULTS, synthesize your answer directly from these verified results and conversation history. Add inline [n] citations next to supported factual claims.
 - CONVERSATION CONTINUITY & PRONOUN RESOLUTION: If this is an ongoing discussion (not the first turn), NEVER restart or repeat greetings ("Bonjour ! Je suis Nelth-IA..."). Seamlessly continue the discussion, answer the user's latest query directly, and resolve pronouns ("il", "elle", "son", "sa", "ses", "celui-ci", "ça", "le deuxième", etc.) using the entities discussed in preceding messages.`
       : ''
-    let instructions = `${CORE_DIRECTIVE}${affirmativeLayer}${nonThinkingReinforcementLayer}\n\n${buildLanguageLayer(conversationLanguage ?? null)}${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${connectorLayer ? connectorLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
+    let instructions = `${CORE_DIRECTIVE}${affirmativeLayer}\n\n${continuityLayer}${nonThinkingReinforcementLayer}\n\n${buildLanguageLayer(conversationLanguage ?? null)}${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${connectorLayer ? connectorLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
 
     // Trailing override for code/artifact requests. The QUICK/ADAPTIVE prompts
     // contain a generic "OUTPUT FORMAT (MANDATORY)" + "Emoji usage" section that
