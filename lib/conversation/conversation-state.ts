@@ -697,18 +697,26 @@ Answer the new request directly; do not re-explain or re-ask about the old topic
 
 /**
  * Compact imperative reminder built from the SAME state as the detailed
- * <conversation_state> block. Used TWICE per turn (bookend prompting +
- * re-injection, both research-backed against instruction dilution):
+ * <conversation_state> block. Used TWICE on high-risk turns ONLY (ambiguous
+ * multi-option replies, topic-less exchanges) — bookend prompting +
+ * re-injection, both research-backed against instruction dilution:
  *  1. as a FINAL CONTINUITY REMINDER trailer at the very end of the system
  *     instructions (models attend to beginnings AND ends);
  *  2. appended to the last user message copy sent to the model, so a fresh
  *     directive sits right before generation.
- * Returns '' when there is nothing worth reinforcing.
+ * Returns '' when there is nothing worth reinforcing — routine topic
+ * continuations stay clean (top layer + policy only) so weak models never
+ * see meta-directive noise on normal turns.
  */
 export function buildContinuityReminder(state: ConversationState): string {
   if (!state || !state.hasAssistantMessage) return ''
   if (state.lastUserIntent === 'none' || state.lastUserIntent === 'greeting')
     return ''
+  // Restricted to high-risk turns ONLY (ambiguous multi-option replies and
+  // topic-less exchanges): routine topic continuations already have the top
+  // layer + policy, and repeating meta-directives on every turn degrades weak
+  // models (echoing, stilted tone). Less is more.
+  if (!state.pendingClarification && state.activeTopic) return ''
 
   const constraints =
     state.constraints.length > 0
@@ -721,18 +729,6 @@ export function buildContinuityReminder(state: ConversationState): string {
   }
   if (!state.activeTopic) {
     return `No topic established yet and the user just confirmed. Do NOT greet (no Bonjour/Salut/Hello/👋). Invite their request in one short sentence.${constraints}`
-  }
-  if (
-    state.lastUserIntent === 'new_request' ||
-    state.lastUserIntent === 'followup' ||
-    state.lastUserIntent === 'confirmation'
-  ) {
-    const topic = quote(state.activeTopic)
-    const switchNote =
-      state.lastUserIntent === 'new_request' && state.previousTopic
-        ? ' Old topic is history only.'
-        : ''
-    return `Stay on the active topic "${topic}". Answer directly with no greeting opener. Do not switch topics and do not repeat old explanations.${switchNote}${constraints}`
   }
   return ''
 }

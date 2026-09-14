@@ -701,9 +701,12 @@ describe('continuity reminder (bookend + re-injection)', () => {
         ['user', 'CODE DE PYTHON']
       )
     )
-    const reminder = buildContinuityReminder(fresh)
-    expect(reminder).toContain('no greeting opener')
-    expect(reminder).toContain('CODE DE PYTHON')
+    // New request WITH a topic: reminder stays silent (no meta noise), the
+    // detailed top layer still carries the no-reset directive.
+    expect(buildContinuityReminder(fresh)).toBe('')
+    expect(buildConversationStateLayer(fresh)).toContain(
+      'Do NOT open with a greeting'
+    )
   })
 
   it('stays silent on cold starts and greetings', () => {
@@ -715,6 +718,26 @@ describe('continuity reminder (bookend + re-injection)', () => {
         trackConversationState(turns(['user', 'bonjour']))
       )
     ).toBe('')
+  })
+
+  it('stays silent on routine topic continuations (no meta noise)', () => {
+    const followup = trackConversationState(
+      turns(
+        ['user', 'Recherche-moi Tilsal150'],
+        ['assistant', 'Voici des informations sur Tilsal150.'],
+        ['user', 'Et son âge ?']
+      )
+    )
+    expect(buildContinuityReminder(followup)).toBe('')
+
+    const switchTurn = trackConversationState(
+      turns(
+        ['user', 'Recherche-moi Tilsal150'],
+        ['assistant', 'Voici Tilsal150.'],
+        ['user', 'Combien coûte GitHub Copilot ?']
+      )
+    )
+    expect(buildContinuityReminder(switchTurn)).toBe('')
   })
 
   it('appends the note to the last user message copy', () => {
