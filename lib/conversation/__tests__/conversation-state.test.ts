@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  appendContinuityReminder,
   buildAffirmativeHint,
+  buildContinuityReminder,
   buildConversationStateLayer,
   type ConversationTurnInput,
   extractConstraints,
@@ -664,5 +666,77 @@ describe('response continuity guard', () => {
       state
     )
     expect(check.ok).toBe(true)
+  })
+})
+
+describe('continuity reminder (bookend + re-injection)', () => {
+  it('reminds clarification with named options on ambiguous replies', () => {
+    const state = trackConversationState(
+      turns(
+        ['user', 'Recherche-moi Tilsal150'],
+        ['assistant', 'Tu veux YouTube, Spotify ou TikTok ?'],
+        ['user', 'Oui']
+      )
+    )
+    const reminder = buildContinuityReminder(state)
+    expect(reminder).toContain('ONE short clarification question')
+    expect(reminder).toContain('Spotify')
+    expect(reminder).toContain('Do NOT choose yourself')
+  })
+
+  it('reminds no-greeting on topic-less confirmations and new requests', () => {
+    const invited = trackConversationState(
+      turns(
+        ['user', 'BONJOUR'],
+        ['assistant', 'Bonjour ! 👋 Ravi de vous voir.'],
+        ['user', 'OUI']
+      )
+    )
+    expect(buildContinuityReminder(invited)).toContain('Do NOT greet')
+
+    const fresh = trackConversationState(
+      turns(
+        ['user', 'BONJOUR'],
+        ['assistant', 'Bonjour ! 👋 Ravi de vous voir.'],
+        ['user', 'CODE DE PYTHON']
+      )
+    )
+    const reminder = buildContinuityReminder(fresh)
+    expect(reminder).toContain('no greeting opener')
+    expect(reminder).toContain('CODE DE PYTHON')
+  })
+
+  it('stays silent on cold starts and greetings', () => {
+    expect(
+      buildContinuityReminder(trackConversationState(turns(['user', 'ok'])))
+    ).toBe('')
+    expect(
+      buildContinuityReminder(
+        trackConversationState(turns(['user', 'bonjour']))
+      )
+    ).toBe('')
+  })
+
+  it('appends the note to the last user message copy', () => {
+    const messages = [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'BONJOUR' },
+      { role: 'assistant', content: 'Bonjour !' },
+      { role: 'user', content: 'OUI' }
+    ]
+    const out = appendContinuityReminder(messages, 'Do NOT greet.')
+    expect(out[3].content).toContain('[System note: Do NOT greet.]')
+    expect(out[1].content).toBe('BONJOUR')
+
+    const arrayContent = [
+      { role: 'user', content: [{ type: 'text', text: 'hi' }] }
+    ]
+    const out2 = appendContinuityReminder(arrayContent, 'Stay on topic.')
+    expect(out2[0].content).toHaveLength(2)
+
+    expect(appendContinuityReminder(messages, '')).toBe(messages)
+    expect(
+      appendContinuityReminder([{ role: 'assistant', content: 'yo' }], 'x')
+    ).toEqual([{ role: 'assistant', content: 'yo' }])
   })
 })

@@ -11,7 +11,9 @@ import {
 
 import { researcher } from '@/lib/agents/researcher'
 import {
+  appendContinuityReminder,
   buildAffirmativeHint,
+  buildContinuityReminder,
   buildConversationStateLayer,
   trackConversationState,
   verifyResponseContinuity
@@ -324,6 +326,9 @@ export async function createEphemeralChatStreamResponse(
         ephemeralConversationState.hasAssistantMessage &&
         ephemeralConversationState.lastUserIntent !== 'greeting' &&
         ephemeralConversationState.lastUserIntent !== 'none'
+      const ephemeralContinuityReminder = buildContinuityReminder(
+        ephemeralConversationState
+      )
 
       // Affirmative continuation hint — same centralized builder as the main
       // chat path (ambiguous options, no-topic-yet, exact-topic cases).
@@ -358,6 +363,7 @@ export async function createEphemeralChatStreamResponse(
         conversationLanguage,
         affirmativeHint: ephemeralAffirmativeHint,
         conversationStateLayer: ephemeralConversationStateLayer,
+        conversationStateTrailer: ephemeralContinuityReminder || undefined,
         imageAttachment,
         userQuery,
         capabilities: {
@@ -368,6 +374,12 @@ export async function createEphemeralChatStreamResponse(
       })
 
       const modelId = `${model.providerId}:${model.id}`
+      // Re-injection (same rule as the main chat path): fresh turn directive
+      // on the last user message copy, right before generation.
+      modelMessages = appendContinuityReminder(
+        modelMessages,
+        ephemeralContinuityReminder
+      )
       const result = await researchAgent.stream({
         messages: modelMessages,
         abortSignal,

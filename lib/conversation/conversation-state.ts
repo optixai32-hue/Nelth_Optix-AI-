@@ -696,6 +696,80 @@ Answer the new request directly; do not re-explain or re-ask about the old topic
 }
 
 /**
+ * Compact imperative reminder built from the SAME state as the detailed
+ * <conversation_state> block. Used TWICE per turn (bookend prompting +
+ * re-injection, both research-backed against instruction dilution):
+ *  1. as a FINAL CONTINUITY REMINDER trailer at the very end of the system
+ *     instructions (models attend to beginnings AND ends);
+ *  2. appended to the last user message copy sent to the model, so a fresh
+ *     directive sits right before generation.
+ * Returns '' when there is nothing worth reinforcing.
+ */
+export function buildContinuityReminder(state: ConversationState): string {
+  if (!state || !state.hasAssistantMessage) return ''
+  if (state.lastUserIntent === 'none' || state.lastUserIntent === 'greeting')
+    return ''
+
+  const constraints =
+    state.constraints.length > 0
+      ? ` Constraints in force: ${state.constraints.map(c => `"${c}"`).join(', ')}.`
+      : ''
+
+  if (state.ambiguousConfirmation && state.offeredOptions.length >= 2) {
+    const options = state.offeredOptions.map(o => `"${o}"`).join(' vs ')
+    return `The user replied "${quote(state.lastUserText)}" without choosing between ${options}. Ask ONE short clarification question naming these options. Do NOT choose yourself. Stay on "${quote(state.activeTopic)}".${constraints}`
+  }
+  if (!state.activeTopic) {
+    return `No topic established yet and the user just confirmed. Do NOT greet (no Bonjour/Salut/Hello/👋). Invite their request in one short sentence.${constraints}`
+  }
+  if (
+    state.lastUserIntent === 'new_request' ||
+    state.lastUserIntent === 'followup' ||
+    state.lastUserIntent === 'confirmation'
+  ) {
+    const topic = quote(state.activeTopic)
+    const switchNote =
+      state.lastUserIntent === 'new_request' && state.previousTopic
+        ? ' Old topic is history only.'
+        : ''
+    return `Stay on the active topic "${topic}". Answer directly with no greeting opener. Do not switch topics and do not repeat old explanations.${switchNote}${constraints}`
+  }
+  return ''
+}
+
+/**
+ * Appends a "[System note: …]" reminder to the LAST user message copy sent
+ * to the model (string content extended, array content appended). Tolerant
+ * by design: unknown shapes pass through untouched, never throws.
+ */
+export function appendContinuityReminder<
+  T extends { role: string; content: unknown }
+>(modelMessages: T[], reminder: string): T[] {
+  if (!reminder || !Array.isArray(modelMessages)) return modelMessages
+  try {
+    for (let i = modelMessages.length - 1; i >= 0; i--) {
+      const m = modelMessages[i] as {
+        role: string
+        content: string | Array<{ type?: string; text?: string }>
+      }
+      if (m?.role !== 'user') continue
+      if (typeof m.content === 'string') {
+        m.content = `${m.content}\n\n[System note: ${reminder}]`
+      } else if (Array.isArray(m.content)) {
+        m.content = [
+          ...m.content,
+          { type: 'text', text: `[System note: ${reminder}]` }
+        ]
+      }
+      break
+    }
+  } catch {
+    // Pass through untouched on any unexpected shape.
+  }
+  return modelMessages
+}
+
+/**
  * Post-generation continuity guard (observability layer of the "final
  * protection"): checks a streamed answer against the deterministic
  * conversation state AFTER generation. The orchestrators log violations

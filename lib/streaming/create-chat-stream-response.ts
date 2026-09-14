@@ -15,7 +15,9 @@ import {
   isConnectorFollowUp
 } from '@/lib/connectors/context'
 import {
+  appendContinuityReminder,
   buildAffirmativeHint,
+  buildContinuityReminder,
   buildConversationStateLayer,
   trackConversationState,
   verifyResponseContinuity
@@ -446,6 +448,9 @@ export async function createChatStreamResponse(
         conversationState.hasAssistantMessage &&
         conversationState.lastUserIntent !== 'greeting' &&
         conversationState.lastUserIntent !== 'none'
+      // Compact reminder: same state as the top layer, reused for the
+      // end-of-instructions trailer AND the last-user-message re-injection.
+      const continuityReminder = buildContinuityReminder(conversationState)
 
       // Affirmative continuation hint ("oui" after "Je peux te donner le
       // parcours…"): centralized builder (see lib/conversation/) covering the
@@ -488,6 +493,7 @@ export async function createChatStreamResponse(
         conversationLanguage,
         affirmativeHint,
         conversationStateLayer,
+        conversationStateTrailer: continuityReminder || undefined,
         imageAttachment,
         userQuery,
         userId,
@@ -514,6 +520,14 @@ export async function createChatStreamResponse(
         {
           convertDataPart
         }
+      )
+
+      // Re-injection: a fresh copy of the turn directive sits right before
+      // generation, on the last user message (research-backed against
+      // instruction dilution mid-conversation).
+      modelMessages = appendContinuityReminder(
+        modelMessages,
+        continuityReminder
       )
 
       if (shouldTruncateMessages(modelMessages, model)) {

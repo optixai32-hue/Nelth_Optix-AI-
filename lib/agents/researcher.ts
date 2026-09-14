@@ -652,7 +652,8 @@ export async function createResearcher({
   connectorCallsSink,
   connectorIntentOverride,
   affirmativeHint,
-  conversationStateLayer
+  conversationStateLayer,
+  conversationStateTrailer
 }: {
   model: string
   modelConfig?: Model
@@ -689,6 +690,13 @@ export async function createResearcher({
    * question. Empty when there is nothing worth steering.
    */
   conversationStateLayer?: string
+  /**
+   * Compact continuity reminder rendered as a FINAL trailer at the very END
+   * of the system instructions (bookend prompting: models attend to
+   * beginnings AND ends). Same source as the top layer + user-message
+   * re-injection — three placements, one deterministic state.
+   */
+  conversationStateTrailer?: string
   /** Capability gate from the orchestrator. When `trivial` is set the request
    *  needs no skill and no external tool, so we arm NO tools — the model answers
    *  immediately without the search/fetch/image/document agent. */
@@ -1072,6 +1080,11 @@ export async function createResearcher({
     // clarification). Placed right after the affirmative layer so both models
     // obey the user's objective before any other instruction.
     const continuityLayer = `${CONVERSATION_CONTINUITY_POLICY}${conversationStateLayer ? `\n\n${conversationStateLayer}` : ''}`
+    // Bookend: the same directive repeated at the very end of the
+    // instructions, where diluted attention lands last.
+    const continuityTrailer = conversationStateTrailer
+      ? `\n\nFINAL CONTINUITY REMINDER — read this last, obey first:\n${conversationStateTrailer}`
+      : ''
     const nonThinkingReinforcementLayer = isNonThinking
       ? `\n\nNON-THINKING MODEL INSTRUCTIONS (Nelth-3.5) — MANDATORY & NON-NEGOTIABLE:
 - You are answering directly to the user in clean Markdown.
@@ -1079,7 +1092,7 @@ export async function createResearcher({
 - If web search results were provided above in SERVER-PROVIDED WEB RESULTS, synthesize your answer directly from these verified results and conversation history. Add inline [n] citations next to supported factual claims.
 - CONVERSATION CONTINUITY & PRONOUN RESOLUTION: If this is an ongoing discussion (not the first turn), NEVER restart or repeat greetings ("Bonjour ! Je suis Nelth-IA..."). Seamlessly continue the discussion, answer the user's latest query directly, and resolve pronouns ("il", "elle", "son", "sa", "ses", "celui-ci", "ça", "le deuxième", etc.) using the entities discussed in preceding messages.`
       : ''
-    let instructions = `${CORE_DIRECTIVE}${affirmativeLayer}\n\n${continuityLayer}${nonThinkingReinforcementLayer}\n\n${buildLanguageLayer(conversationLanguage ?? null)}${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${connectorLayer ? connectorLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}`
+    let instructions = `${CORE_DIRECTIVE}${affirmativeLayer}\n\n${continuityLayer}${nonThinkingReinforcementLayer}\n\n${buildLanguageLayer(conversationLanguage ?? null)}${toolCallProtocol}\n\n${ARTIFACT_OUTPUT_RULE}\n\n${skillLayer ? skillLayer + '\n\n' : ''}${connectorLayer ? connectorLayer + '\n\n' : ''}${systemPrompt}${preloadedSearchLayer}\n\n${INTERNAL_SYSTEMS_DIRECTIVE}\nCurrent date and time: ${currentDate}${continuityTrailer}`
 
     // Trailing override for code/artifact requests. The QUICK/ADAPTIVE prompts
     // contain a generic "OUTPUT FORMAT (MANDATORY)" + "Emoji usage" section that
