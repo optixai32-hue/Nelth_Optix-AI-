@@ -610,19 +610,28 @@ function detectQuickIntent(
   // Bare "temps" alone is NOT matched (duration/cooking-time false positives
   // like "combien de temps", "temps de cuisson").
   const hasCurrentInfoKeyword =
-    /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualit[eé]s?|news|prix|price|m[eé]t[eé]o|weather|current|recent|r[eé]cents?|r[eé]centes?|latest|last|dernier[es]*|derni[eè]res?|hier|yesterday|today|aujourd'hui|demain|tomorrow|quel\s+temps|temps\s+[aà]|temps\s+qu|temp[eé]rature|ce\s+jour|ce\s+matin|ce\s+soir|cette\s+semaine|ce\s+mois|cette\s+ann[eé]e|en\s+direct|live|score|match|r[eé]sultat|r[eé]sultats|classement|gagnant|vainqueur|events?|[eé]v[eé]nements?|annonces?|announcements?|wwdc|qui\s+est|who\s+is|c'est\s+quoi|what\s+is|qu'est[- ]ce\s+qui|2026|2025|2024|president|presidents?|pr[eé]sident[es]?|premier\s+ministre|prime\s+minister|gouvernement|government|ministre|ministres|minister|ministers|election|elections?|[eé]lection[s]?|dirigeant|dirigeants|leader|leaders|chef\s+d'etat|head\s+of\s+state|qui\s+gouverne|qui\s+dirige|qui\s+commande|qui\s+a\s+gagn[eé]|qui\s+est\s+le|qui\s+est\s+la|qui\s+sont|who\s+is|who\s+are|est-ce\s+que|est-ce\s+vrai|is\s+it\s+true|fact\s*check|vrai\s+ou\s+faux|vrai\s+que|verifie|verifies|verifier|check|actuel|actuelle|actuellement|currently|present|incumbent|pouvoir|madagascar)\b/i.test(
+    /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?\s+(r[eé]centes?|actuelles?)|actualit[eé]s?|news|prix|price|m[eé]t[eé]o|weather|current|recent|r[eé]cents?|r[eé]centes?|latest|last|dernier[es]*|derni[eè]res?|hier|yesterday|today|aujourd'hui|demain|tomorrow|quel\s+temps|temps\s+[aà]|temps\s+qu|temp[eé]rature|ce\s+jour|ce\s+matin|ce\s+soir|cette\s+semaine|ce\s+mois|cette\s+ann[eé]e|en\s+direct|live|score|match|r[eé]sultat|r[eé]sultats|classement|gagnant|vainqueur|events?|[eé]v[eé]nements?|annonces?|announcements?|wwdc|2026|2025|2024|qui\s+a\s+gagn[eé]|fact\s*check|est-ce\s+vrai\s+que|actuel|actuelle|actuellement|currently|cours\s+(de|du|des|d['’]))\b/i.test(
+      text
+    )
+
+  const isMathOrCode =
+    /\b(calcule|calculer|combien\s+font|combien\s+fait|\d+\s*[\+\-\*\/x\^]\s*\d+|equation|integrale|derivee|theoreme|theoremes|code|coder|fonction|function|script|programme|algorithme|javascript|typescript|python|html|css|react|sql|regex)\b/i.test(
+      text
+    )
+  const isExplicitSearch =
+    /\b(search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|googler?|sur\s+(le\s+)?web|sur\s+internet|en\s+ligne)\b/i.test(
       text
     )
 
   let search: boolean
-  if (code) {
+  if (code || (isMathOrCode && !isExplicitSearch)) {
     // A from-scratch build doesn't need web-search guidance; only when it must
-    // ground on a real brand/asset.
-    search = artifact.needsExternal
+    // ground on a real brand/asset or explicit search was asked.
+    search = artifact.needsExternal || isExplicitSearch
   } else if (image || document) {
     search = false
   } else {
-    search = hasCurrentInfoKeyword || webImage
+    search = isExplicitSearch || (!isMathOrCode && (hasCurrentInfoKeyword || webImage))
   }
 
   // WEB IMAGE SEARCH: a request to FIND existing images on the web must use the

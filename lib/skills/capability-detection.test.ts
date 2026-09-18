@@ -151,4 +151,34 @@ describe('detectRequestCapabilities — all languages', () => {
       expect(caps.needsSearch, `query: ${q}`).toBe(false)
     }
   })
+
+  it('does not trigger web search for general knowledge, math, or code', async () => {
+    for (const q of [
+      'Pourquoi le ciel est bleu ?',
+      'Comment fonctionne la photosynthèse ?',
+      'Combien font 15 + 27 ?',
+      'Résous cette équation x + 4 = 10',
+      'Écris un script Python pour trier une liste',
+      'Comment faire une boucle for en JavaScript ?',
+      'Explique le théorème de Pythagore',
+      'C’est quoi une fonction récursive ?'
+    ]) {
+      const caps = await detectRequestCapabilities(q)
+      expect(caps.needsSearch, `query: ${q}`).toBe(false)
+    }
+  })
+
+  it('triggers web search for explicit search, weather, prices, recent news, and 2024-2026', async () => {
+    for (const q of [
+      'Cherche les nouveautés de Bun en 2026',
+      'Météo à Paris aujourd’hui',
+      'Quel est le prix du Bitcoin actuellement ?',
+      'Dernières actualités en France',
+      'Résultats élections 2025'
+    ]) {
+      const caps = await detectRequestCapabilities(q)
+      expect(caps.needsSearch, `query: ${q}`).toBe(true)
+    }
+  })
 })
+

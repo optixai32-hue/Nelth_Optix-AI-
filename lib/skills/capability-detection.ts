@@ -58,20 +58,24 @@ export const DOCUMENT_INTENT_RE = intentRe(
     '|فاتورة|فواتير|تقرير|تقارير|عقد|عقود|وثيقة|وثائق|مستند|مستندات|ملف|ملفات|عرض\\s+تقديمي|شرائح|جدول|发票|报告|合同|文档|文件|演示|幻灯片|表格|документ|документы|файл|файлы|договор|договоры|презентация|слайды|таблица|счет'
 )
 const CURRENT_INFO_RE = intentRe(
-  'search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?|informations?|actualites?|news|prix|price|prices|meteo|weather|current|recent|recents?|recentes?|latest|dernier[es]*|dernieres?|hier|yesterday|today|aujourd.hui|demain|tomorrow|ce\\s+jour|ce\\s+matin|ce\\s+soir|cette\\s+semaine|ce\\s+mois|cette\\s+annee|en\\s+direct|live|score|match|resultats?|classement|gagnant|vainqueur|events?|evenements?|annonces?|announcements?|wwdc|2026|2025|2024' +
-    '|president|presidents?|pr[eé]sident[es]?|premier\\s+ministre|prime\\s+minister|gouvernement|government|ministre|ministres|minister|ministers|election|elections?|[eé]lection[s]?|dirigeant|dirigeants|leader|leaders|chef\\s+d.etat|head\\s+of\\s+state|qui\\s+gouverne|qui\\s+dirige|qui\\s+commande|qui\\s+a\\s+gagn[eé]|qui\\s+est\\s+le|qui\\s+est\\s+la|qui\\s+sont|who\\s+is|who\\s+are|est-ce\\s+que|est-ce\\s+vrai|is\\s+it\\s+true|fact\\s*check|vrai\\s+ou\\s+faux|vrai\\s+que|verifie|verifies|verifier|check|actuel|actuelle|actuellement|currently|present|incumbent|pouvoir|madagascar' +
-    // Questions seeking information / definitions / explanations
-    '|qui\\s+est(?!\\s+tu\\b)|who\\s+is(?!\\s+you\\b)|c.est\\s+quoi|what\\s+is|c.est\\s+qui|who.s|qu.est[-\\s]ce\\s+qu|qu.est[-\\s]ce\\s+qui|qui\\s+a|qui\\s+a\\s+fait|qui\\s+a\\s+cree|qui\\s+a\\s+invente|quel\\s+est|quelle\\s+est|quels\\s+sont|quelles\\s+sont|what\\s+are|which\\s+is|where\\s+is|ou\\s+se\\s+trouve|ou\\s+est|comment\\s+fonctionne|how\\s+does|pourquoi|why\\s+is|combien\\s+coute|combien\\s+vaut|how\\s+much|how\\s+many' +
+  'search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?\\s+(recentes?|actuelles?)|actualites?|news|prix|price|prices|meteo|weather|current|recent|recents?|recentes?|latest|dernier[es]*|dernieres?|hier|yesterday|today|aujourd.hui|demain|tomorrow|ce\\s+jour|ce\\s+matin|ce\\s+soir|cette\\s+semaine|ce\\s+mois|cette\\s+annee|en\\s+direct|live|score|match|resultats?|classement|gagnant|vainqueur|events?|evenements?|annonces?|announcements?|wwdc|2026|2025|2024' +
+    '|president|presidents?|pr[eé]sident[es]?|premier\\s+ministre|prime\\s+minister|gouvernement|government|ministre|ministres|minister|ministers|election|elections?|[eé]lection[s]?|dirigeant|dirigeants|leader|leaders|chef\\s+d.etat|head\\s+of\\s+state|qui\\s+gouverne|qui\\s+dirige|qui\\s+commande|qui\\s+a\\s+gagn[eé]|est-ce\\s+que|est-ce\\s+vrai|is\\s+it\\s+true|fact\\s*check|vrai\\s+ou\\s+faux|vrai\\s+que|verifie|verifies|verifier|check|actuel|actuelle|actuellement|currently|present|incumbent|pouvoir|madagascar' +
+    // Pricing and costs (not general math/explanations)
+    '|combien\\s+coute|combien\\s+vaut|how\\s+much|how\\s+many' +
     // Releases, dates, technology, companies, models
-    '|date\\s+de\\s+sortie|release\\s+date|sortie|sorti|sortira|disponible|disponibilite|version|modele|entreprise|societe|startup|compagnie|marque|intelligence\\s+artificielle|deepseek|chatgpt|openai|grok|claude|mistral|gemini|apple|google|microsoft|tesla|nvidia|starlink|spacex' +
-    // Current affairs, geography, economics, politics
-    '|championnat|ligue|tournoi|guerre|crise|politique|bourse|action|actions|crypto|bitcoin|inflation|taux|monnaie|population|superficie|capitale|maire|habitant|habitants' +
+    '|date\\s+de\\s+sortie|release\\s+date|sortie|sorti|sortira|disponible|disponibilite|version|modele|startup|intelligence\\s+artificielle|deepseek|chatgpt|openai|grok|claude|mistral|gemini|apple|google|microsoft|tesla|nvidia|starlink|spacex' +
+    // Current affairs, economics, markets, prices, gold/currencies
+    '|cours\\s+(de|du|des|d[\'’])|championnat|ligue|tournoi|guerre|crise|politique|bourse|action|actions|crypto|bitcoin|inflation|taux|monnaie|superficie|capitale|maire|habitant|habitants' +
     // Weather asked the French way: "quel temps fait-il ?", "temps à Paris".
     // Bare "temps" alone is NOT matched (duration/cooking-time false
     // positives like "combien de temps", "temps de cuisson").
     '|quel\\s+temps|temps\\s+a|temps\\s+qu|temperature' +
-    '|buscar|busca|busqueda|noticias?|precio|precios|hoy|ayer|quien\\s+es|suchen|sucht|suche|nachrichten|preis|heute|gestern|wer\\s+ist|cercare|cerca|notizie|notizia|prezzo|oggi|ieri|chi\\s+e|preco|hoje|ontem|quem\\s+e|mitady|vaovao|vidy|androany|omaly' +
-    '|ابحث|بحث|أخبار|اخبار|سعر|اليوم|أمس|امس|من\\s+هو|搜索|新闻|价格|今天|昨天|是谁|искать|новости|цена|сегодня|вчера|кто\\s+такой'
+    '|buscar|busca|busqueda|noticias?|precio|precios|hoy|ayer|suchen|sucht|suche|nachrichten|preis|heute|gestern|cercare|cerca|notizie|notizia|prezzo|oggi|ieri|preco|hoje|ontem|mitady|vaovao|vidy|androany|omaly' +
+    '|ابحث|بحث|أخبار|اخبار|سعر|اليوم|أمس|امس|搜索|新闻|价格|今天|昨天|искать|новости|цена|сегодня|вчера'
+)
+
+const MATH_OR_CODE_RE = intentRe(
+  'calcule|calculer|combien\\s+font|combien\\s+fait|\\d+\\s*[\\+\\-\\*\\/x\\^]\\s*\\d+|equation|integrale|derivee|theoreme|theoremes|code|coder|fonction|function|script|programme|algorithme|javascript|typescript|python|html|css|react|sql|regex'
 )
 
 const DOC_FORMATS = new Set(['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'ppt'])
@@ -205,9 +209,12 @@ export async function detectRequestCapabilities(
     attachmentFormats.some(f => DOC_FORMATS.has(f.toLowerCase()))
 
   const isFollowUp = isConversationContinuation(query, history)
+  const isExplicitSearch = WEB_SEARCH_VERB_RE.test(qf)
+  const isMathOrCode = MATH_OR_CODE_RE.test(qf)
 
   const needsSearch = query
-    ? (CURRENT_INFO_RE.test(qf) || webImageSearch || isFollowUp) &&
+    ? (isExplicitSearch ||
+        (!isMathOrCode && (CURRENT_INFO_RE.test(qf) || webImageSearch || isFollowUp))) &&
       !founderPhoto &&
       !isInternalKnowledge
     : false

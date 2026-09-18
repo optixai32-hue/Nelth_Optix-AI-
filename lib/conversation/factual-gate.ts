@@ -32,7 +32,10 @@ function foldQuery(text: string): string {
  * ("5h/mois" → "5000 caractères" → "30 min"). Folded (no diacritics), FR/EN.
  */
 const PRICING_RE =
-  /\b(prix|price|prices|pricing|tarif|tarifs|cout|coute|coutent|couter|combien|how\s*much|payant|payer|paiement|payment|facturation|billing|abonnement|subscription|forfait|gratuit|gratis|free\b|cout\s*par|par\s*mois|per\s*month)\b/
+  /\b(prix|price|prices|pricing|tarif|tarifs|cout|coute|coutent|couter|combien\s*(coute|vaut|ca\s*coute|ca\s*vaut|d'euros|de\s*dollars|de\s*frais)|how\s*much\s*(does|is|costs?)|payant|payer|paiement|payment|facturation|billing|abonnement|subscription|forfait|gratuit|gratis|free\b|cout\s*par|par\s*mois|per\s*month)\b/
+
+const MATH_OR_CODE_RE =
+  /\b(calcule|calculer|combien\s+font|combien\s+fait|\d+\s*[\+\-\*\/x\^]\s*\d+|equation|integrale|derivee|theoreme|theoremes|code|coder|fonction|function|script|programme|algorithme|javascript|typescript|python|html|css|react|sql|regex)\b/
 
 /** Quotas, caps, usage limits — "free no limit", "heures/mois", "caractères". */
 const QUOTA_RE =
@@ -60,6 +63,7 @@ export function needsFactVerification(query: string): boolean {
   const q = foldQuery(query).trim()
   if (!q) return false
   if (INTERNAL_RE.test(q)) return false
+  if (MATH_OR_CODE_RE.test(q)) return false
   return (
     PRICING_RE.test(q) ||
     QUOTA_RE.test(q) ||

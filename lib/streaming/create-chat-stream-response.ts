@@ -303,17 +303,11 @@ export async function createChatStreamResponse(
         needsFactVerification(userQuery ?? '')
       const needsSearchEff = caps.needsSearch || factVerification
 
-      const isPureChitChat = isPureGreeting(userQuery ?? '')
       const shouldPreloadSearch =
         !connectorDataIntent &&
         !caps.founderPhoto &&
         !isIdentityQuery(userQuery ?? '') &&
-        (Boolean(needsSearchEff) ||
-          (isNonThinkingModel &&
-            !isPureChitChat &&
-            !needsImageEff &&
-            !caps.needsDocument &&
-            !caps.founderPhoto))
+        Boolean(needsSearchEff)
 
       const trivial =
         !caps.needsSearch &&
