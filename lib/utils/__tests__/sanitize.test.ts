@@ -74,6 +74,18 @@ describe('extractFakeSearchQuery', () => {
     expect(extractFakeSearchQuery(text)).toBe('qui est le président de Madagascar')
   })
 
+  it('extracts query from <tool_call> format', () => {
+    const text =
+      '<tool_call>{"name":"search","arguments":{"query":"colonel mickael"}}</tool_call>'
+    expect(extractFakeSearchQuery(text)).toBe('colonel mickael')
+  })
+
+  it('extracts query from JSON-style tool call', () => {
+    const text =
+      '{"name":"search","parameters":{"query":"colonel mickael"}}'
+    expect(extractFakeSearchQuery(text)).toBe('colonel mickael')
+  })
+
   it('returns null when no fake search exists', () => {
     expect(extractFakeSearchQuery('Bonjour tout le monde !')).toBeNull()
   })

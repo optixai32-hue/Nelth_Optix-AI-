@@ -955,19 +955,42 @@ export async function createChatStreamResponse(
             // render a blank bubble with no Retry. Inject an honest fallback
             // line instead (localized, counted as content so a trailing
             // stream error stays suppressed).
-            // For "lire mon dernier mail" we have the actual mail body from
-            // the preload — show that instead of a generic apology.
+            // Also triggers if the model emitted ONLY the echoed query/title
+            // (e.g. "Colonel Mickael") followed by a fake search XML call.
+            const isEchoOrTitle =
+              Boolean(userQuery) &&
+              (accumulatedCleanText.trim().toLowerCase() ===
+                userQuery.trim().toLowerCase() ||
+                accumulatedCleanText
+                  .trim()
+                  .replace(/^#+\s*/, '')
+                  .toLowerCase() === userQuery.trim().toLowerCase() ||
+                (accumulatedCleanText.trim().length <=
+                  userQuery.trim().length + 20 &&
+                  accumulatedCleanText
+                    .toLowerCase()
+                    .includes(userQuery.trim().toLowerCase())))
+
+            const fakeSearchQuery = extractFakeSearchQuery(
+              accumulatedRawModelText
+            )
+
             if (
               shouldInjectEmptyFallback({
                 wroteContent,
                 wroteToolPart,
                 aborted: abortSignal?.aborted === true
-              })
+              }) ||
+              (isEchoOrTitle && Boolean(fakeSearchQuery))
             ) {
               console.error(
-                '[Stream] silent-empty response — injecting fallback text',
+                '[Stream] silent-empty response or title-echo fake search — injecting fallback text',
                 'connectorPreloadCalls.length=',
-                connectorPreloadCalls.length
+                connectorPreloadCalls.length,
+                'isEchoOrTitle=',
+                isEchoOrTitle,
+                'fakeSearchQuery=',
+                fakeSearchQuery
               )
               let fallbackDelta: string | null = null
 
@@ -986,13 +1009,13 @@ export async function createChatStreamResponse(
 
               // 0b) Model attempted a fake search XML call (e.g. <search"> query) that got stripped
               if (!fallbackDelta) {
-                const fakeSearchQuery = extractFakeSearchQuery(
-                  accumulatedRawModelText
-                )
-                if (fakeSearchQuery) {
+                const targetFakeQuery =
+                  fakeSearchQuery ||
+                  extractFakeSearchQuery(accumulatedRawModelText)
+                if (targetFakeQuery) {
                   try {
                     const liveSearchResult = await runWebSearch(
-                      fakeSearchQuery,
+                      targetFakeQuery,
                       isNonThinkingModel ? 7 : 10,
                       'basic',
                       [],
@@ -1000,13 +1023,14 @@ export async function createChatStreamResponse(
                       caps.webImageSearch ? ['image', 'web'] : ['web']
                     )
                     if (liveSearchResult.results.length > 0) {
+                      searchResultsForCitation = liveSearchResult
                       if (!searchChunksEmitted) {
                         searchChunksEmitted = true
                         writer.write({
                           type: 'tool-call',
                           toolCallId: 'call-search-fallback',
                           toolName: 'search',
-                          args: { query: fakeSearchQuery }
+                          args: { query: targetFakeQuery }
                         } as unknown as Parameters<typeof writer.write>[0])
                         writer.write({
                           type: 'tool-result',
@@ -1181,11 +1205,14 @@ export async function createChatStreamResponse(
                 fallbackDelta = `J'ai consulté vos données ${services} mais n'ai pas pu générer le résumé. Pourriez-vous reformuler votre demande ?`
               }
 
+              const deltaPrefix =
+                wroteContent && fallbackDelta ? '\n\n' : ''
               writer.write({
                 type: 'text-delta',
-                id: 'txt-0',
-                delta:
+                id: `txt-${writtenPartCount}`,
+                delta: `${deltaPrefix}${
                   fallbackDelta ?? emptyResponseText(conversationLanguage?.lang)
+                }`
               } as unknown as Parameters<typeof writer.write>[0])
               console.log(
                 `[Stream] fallback injected: "${(fallbackDelta ?? '').slice(0, 120)}" (length=${(fallbackDelta ?? '').length})`

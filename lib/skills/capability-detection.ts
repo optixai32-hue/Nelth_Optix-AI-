@@ -60,6 +60,10 @@ export const DOCUMENT_INTENT_RE = intentRe(
 const CURRENT_INFO_RE = intentRe(
   'search|cherche[rsz]?|recherche[rsz]?|trouve[rsz]?|infos?\\s+(recentes?|actuelles?)|actualites?|news|prix|price|prices|meteo|weather|current|recent|recents?|recentes?|latest|dernier[es]*|dernieres?|hier|yesterday|today|aujourd.hui|demain|tomorrow|ce\\s+jour|ce\\s+matin|ce\\s+soir|cette\\s+semaine|ce\\s+mois|cette\\s+annee|en\\s+direct|live|score|match|resultats?|classement|gagnant|vainqueur|events?|evenements?|annonces?|announcements?|wwdc|2026|2025|2024' +
     '|president|presidents?|pr[eé]sident[es]?|premier\\s+ministre|prime\\s+minister|gouvernement|government|ministre|ministres|minister|ministers|election|elections?|[eé]lection[s]?|dirigeant|dirigeants|leader|leaders|chef\\s+d.etat|head\\s+of\\s+state|qui\\s+gouverne|qui\\s+dirige|qui\\s+commande|qui\\s+a\\s+gagn[eé]|est-ce\\s+que|est-ce\\s+vrai|is\\s+it\\s+true|fact\\s*check|vrai\\s+ou\\s+faux|vrai\\s+que|verifie|verifies|verifier|check|actuel|actuelle|actuellement|currently|present|incumbent|pouvoir|madagascar' +
+    // Military, official and leadership titles
+    '|colonel|g[eé]n[eé]ral|commandant|capitaine|lieutenant|amiral|officier|pr[eé]fet|gouverneur|maire|depute|d[eé]put[eé]|senateur|s[eé]nateur|ambassadeur|chancelier' +
+    // Person lookup questions (not greeting/identity questions)
+    '|qui\\s+est(?!\\s+tu\\b)|who\\s+is(?!\\s+you\\b)|c[\'’]est\\s+qui|qui\\s+sont|who\\s+are' +
     // Pricing and costs (not general math/explanations)
     '|combien\\s+coute|combien\\s+vaut|how\\s+much|how\\s+many' +
     // Releases, dates, technology, companies, models

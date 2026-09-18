@@ -174,7 +174,9 @@ describe('detectRequestCapabilities — all languages', () => {
       'Météo à Paris aujourd’hui',
       'Quel est le prix du Bitcoin actuellement ?',
       'Dernières actualités en France',
-      'Résultats élections 2025'
+      'Résultats élections 2025',
+      'colonel mickael',
+      'qui est Mickaël Pouvin'
     ]) {
       const caps = await detectRequestCapabilities(q)
       expect(caps.needsSearch, `query: ${q}`).toBe(true)

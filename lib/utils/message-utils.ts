@@ -291,7 +291,7 @@ export function extractFakeSearchQuery(text: string): string | null {
   if (searchTagMatch && searchTagMatch[1]?.trim()) {
     return searchTagMatch[1].trim()
   }
-  // Match <invoke name="search">... or <tool_call...
+  // Match <invoke name="search">... or <invoke tool="search">...
   const invokeMatch = text.match(
     /<invoke\b[^>]*\b(?:name="search"|tool="search")[^>]*>([\s\S]*?)<\/invoke>/i
   )
@@ -304,6 +304,42 @@ export function extractFakeSearchQuery(text: string): string | null {
     } catch {
       return invokeMatch[1].replace(/[{}"']/g, '').trim()
     }
+  }
+  // Match <tool_call> or <tool_calls> containing search
+  const toolCallMatch = text.match(
+    /<tool_calls?\b[^>]*>([\s\S]*?)(?:<\/tool_calls?>|$)/i
+  )
+  if (toolCallMatch && toolCallMatch[1]?.trim()) {
+    const block = toolCallMatch[1].trim()
+    try {
+      const parsed = JSON.parse(block)
+      const q =
+        parsed.arguments?.query ||
+        parsed.input?.query ||
+        parsed.parameters?.query ||
+        parsed.query
+      if (typeof q === 'string' && q.trim()) return q.trim()
+    } catch {
+      const queryPropMatch = block.match(/"query"\s*:\s*"([^"]+)"/i)
+      if (queryPropMatch && queryPropMatch[1]?.trim()) {
+        return queryPropMatch[1].trim()
+      }
+    }
+  }
+  // Match JSON-style fake tool call: {"name":"search",...}
+  const jsonToolMatch = text.match(
+    /\{"name"\s*:\s*"search"\s*,\s*"(?:parameters|input|args|arguments)"\s*:\s*\{[\s\S]*?"query"\s*:\s*"([^"]+)"/i
+  )
+  if (jsonToolMatch && jsonToolMatch[1]?.trim()) {
+    return jsonToolMatch[1].trim()
+  }
+  // Match <tool_call:search> or <tool-search>
+  const toolColonMatch = text.match(
+    /<(?:tool_calls?:search|tool-search)\b[^>]*>([\s\S]*?)(?:<\/(?:tool_calls?(?::search)?|tool-search)>|$)/i
+  )
+  if (toolColonMatch && toolColonMatch[1]?.trim()) {
+    const qMatch = toolColonMatch[1].match(/"query"\s*:\s*"([^"]+)"/i)
+    if (qMatch && qMatch[1]?.trim()) return qMatch[1].trim()
   }
   return null
 }
