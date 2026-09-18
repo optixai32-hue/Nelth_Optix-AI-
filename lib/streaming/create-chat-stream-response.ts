@@ -333,45 +333,55 @@ export async function createChatStreamResponse(
           messagesToModel
         )
         preloadedSearchQuery = effectiveSearchQuery
-        const searchResult = await runWebSearch(
-          effectiveSearchQuery,
-          // Web count only — the provider always fetches 20 images in parallel
-          // when 'image' is requested, so image searches get BOTH web + images.
-          isNonThinkingModel ? 7 : 10,
-          'basic',
-          [],
-          [],
-          caps.webImageSearch ? ['image', 'web'] : ['web']
-        )
-        preloadedSearchContext = searchResult.results
-          .map(
-            (result, i) =>
-              `[${i + 1}] ${result.title}: ${result.url}\n  ${result.content}`
-          )
-          .join('\n\n')
-        if (searchResult.images && searchResult.images.length > 0) {
-          // Images are numbered (IMG-i) in their OWN space so the model never
-          // confuses them with the [n] web-result citations.
-          const imageLines = searchResult.images
-            .map((image, i) => {
-              const imageUrl = typeof image === 'string' ? image : image.url
-              const imageData =
-                typeof image === 'string'
-                  ? { url: imageUrl }
-                  : {
-                      url: imageUrl,
-                      ...(image.sourceUrl && { sourceUrl: image.sourceUrl }),
-                      ...(image.title && { title: image.title }),
-                      ...(image.description && {
-                        description: image.description
-                      })
-                    }
-              return `(IMG-${i + 1}) ${JSON.stringify(imageData)}`
-            })
-            .join('\n')
-          preloadedSearchContext += `\n\nIMAGES DISPONIBLES (numérotées IMG-1, IMG-2, ... — espace SÉPARÉ des citations [n]):\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: affiche au maximum 3 images pertinentes directement avec la syntaxe Markdown ![légende](url) — UNE IMAGE PAR LIGNE, rien d'autre sur la ligne — puis une section « 📋 Sources » façon ChatGPT : liste numérotée de liens cliquables au format EXACT \`1. [Titre court — Nom du site](URL exacte)\` — JAMAIS d'URL brute affichée en texte. RÈGLES STRICTES: (1) Présente les images choisies DANS L'ORDRE CROISSANT des numéros IMG, sans réordonner ni mélanger. (2) Chaque légende reprend EXACTEMENT le titre/description fourni — n'invente aucune légende. (3) Copie chaque URL EXACTEMENT sans la modifier. (4) N'ajoute AUCUN marqueur de citation [n] dans la phrase d'intro, les légendes ou la section « 📋 Sources » des images — les liens sources suffisent. (5) Ne montre JAMAIS les 20 images, n'utilise aucun bloc spec ni grille. (6) N'écris JAMAIS "Image not available" ni aucun texte de remplacement : si une image ne convient pas, ignore-la silencieusement. Ne dis pas que les images sont indisponibles. (7) Les marqueurs [n] sont INTERDITS sauf s'ils correspondent à un résultat web numéroté réellement fourni ci-dessus — ne JAMAIS inventer de numéros de citation ; sans résultats web, aucun [n].`
+        try {
+          const searchResult = await Promise.race([
+            runWebSearch(
+              effectiveSearchQuery,
+              isNonThinkingModel ? 7 : 10,
+              'basic',
+              [],
+              [],
+              caps.webImageSearch ? ['image', 'web'] : ['web']
+            ),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Preloaded search timeout')), 6000)
+            )
+          ])
+
+          if (searchResult && searchResult.results && searchResult.results.length > 0) {
+            preloadedSearchContext = searchResult.results
+              .map(
+                (result, i) =>
+                  `[${i + 1}] ${result.title}: ${result.url}\n  ${result.content}`
+              )
+              .join('\n\n')
+          }
+
+          if (searchResult && searchResult.images && searchResult.images.length > 0) {
+            const imageLines = searchResult.images
+              .map((image, i) => {
+                const imageUrl = typeof image === 'string' ? image : image.url
+                const imageData =
+                  typeof image === 'string'
+                    ? { url: imageUrl }
+                    : {
+                        url: imageUrl,
+                        ...(image.sourceUrl && { sourceUrl: image.sourceUrl }),
+                        ...(image.title && { title: image.title }),
+                        ...(image.description && {
+                          description: image.description
+                        })
+                      }
+                return `(IMG-${i + 1}) ${JSON.stringify(imageData)}`
+              })
+              .join('\n')
+            preloadedSearchContext = (preloadedSearchContext ? preloadedSearchContext + '\n\n' : '') +
+              `IMAGES DISPONIBLES (numérotées IMG-1, IMG-2, ... — espace SÉPARÉ des citations [n]):\n${imageLines}\nDIRECTIVE POUR LES RECHERCHES D'IMAGES: affiche au maximum 3 images pertinentes directement avec la syntaxe Markdown ![légende](url) — UNE IMAGE PAR LIGNE, rien d'autre sur la ligne — puis une section « 📋 Sources » façon ChatGPT : liste numérotée de liens cliquables au format EXACT \`1. [Titre court — Nom du site](URL exacte)\` — JAMAIS d'URL brute affichée en texte. RÈGLES STRICTES: (1) Présente les images choisies DANS L'ORDRE CROISSANT des numéros IMG, sans réordonner ni mélanger. (2) Chaque légende reprend EXACTEMENT le titre/description fourni — n'invente aucune légende. (3) Copie chaque URL EXACTEMENT sans la modifier. (4) N'ajoute AUCUN marqueur de citation [n] dans la phrase d'intro, les légendes ou la section « 📋 Sources » des images — les liens sources suffisent. (5) Ne montre JAMAIS les 20 images, n'utilise aucun bloc spec ni grille. (6) N'écris JAMAIS "Image not available" ni aucun texte de remplacement : si une image ne convient pas, ignore-la silencieusement. Ne dis pas que les images sont indisponibles. (7) Les marqueurs [n] sont INTERDITS sauf s'ils correspondent à un résultat web numéroté réellement fourni ci-dessus — ne JAMAIS inventer de numéros de citation ; sans résultats web, aucun [n].`
+          }
+          searchResultsForCitation = searchResult
+        } catch (searchErr) {
+          console.warn('[Stream] Preloaded search failed or timed out:', searchErr)
         }
-        searchResultsForCitation = searchResult
       }
 
       let prevCtx: Awaited<ReturnType<typeof getPreviousDesignContext>> = {
@@ -490,6 +500,7 @@ export async function createChatStreamResponse(
         skillContext,
         preloadedSearchContext,
         preloadedSearchQuery,
+        preloadedSearchAttempted: Boolean(shouldPreloadSearch),
         conversationLanguage,
         affirmativeHint,
         conversationStateLayer,
@@ -503,7 +514,7 @@ export async function createChatStreamResponse(
         connectorIntentOverride: connectorFollowUp ? true : undefined,
         capabilities: {
           trivial,
-          needsSearch: needsSearchEff && !preloadedSearchContext,
+          needsSearch: needsSearchEff && !shouldPreloadSearch,
           needsImage: needsImageEff,
           needsDocument: caps.needsDocument
         }

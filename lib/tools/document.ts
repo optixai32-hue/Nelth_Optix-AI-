@@ -3,16 +3,12 @@ import { headers } from 'next/headers'
 import { tool } from 'ai'
 import { z } from 'zod'
 
-import { generateDocument } from '@/lib/skills/document-engine'
 import {
   type DocumentFormat,
   formatFromName,
-  mimeForFormat,
-  modifyDocument,
-  readDocument,
-  validateDocument
+  mimeForFormat
 } from '@/lib/skills/document-runtime'
-import { storeDocument } from '@/lib/skills/document-store'
+
 
 const FORMATS = ['pdf', 'docx', 'xlsx', 'pptx', 'html', 'markdown'] as const
 
@@ -95,6 +91,15 @@ export const documentTool = tool({
   }) => {
     try {
       const fmt = format as DocumentFormat
+      const [
+        { generateDocument },
+        { modifyDocument, readDocument, validateDocument },
+        { storeDocument }
+      ] = await Promise.all([
+        import('@/lib/skills/document-engine'),
+        import('@/lib/skills/document-runtime'),
+        import('@/lib/skills/document-store')
+      ])
 
       if (operation === 'read') {
         const buffer = await resolveSourceBuffer(fileContentBase64, fileUrl)

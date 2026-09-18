@@ -1,24 +1,34 @@
 import { SearchProvider } from './base'
+import { DuckDuckGoSearchProvider } from './duckduckgo'
 import { FourGetSearchProvider } from './fourget'
 
-export type SearchProviderType = '4get' | 'fourget'
+export type SearchProviderType = 'duckduckgo' | 'ddg' | '4get' | 'fourget'
 
 /**
  * Resolves the configured search provider from environment variables.
- * Defaults to '4get' (https://4get.sudovanilla.org).
+ * Defaults to 'duckduckgo' with automatic 4get fallback.
  */
 export function resolveSearchProviderType(): SearchProviderType {
-  return '4get'
+  const envType = (process.env.SEARCH_API || '').toLowerCase().trim()
+  if (envType === '4get' || envType === 'fourget') {
+    return '4get'
+  }
+  return 'duckduckgo'
 }
 
 /**
- * Creates the search provider (4get).
+ * Creates the search provider.
  */
 export function createSearchProvider(
-  _type?: SearchProviderType
+  type?: SearchProviderType
 ): SearchProvider {
-  return new FourGetSearchProvider()
+  const resolved = type ?? resolveSearchProviderType()
+  if (resolved === '4get' || resolved === 'fourget') {
+    return new FourGetSearchProvider()
+  }
+  return new DuckDuckGoSearchProvider()
 }
 
-export { FourGetSearchProvider }
+export { DuckDuckGoSearchProvider, FourGetSearchProvider }
 export type { SearchProvider }
+

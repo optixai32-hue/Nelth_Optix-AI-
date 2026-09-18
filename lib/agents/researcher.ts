@@ -311,11 +311,10 @@ export { isAffirmativeContinuation } from '@/lib/conversation/conversation-state
 // Enhanced wrapper function with better type safety and streaming support
 export function wrapSearchToolForQuickMode<
   T extends ReturnType<typeof createSearchTool>
->(originalTool: T): T {
-  // Hard cap: exactly ONE real search call per turn. Repeat calls REPLAY the
-  // first results with an explicit stop-note instead of returning empty
-  // payloads — empty payloads made the model retry with reformulations (one
-  // "Web search" card per attempt) while never answering.
+>(originalTool: T, fallbackUserQuery?: string): T {
+  // Hard cap: up to ONE successful search call per turn. Repeat calls REPLAY
+  // results with an explicit stop-note. If the first search had 0 results or a
+  // broken query (e.g. ":"), an automatic retry is permitted.
   let searchCallCount = 0
   let cachedComplete: Record<string, unknown> | null = null
   let cachedQuery = ''
@@ -331,18 +330,35 @@ export function wrapSearchToolForQuickMode<
         throw new Error('Search tool execute function is not defined')
       }
 
+      // Recover valid query if the model emits a broken token (e.g. ":" or empty)
+      let queryStr =
+        typeof params?.query === 'string' ? params.query.trim() : ''
+      if (
+        !queryStr ||
+        queryStr.length <= 1 ||
+        /^[:\s.,?!;/\\]+$/.test(queryStr)
+      ) {
+        if (fallbackUserQuery && fallbackUserQuery.trim()) {
+          queryStr = fallbackUserQuery.trim()
+        }
+      }
+
       searchCallCount += 1
-      if (searchCallCount > 1) {
+      const hasRealResults =
+        cachedComplete &&
+        Array.isArray((cachedComplete as any).results) &&
+        (cachedComplete as any).results.length > 0
+
+      // Only lock budget if previous search had real results OR if we've already done 2 calls
+      if (searchCallCount > 1 && (hasRealResults || searchCallCount > 2)) {
         yield {
           state: 'searching' as const,
-          query: params.query
+          query: queryStr
         }
-        // Cast: the replayed payload carries an extra `note` for the model;
-        // it must not widen the tool's inferred output type.
         if (cachedComplete) {
           yield {
             ...cachedComplete,
-            query: params.query,
+            query: queryStr,
             note: `SEARCH BUDGET USED (1 search per question): these are the results of your first search ("${cachedQuery}"). Answer NOW from these results — do NOT search again.`
           } as never
         } else {
@@ -350,7 +366,7 @@ export function wrapSearchToolForQuickMode<
             state: 'complete' as const,
             results: [],
             images: [],
-            query: params.query,
+            query: queryStr,
             number_of_results: 0,
             note: 'SEARCH BUDGET USED (1 search per question): the first search failed — answer from your own knowledge and do NOT search again.'
           } as never
@@ -358,11 +374,12 @@ export function wrapSearchToolForQuickMode<
         return
       }
 
-      cachedQuery = params.query
+      cachedQuery = queryStr
 
       // Force optimized type for quick mode
       const modifiedParams = {
         ...params,
+        query: queryStr,
         type: 'optimized' as const
       }
 
@@ -399,7 +416,7 @@ export function wrapSearchToolForQuickMode<
           state: 'complete' as const,
           results: [],
           images: [],
-          query: params.query,
+          query: queryStr,
           number_of_results: 0
         }
       }
@@ -643,6 +660,7 @@ export async function createResearcher({
   searchMode = 'adaptive',
   skillContext,
   preloadedSearchContext,
+  preloadedSearchAttempted,
   preloadedSearchQuery,
   imageAttachment,
   userQuery,
@@ -662,6 +680,8 @@ export async function createResearcher({
   skillContext?: string
   /** Server-side search results used when the selected model emits fake XML tool calls. */
   preloadedSearchContext?: string
+  /** True when a server-side search was executed, even if it returned 0 results. */
+  preloadedSearchAttempted?: boolean
   /** The exact search query that produced the preloaded results (provenance). */
   preloadedSearchQuery?: string
   /** URL of an uploaded image attachment to force the img2img route. */
@@ -781,7 +801,7 @@ export async function createResearcher({
         // the stream would error out AFTER the answer was already streamed. Drop the
         // search-details block here; the preloaded context already instructs the
         // model to answer directly from the provided results.
-        if (preloadedSearchContext) {
+        if (preloadedSearchContext || preloadedSearchAttempted) {
           quickIntent.search = false
         }
         console.log(
@@ -803,7 +823,7 @@ export async function createResearcher({
         })
         activeToolsList = ['search', 'fetch', 'document', 'generateImage']
         maxSteps = 20
-        searchTool = wrapSearchToolForQuickMode(originalSearchTool)
+        searchTool = wrapSearchToolForQuickMode(originalSearchTool, userQuery)
         break
 
       case 'adaptive':
@@ -820,7 +840,7 @@ export async function createResearcher({
           `[Researcher] Adaptive mode: maxSteps=50, tools=[${activeToolsList.join(', ')}]`
         )
         maxSteps = 50
-        searchTool = wrapSearchToolForQuickMode(originalSearchTool)
+        searchTool = wrapSearchToolForQuickMode(originalSearchTool, userQuery)
         break
     }
 
@@ -905,7 +925,7 @@ export async function createResearcher({
       activeToolsList = []
     }
 
-    if (preloadedSearchContext) {
+    if (preloadedSearchContext || preloadedSearchAttempted) {
       activeToolsList = activeToolsList.filter(
         toolName => toolName !== 'search' && toolName !== 'fetch'
       )
@@ -1065,7 +1085,7 @@ export async function createResearcher({
     const connectorProtocol = connectorTools
       ? `\n\n${CONNECTOR_CALL_PROTOCOL}`
       : ''
-    const toolCallProtocol = preloadedSearchContext
+    const toolCallProtocol = (preloadedSearchContext || preloadedSearchAttempted)
       ? `${PRELOADED_SEARCH_PROTOCOL}${connectorProtocol}`
       : activeToolsList.length === 0
         ? `DIRECT CONVERSATIONAL RESPONSE PROTOCOL:
@@ -1144,16 +1164,10 @@ Requirements for the artifact:
       instructions,
       tools,
       activeTools: activeToolsList,
-      // Tool-choice priority: a request's dominant intent must win. Image tasks
-      // are checked BEFORE search, because `needsSearch` is triggered by a very
-      // broad regex (matches "2026", "today", "current", "event", "price", …).
-      // Without this ordering, an image-edit / image-generation request that also
-      // contains a current-info word would be hard-forced to the `search` tool and
-      // never call the intended image tool.
-      // Connector-first: when connector tools are armed, the answer lives in
-      // the user's own accounts — never hard-force the web search tool or the
-      // model would burn its first (and often only) step on the public web.
-      // The model still sees `search` and can use it after the connectors.
+      // Tool-choice priority: image generation task forced when explicitly requested.
+      // For web search, we use natural 'auto' choice so reasoning models have time
+      // to deliberate and formulate a precise query rather than emitting a broken
+      // single token like ":".
       ...(capabilities?.needsImage && activeToolsList.includes('generateImage')
         ? {
             toolChoice: {
@@ -1161,13 +1175,7 @@ Requirements for the artifact:
               toolName: 'generateImage' as const
             }
           }
-        : capabilities?.needsSearch &&
-            activeToolsList.includes('search') &&
-            !connectorTools
-          ? {
-              toolChoice: { type: 'tool' as const, toolName: 'search' as const }
-            }
-          : {}),
+        : {}),
       prepareStep: ({ steps }) => {
         const hasImage = steps.some(step =>
           (step.toolCalls ?? []).some(
