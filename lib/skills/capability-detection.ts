@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai'
 
+import { isPureGreeting } from '@/lib/utils/message-utils'
 import { getSkillRegistry } from './registry'
 import { routeSkills } from './router'
 import { foldText, intentRe } from './text-fold'
@@ -81,6 +82,52 @@ const CURRENT_INFO_RE = intentRe(
 const MATH_OR_CODE_RE = intentRe(
   'calcule|calculer|combien\\s+font|combien\\s+fait|\\d+\\s*[\\+\\-\\*\\/x\\^]\\s*\\d+|equation|integrale|derivee|theoreme|theoremes|code|coder|fonction|function|script|programme|algorithme|javascript|typescript|python|html|css|react|sql|regex'
 )
+
+const LINGUISTIC_OR_CREATIVE_RE = intentRe(
+  'traduis|traduire|traduction|translate|translation|corrige|corriger|correction|orthographe|grammaire|reformule|reformuler|resume[rz]?|resumer|poeme|poesie|histoire|raconte|blague|joke|paraphrase|dissertation|redige|rediger'
+)
+
+const CONVERSATIONAL_CHITCHAT_RE = intentRe(
+  'bonjour|salut|coucou|hello|hi|hey|yo|salama|manao\\s+ahoana|ca\\s+va|comment\\s+ca\\s+va|merci|thanks|ok|okay|d.accord|super|cool|bienvenue|au\\s+revoir|bye|a\\s+demain|bonne\\s+nuit|bonne\\s+journee'
+)
+
+const EXPLANATION_OR_CONCEPT_RE = intentRe(
+  'pourquoi|comment|how|why|explique|expliquer|qu.est[-\\s]ce\\s+(que?|qui)|c.est\\s+quoi|definition'
+)
+
+/**
+ * Detects if a query is a short standalone entity/topic lookup (1 to 5 words)
+ * like "Colonel Mickael", "Mickaël Pouvin", "DeepSeek R1", "Air Madagascar",
+ * "RTX 5090", "Tournoi des 6 nations", etc.
+ * Following Gemini's Grounding model, non-conversational short entity inputs
+ * are prime candidates for web search grounding.
+ */
+export function isStandaloneEntityLookup(q: string | undefined | null): boolean {
+  if (!q) return false
+  const trimmed = q.trim()
+  if (!trimmed) return false
+  const qf = foldText(trimmed)
+  const words = qf.split(/\s+/)
+  if (words.length > 5) return false
+
+  // Exclude greetings, conversational phrases, math, code, linguistic, identity
+  if (isPureGreeting(trimmed) || CONVERSATIONAL_CHITCHAT_RE.test(qf)) {
+    return false
+  }
+  if (MATH_OR_CODE_RE.test(qf)) return false
+  if (LINGUISTIC_OR_CREATIVE_RE.test(qf)) return false
+  if (IDENTITY_QUERY_RE.test(qf)) return false
+  if (EXPLANATION_OR_CONCEPT_RE.test(qf)) return false
+
+  // Exclude conversational sentence starters
+  const hasConversationalOpener =
+    /^(je|tu|il|elle|on|nous|vous|ils|i|you|he|she|we|they|peux|pourrais|veux|voudrais|dis|aide|donne-moi|fais-moi|can|could|please|tell|give)\b/i.test(
+      qf
+    )
+  if (hasConversationalOpener) return false
+
+  return true
+}
 
 const DOC_FORMATS = new Set(['pdf', 'docx', 'xlsx', 'pptx', 'doc', 'ppt'])
 
@@ -215,10 +262,17 @@ export async function detectRequestCapabilities(
   const isFollowUp = isConversationContinuation(query, history)
   const isExplicitSearch = WEB_SEARCH_VERB_RE.test(qf)
   const isMathOrCode = MATH_OR_CODE_RE.test(qf)
+  const isLinguisticOrCreative = LINGUISTIC_OR_CREATIVE_RE.test(qf)
+  const isEntityLookup = isStandaloneEntityLookup(query)
 
   const needsSearch = query
     ? (isExplicitSearch ||
-        (!isMathOrCode && (CURRENT_INFO_RE.test(qf) || webImageSearch || isFollowUp))) &&
+        (!isMathOrCode &&
+          !isLinguisticOrCreative &&
+          (CURRENT_INFO_RE.test(qf) ||
+            isEntityLookup ||
+            webImageSearch ||
+            isFollowUp))) &&
       !founderPhoto &&
       !isInternalKnowledge
     : false

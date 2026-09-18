@@ -161,7 +161,10 @@ describe('detectRequestCapabilities — all languages', () => {
       'Écris un script Python pour trier une liste',
       'Comment faire une boucle for en JavaScript ?',
       'Explique le théorème de Pythagore',
-      'C’est quoi une fonction récursive ?'
+      'C’est quoi une fonction récursive ?',
+      'Traduis ce texte en anglais',
+      'Écris un poème sur la mer',
+      'Corrige les fautes d’orthographe'
     ]) {
       const caps = await detectRequestCapabilities(q)
       expect(caps.needsSearch, `query: ${q}`).toBe(false)
@@ -176,7 +179,11 @@ describe('detectRequestCapabilities — all languages', () => {
       'Dernières actualités en France',
       'Résultats élections 2025',
       'colonel mickael',
-      'qui est Mickaël Pouvin'
+      'Colonel Mickael',
+      'qui est Mickaël Pouvin',
+      'Mickaël Pouvin',
+      'DeepSeek R1',
+      'Air Madagascar'
     ]) {
       const caps = await detectRequestCapabilities(q)
       expect(caps.needsSearch, `query: ${q}`).toBe(true)
