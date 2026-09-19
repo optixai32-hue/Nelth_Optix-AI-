@@ -244,7 +244,11 @@ const FAKE_TOOL_PATTERNS = [
   // JSON-style fake tool calls the Dots model emits as text:
   // {"name":"gmail","parameters":{"operation":"list",...}}
   // Match a JSON object with "name" + ("parameters"|"input"|"args") keys.
-  /\{"name"\s*:\s*"[^"]+"\s*,\s*"(?:parameters|input|args)"\s*:\s*\{[\s\S]*?\}\s*\}/g
+  /\{"name"\s*:\s*"[^"]+"\s*,\s*"(?:parameters|input|args)"\s*:\s*\{[\s\S]*?\}\s*\}/g,
+  // Fake search announcement lines: model writes text announcing search instead of calling the tool
+  /^[ \t]*(?:(?:je\s+(?:fais|vais\s+(?:faire|effectuer)|lance|procède\s+[aà])\s+une\s+recherche(?:\s+web)?|recherche\s+(?:web\s+)?en\s+cours|searching\s+the\s+web\s+for|let\s+me\s+search\s+(?:the\s+web\s+)?for|je\s+recherche\s+(?:des\s+informations\s+)?(?:sur|pour)|nous\s+allons\s+(?:rechercher|faire\s+une\s+recherche))[^\n]*)[.:]?[ \t]*$/gim,
+  /^[ \t]*\[\s*(?:recherche(?:\s+web)?|search|searching)\s*:[^\]]*\][ \t]*$/gim,
+  /^[ \t]*recherche\s+web\s*:\s*.*$/gim
 ]
 
 export function stripFakeToolCallXml(text: string): string {
@@ -340,6 +344,14 @@ export function extractFakeSearchQuery(text: string): string | null {
   if (toolColonMatch && toolColonMatch[1]?.trim()) {
     const qMatch = toolColonMatch[1].match(/"query"\s*:\s*"([^"]+)"/i)
     if (qMatch && qMatch[1]?.trim()) return qMatch[1].trim()
+  }
+  // Match text-based search announcements: "Je fais une recherche sur ...", "Recherche web en cours : ...", "Searching the web for ..."
+  const searchAnnounceMatch = text.match(
+    /(?:recherche\s+web\s*(?:en\s+cours\s*)?:\s*|je\s+(?:fais|vais\s+(?:faire|effectuer)|lance)\s+une\s+recherche(?:\s+web)?\s+(?:sur|pour)\s+|je\s+recherche\s+(?:des\s+informations\s+)?(?:sur|pour)\s+|searching\s+the\s+web\s+for\s+|let\s+me\s+search\s+(?:the\s+web\s+)?for\s+)(["'«]?)([^.\n"'»]+)\1/i
+  )
+  if (searchAnnounceMatch && searchAnnounceMatch[2]?.trim()) {
+    const q = searchAnnounceMatch[2].trim()
+    if (q.length >= 2) return q
   }
   return null
 }

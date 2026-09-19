@@ -368,7 +368,7 @@ export async function createEphemeralChatStreamResponse(
         skillContext,
         preloadedSearchContext,
         preloadedSearchQuery,
-        preloadedSearchAttempted: Boolean(shouldPreloadSearch),
+        preloadedSearchAttempted: Boolean(preloadedSearchContext),
         conversationLanguage,
         affirmativeHint: ephemeralAffirmativeHint,
         conversationStateLayer: ephemeralConversationStateLayer,
@@ -377,7 +377,7 @@ export async function createEphemeralChatStreamResponse(
         userQuery,
         capabilities: {
           trivial,
-          needsSearch: needsSearchEff && !shouldPreloadSearch,
+          needsSearch: needsSearchEff && !preloadedSearchContext,
           needsImage: needsImageEff
         }
       })

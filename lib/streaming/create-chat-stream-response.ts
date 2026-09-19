@@ -494,7 +494,7 @@ export async function createChatStreamResponse(
         skillContext,
         preloadedSearchContext,
         preloadedSearchQuery,
-        preloadedSearchAttempted: Boolean(shouldPreloadSearch),
+        preloadedSearchAttempted: Boolean(preloadedSearchContext),
         conversationLanguage,
         affirmativeHint,
         conversationStateLayer,
@@ -508,7 +508,7 @@ export async function createChatStreamResponse(
         connectorIntentOverride: connectorFollowUp ? true : undefined,
         capabilities: {
           trivial,
-          needsSearch: needsSearchEff && !shouldPreloadSearch,
+          needsSearch: needsSearchEff && !preloadedSearchContext,
           needsImage: needsImageEff,
           needsDocument: caps.needsDocument
         }
@@ -975,20 +975,30 @@ export async function createChatStreamResponse(
               accumulatedRawModelText
             )
 
+            const isSearchAnnouncement =
+              !wroteToolPart &&
+              /^\s*(?:je\s+(?:fais|vais\s+(?:faire|effectuer)|lance|procède\s+[aà])\s+une\s+recherche|recherche\s+(?:web\s+)?en\s+cours|searching\s+the\s+web|let\s+me\s+search|je\s+recherche\s+(?:des\s+informations\s+)?(?:sur|pour)|recherche\s+web\s*:)/i.test(
+                accumulatedCleanText.trim()
+              ) &&
+              accumulatedCleanText.trim().length <= 160
+
             if (
               shouldInjectEmptyFallback({
                 wroteContent,
                 wroteToolPart,
                 aborted: abortSignal?.aborted === true
               }) ||
-              (isEchoOrTitle && Boolean(fakeSearchQuery))
+              (isEchoOrTitle && Boolean(fakeSearchQuery)) ||
+              isSearchAnnouncement
             ) {
               console.error(
-                '[Stream] silent-empty response or title-echo fake search — injecting fallback text',
+                '[Stream] silent-empty response or title-echo/announcement fake search — injecting fallback text',
                 'connectorPreloadCalls.length=',
                 connectorPreloadCalls.length,
                 'isEchoOrTitle=',
                 isEchoOrTitle,
+                'isSearchAnnouncement=',
+                isSearchAnnouncement,
                 'fakeSearchQuery=',
                 fakeSearchQuery
               )
@@ -1011,7 +1021,8 @@ export async function createChatStreamResponse(
               if (!fallbackDelta) {
                 const targetFakeQuery =
                   fakeSearchQuery ||
-                  extractFakeSearchQuery(accumulatedRawModelText)
+                  extractFakeSearchQuery(accumulatedRawModelText) ||
+                  (isSearchAnnouncement ? userQuery : null)
                 if (targetFakeQuery) {
                   try {
                     const liveSearchResult = await runWebSearch(
