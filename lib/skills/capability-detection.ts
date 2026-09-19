@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai'
 
+import { isAffirmativeContinuation } from '@/lib/conversation/conversation-state'
 import { isPureGreeting } from '@/lib/utils/message-utils'
 import { getSkillRegistry } from './registry'
 import { routeSkills } from './router'
@@ -264,11 +265,17 @@ export async function detectRequestCapabilities(
   const isMathOrCode = MATH_OR_CODE_RE.test(qf)
   const isLinguisticOrCreative = LINGUISTIC_OR_CREATIVE_RE.test(qf)
   const isEntityLookup = isStandaloneEntityLookup(query)
+  // Affirmative continuations ("oui", "ok", "yes", "d'accord") should NOT
+  // trigger a new web search — the model continues the topic from existing
+  // context via buildAffirmativeHint. Without this gate the weak model
+  // receives a redundant preloaded search and echoes the query as text.
+  const isAffirmative = isAffirmativeContinuation(query ?? '')
 
   const needsSearch = query
     ? (isExplicitSearch ||
         (!isMathOrCode &&
           !isLinguisticOrCreative &&
+          !isAffirmative &&
           (CURRENT_INFO_RE.test(qf) ||
             isEntityLookup ||
             webImageSearch ||

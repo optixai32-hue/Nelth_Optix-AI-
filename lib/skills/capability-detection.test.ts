@@ -189,5 +189,32 @@ describe('detectRequestCapabilities — all languages', () => {
       expect(caps.needsSearch, `query: ${q}`).toBe(true)
     }
   })
+
+  it('does NOT trigger web search for affirmative continuations even with search-backed history', async () => {
+    // Simulates: user asks "apple iphone 18" → AI answers with citations →
+    // user says "oui". The "oui" should NOT trigger a new web search.
+    const historyWithSearch = [
+      {
+        id: '1',
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: 'apple iphone 18' }]
+      },
+      {
+        id: '2',
+        role: 'assistant' as const,
+        parts: [
+          {
+            type: 'text' as const,
+            text: `Voici ce que l'on sait sur l'iPhone 18[1](#tool-search).`
+          }
+        ]
+      }
+    ]
+
+    for (const q of ['oui', 'ok', 'yes', "d'accord", 'Ok', 'Oui']) {
+      const caps = await detectRequestCapabilities(q, [], historyWithSearch)
+      expect(caps.needsSearch, `query: "${q}" must NOT search`).toBe(false)
+    }
+  })
 })
 
