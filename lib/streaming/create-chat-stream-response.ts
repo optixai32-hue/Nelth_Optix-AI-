@@ -527,14 +527,10 @@ export async function createChatStreamResponse(
         }
       )
 
-      // Re-injection: a fresh copy of the turn directive sits right before
-      // generation, on the last user message (research-backed against
-      // instruction dilution mid-conversation).
-      modelMessages = appendContinuityReminder(
-        modelMessages,
-        continuityReminder
-      )
-
+      // Truncation FIRST (matching the ephemeral path order): context window
+      // management must happen before the reminder injection so the
+      // [System note:] token cost is never counted against the budget and
+      // the reminder is guaranteed to survive truncation.
       if (shouldTruncateMessages(modelMessages, model)) {
         const maxTokens = getMaxAllowedTokens(model)
         const originalCount = modelMessages.length
@@ -546,6 +542,15 @@ export async function createChatStreamResponse(
           )
         }
       }
+
+      // Re-injection: a fresh copy of the turn directive sits right before
+      // generation, on the last user message (research-backed against
+      // instruction dilution mid-conversation). Placed AFTER truncation
+      // so the reminder always survives regardless of context pressure.
+      modelMessages = appendContinuityReminder(
+        modelMessages,
+        continuityReminder
+      )
 
       // Start title generation in parallel if it's a new chat
       if (!initialChat && message) {
