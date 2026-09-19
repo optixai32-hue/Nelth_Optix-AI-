@@ -71,10 +71,9 @@ export const CitationLink = memo(function CitationLink({
     >
       <CitationTrigger
         label={childrenText}
-        showFavicon={false}
         showSiteName={false}
         className={cn(
-          'h-4 px-1.5 text-[10px] leading-none font-normal -translate-y-0.5 whitespace-nowrap no-underline',
+          'gap-1 text-[10px] -translate-y-0.5 whitespace-nowrap no-underline',
           className
         )}
       />
