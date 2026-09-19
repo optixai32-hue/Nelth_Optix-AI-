@@ -194,7 +194,12 @@ export async function POST(req: Request) {
           messageId,
           abortSignal,
           isNewChat,
-          searchMode
+          searchMode,
+          // Client history backstop: the browser's useChat state carries
+          // the freshest turns (see merge in createChatStreamResponse).
+          // Fixes connected-mode continuity when the previous assistant
+          // message is not in Firestore yet (DB save races next request).
+          messages: Array.isArray(messages) ? messages : []
         })
 
     perfTime('createChatStreamResponse resolved', streamStart)

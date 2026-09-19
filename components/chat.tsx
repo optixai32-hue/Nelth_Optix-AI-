@@ -164,7 +164,13 @@ export function Chat({
             chatId: chatId,
             messageId,
             analyticsId: getDistinctId(),
-            ...(isGuest ? { messages } : {}),
+            // Always send the client history (guests AND connected users).
+            // The server merges it with the DB snapshot as a continuity
+            // backstop: when the user replies quickly, the previous
+            // assistant message may not be persisted yet, and the DB-only
+            // history load would miss it — the model would then answer
+            // "oui" with no memory of what it just said.
+            messages,
             message:
               trigger === 'regenerate-message' &&
               messageToRegenerate?.role === 'user'

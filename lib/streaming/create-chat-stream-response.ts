@@ -132,7 +132,8 @@ export async function createChatStreamResponse(
     messageId,
     abortSignal,
     isNewChat,
-    searchMode
+    searchMode,
+    messages: clientMessages
   } = config
 
   // Verify that chatId is provided
@@ -197,10 +198,49 @@ export async function createChatStreamResponse(
         `prepareMessages - Invoked: trigger=${trigger}, isNewChat=${isNewChat}`
       )
       const preparedMessages = await prepareMessages(context, message)
+      // Client-history backstop (parity with the guest path): the browser's
+      // useChat state always has the freshest turns, including the previous
+      // assistant message that may not be in Firestore yet when the user
+      // replies quickly (the DB save races the next request's history
+      // load). Merge any client messages missing from the DB snapshot so
+      // continuity, language, skills and search-query resolution all see
+      // the same history as guests. Skipped for regenerations, where the
+      // DB slice is authoritative and newer client turns must stay cut.
+      let historyForModel: any[] = preparedMessages
+      // NOTE: the declared BaseStreamConfig trigger union is stale — the AI
+      // SDK transport actually sends 'submit-message' | 'regenerate-message'
+      // (see prepareMessages). Compare as string to cover both namings.
+      if (
+        (trigger as string) !== 'regenerate-message' &&
+        (trigger as string) !== 'regenerate-assistant-message' &&
+        Array.isArray(clientMessages) &&
+        clientMessages.length > 0
+      ) {
+        const dbIds = new Set(
+          preparedMessages.map(m => (m as { id?: unknown }).id)
+        )
+        const missing = (clientMessages as any[]).filter(m => {
+          const id = (m as { id?: unknown }).id
+          if (typeof id !== 'string' || id.length === 0 || dbIds.has(id)) {
+            return false
+          }
+          const cid = (m as { metadata?: { conversationId?: unknown } })
+            .metadata?.conversationId
+          if (typeof cid === 'string' && cid.length > 0 && cid !== chatId) {
+            return false
+          }
+          return true
+        })
+        if (missing.length > 0) {
+          // Only the most recent turns can be missing (race window) —
+          // bound the merge so a stale client cannot flood the context.
+          historyForModel = [...preparedMessages, ...missing.slice(-10)]
+        }
+      }
       // Authoritative history normalization: exactly-once current message,
       // no duplicates, no contentless turns — chronological order preserved.
       const { messages: messagesToModel } =
-        normalizeConversationHistory(preparedMessages)
+        normalizeConversationHistory(historyForModel)
       perfTime('prepareMessages completed (stream)', prepareStart)
 
       // Resolve the latest user query and run the Skill Router so the model
