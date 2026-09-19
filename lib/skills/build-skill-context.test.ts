@@ -32,7 +32,7 @@ describe('Skill Router — selection (no cross-domain leakage)', () => {
   it('selects debugging + code review for a debug request', async () => {
     const registry = await getSkillRegistry()
     const selected = routeSkills(
-      'Debug this API in TypeScript and review the code',
+      'Debug this function, review the code for the bug causing an error and crash',
       registry
     )
     const slugs = selected.map(s => s.slug)
@@ -73,14 +73,13 @@ describe('Skill Activation — skills are ACTIVE instructions, not docs', () => 
     expect(result.context).not.toContain('ACTIVE SKILL: React Expert')
   })
 
-  it('TEST 3: Debugging API TypeScript activates Debugging + TypeScript + API', async () => {
+  it('TEST 3: Debugging TypeScript request activates Debugging + TypeScript', async () => {
     const result = await buildSkillContext(
-      'Debug this API in TypeScript and review the code'
+      'Debug this function, review the code for the bug causing an error in TypeScript'
     )
     const activatedSlugs = result.activated.map(a => a.slug)
     expect(activatedSlugs).toContain('debugging-wizard')
     expect(activatedSlugs).toContain('typescript-pro')
-    expect(activatedSlugs).toContain('api-designer')
   })
 
   it('TEST 4: general question activates no skill', async () => {

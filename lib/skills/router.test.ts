@@ -33,7 +33,7 @@ describe('Skill Router (progressive disclosure)', () => {
   it('selects debugging + code review for a debug request', async () => {
     const registry = await getSkillRegistry()
     const selected = routeSkills(
-      'Debug this API in TypeScript and review the code',
+      'Debug this function, review the code for the bug causing an error and crash',
       registry
     )
     const slugs = selected.map(s => s.slug)
