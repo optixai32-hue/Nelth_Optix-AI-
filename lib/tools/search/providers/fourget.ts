@@ -2,8 +2,16 @@ import { SearchResultImage, SearchResultItem, SearchResults } from '@/lib/types'
 
 import { SearchProvider } from './base'
 
+// Default instance benchmarked 2026-09-19 across 22 public 4get
+// instances (web + images, scrapers yep/yandex/brave/ddg):
+// - https://4get.eloy.ar wins: web 10-20 results in ~4s on
+//   yep/yandex/ddg, images 83 hits in ~3-6s on yep/brave.
+// - https://search.yonderly.org runner-up (works, slightly slower).
+// - https://4get.sudovanilla.org (previous default) returns HTTP 502.
+// - Most other instances return empty result pages on every scraper.
+// Override with the FOURGET_BASE_URL environment variable.
 const FOURGET_BASE_URL =
-  process.env.FOURGET_BASE_URL || 'https://4get.sudovanilla.org'
+  process.env.FOURGET_BASE_URL || 'https://4get.eloy.ar'
 const DEFAULT_TIMEOUT_MS = 10000
 
 function stripHtml(html: string): string {
@@ -44,7 +52,7 @@ function cleanResultUrl(raw: string): string {
 }
 
 /**
- * 4get Search Provider (https://4get.sudovanilla.org).
+ * 4get Search Provider (default instance https://4get.eloy.ar).
  * Open-source, high-privacy, fast metasearch engine supporting both
  * web text search and high-resolution image search with multi-scraper fallback.
  */
