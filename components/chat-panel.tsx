@@ -486,7 +486,7 @@ export function ChatPanel({
       className={cn(
         'w-full bg-background group/form-container shrink-0',
         messages.length > 0
-          ? 'sticky bottom-0 px-2 pb-2 md:pb-4'
+          ? 'sticky bottom-0 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-[calc(1rem+env(safe-area-inset-bottom))]'
           : 'px-4 md:px-6'
       )}
     >
@@ -823,7 +823,7 @@ export function ChatPanel({
             spellCheck={false}
             value={input}
             disabled={isLoading || isToolInvocationInProgress()}
-            className="resize-none w-full min-h-12 bg-transparent border-0 p-3 md:p-4 text-sm placeholder:text-muted-foreground focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
+            className="resize-none w-full min-h-12 bg-transparent border-0 p-3 md:p-4 text-base md:text-sm placeholder:text-muted-foreground focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
             onChange={handleInputChange}
             onPaste={e => {
               const text = e.clipboardData.getData('text')

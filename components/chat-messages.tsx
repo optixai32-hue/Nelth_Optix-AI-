@@ -252,7 +252,7 @@ export function ChatMessages({
   const latestSectionMinHeight =
     isMobile && scrollViewportHeight > 0
       ? `${Math.max(0, scrollViewportHeight - mobileFollowUpTopClearance)}px`
-      : `calc(100vh - ${
+      : `calc(100dvh - ${
           isMobile
             ? MOBILE_LATEST_SECTION_OFFSET_FALLBACK
             : DESKTOP_LATEST_SECTION_OFFSET
