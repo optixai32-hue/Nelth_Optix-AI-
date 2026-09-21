@@ -63,7 +63,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  viewportFit: 'cover'
+  viewportFit: 'cover',
+  // Android Chrome (v108+) no longer resizes the layout viewport when the
+  // keyboard opens (default resizes-visual), which leaves the sticky input
+  // bar hidden behind the keyboard on newer devices while older ones still
+  // resize — the classic "works on some Androids, broken on others".
+  // resizes-content restores the resize behavior everywhere.
+  interactiveWidget: 'resizes-content'
 }
 
 export default async function RootLayout({

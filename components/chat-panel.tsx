@@ -486,7 +486,7 @@ export function ChatPanel({
       className={cn(
         'w-full bg-background group/form-container shrink-0',
         messages.length > 0
-          ? 'sticky bottom-0 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-[calc(1rem+env(safe-area-inset-bottom))]'
+          ? 'sticky bottom-0 px-2 pb-2 supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-4 md:supports-[padding:env(safe-area-inset-bottom)]:pb-[calc(1rem+env(safe-area-inset-bottom))]'
           : 'px-4 md:px-6'
       )}
     >
