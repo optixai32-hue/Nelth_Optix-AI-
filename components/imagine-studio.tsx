@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import {
+  IconChevronLeft,
+  IconChevronRight,
   IconLayoutGrid,
   IconPhoto,
   IconPlus,
@@ -146,6 +148,67 @@ function SegmentedControl<T extends string>({
 const ASPECT_RATIOS: AspectRatio[] = ['1:1', '16:9', '9:16']
 const VIDEO_RESOLUTIONS: VideoResolution[] = ['480p', '720p']
 const VIDEO_DURATIONS: VideoDuration[] = ['6s', '10s']
+
+// ---------------------------------------------------------------------------
+// Gallery carousel (placeholder cards — backend fills real creations later)
+// ---------------------------------------------------------------------------
+
+function GalleryRow({
+  label,
+  vertical
+}: {
+  label: string
+  vertical?: boolean
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const scroll = (dir: 1 | -1) => {
+    scrollRef.current?.scrollBy({ left: dir * 320, behavior: 'smooth' })
+  }
+
+  return (
+    <div className="w-full">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+          {label}
+        </span>
+        <div className="hidden gap-1 md:flex">
+          <button
+            type="button"
+            aria-label="Précédent"
+            onClick={() => scroll(-1)}
+            className="flex size-7 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10"
+          >
+            <IconChevronLeft size={16} />
+          </button>
+          <button
+            type="button"
+            aria-label="Suivant"
+            onClick={() => scroll(1)}
+            className="flex size-7 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10"
+          >
+            <IconChevronRight size={16} />
+          </button>
+        </div>
+      </div>
+      <div
+        ref={scrollRef}
+        className="no-scrollbar -mx-4 flex snap-x snap-proximity gap-3 overflow-x-auto px-4 pb-1"
+      >
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className={cn(
+              'flex shrink-0 snap-start items-center justify-center rounded-xl bg-neutral-200/70 text-neutral-400 dark:bg-white/10 dark:text-neutral-500',
+              vertical ? 'aspect-[9/16] w-32 md:w-36' : 'aspect-video w-56 md:w-64'
+            )}
+          >
+            <IconPhoto size={22} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   const [mode, setMode] = useState<StudioMode>('image')
@@ -321,14 +384,13 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           </div>
         )}
 
-        {/* Gallery placeholder (backend fills this in later) */}
-        <div className="mt-10 flex w-full flex-col items-center gap-2 text-center">
-          <span className="flex size-11 items-center justify-center rounded-full bg-black/5 text-neutral-400 dark:bg-white/10 dark:text-neutral-500">
-            <IconPhoto size={20} />
-          </span>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Vos créations apparaîtront ici
-          </p>
+        {/* Gallery carousels: below the composer on desktop, below the
+            resolution/duration selectors on mobile (both sit above this
+            block). 6 horizontal + 6 vertical placeholder cards — the
+            backend fills real creations in later. */}
+        <div className="mt-10 flex w-full flex-col gap-6">
+          <GalleryRow label="Horizontal" />
+          <GalleryRow label="Vertical" vertical />
         </div>
       </div>
     </div>
