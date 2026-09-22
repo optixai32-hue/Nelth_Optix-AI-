@@ -180,7 +180,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-y-auto bg-[#faf9f7] [font-family:Arial,sans-serif] dark:bg-background">
-      <div className="mx-auto flex w-full max-w-[752px] flex-col items-center px-4 pt-10 pb-16 md:pt-[100px]">
+      <div className="mx-auto flex w-full max-w-[752px] flex-col items-center px-4 pt-20 pb-16 md:pt-[100px]">
         <h1 className="text-center text-[25px] font-bold leading-[31px] text-[#080808] md:text-[26px] dark:text-foreground">
           Qu&apos;allons-nous imaginer ?
         </h1>
