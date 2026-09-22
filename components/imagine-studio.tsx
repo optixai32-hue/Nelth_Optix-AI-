@@ -4,7 +4,6 @@ import { useState } from 'react'
 
 import {
   IconLayoutGrid,
-  IconMicrophone,
   IconPhoto,
   IconPlus,
   IconRectangleVertical,
@@ -287,12 +286,9 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
               {aspectRatio}
             </button>
 
-            {/* Mic + generate, pinned right (stays visible while the
+            {/* Generate, pinned right (stays visible while the
                 toolbar row scrolls on mobile) */}
             <div className="sticky right-0 ml-auto flex shrink-0 items-center gap-1 bg-white pl-1 dark:bg-card">
-              <ToolbarIconButton label="Microphone">
-                <IconMicrophone size={16} />
-              </ToolbarIconButton>
               <button
                 type="button"
                 onClick={handleGenerate}
