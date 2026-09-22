@@ -179,7 +179,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   }
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-[#faf9f7] dark:bg-background">
+    <div className="h-full w-full overflow-y-auto bg-[#faf9f7] [font-family:Arial,sans-serif] dark:bg-background">
       <div className="mx-auto flex w-full max-w-[752px] flex-col items-center px-4 pt-10 pb-16 md:pt-[100px]">
         <h1 className="text-center text-[25px] font-bold leading-[31px] text-[#080808] md:text-[26px] dark:text-foreground">
           Qu&apos;allons-nous imaginer ?
@@ -326,7 +326,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                 onClick={handleGenerate}
                 aria-label="Générer"
                 title="Générer"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#8dccf5] text-white transition-transform hover:scale-105 active:scale-95"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition-transform hover:scale-105 active:scale-95 dark:bg-white dark:text-black"
               >
                 <ArrowUp size={18} strokeWidth={2.5} />
               </button>
