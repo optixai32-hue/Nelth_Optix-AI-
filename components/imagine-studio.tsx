@@ -191,9 +191,12 @@ const STYLE_PRESETS = [
   'Bronze'
 ]
 
-// 10 presets, picked once at random, render enlarged as landscape
-// video cards (double width) among the portrait style cards.
+// 10 presets, picked once at random, render enlarged as video cards
+// in three formats — 16:9 landscape (double width), 1:1 square and
+// 9:16 tall — among the portrait style cards.
 const VIDEO_CARD_COUNT = 10
+
+type VideoFormat = 'wide' | 'square' | 'tall'
 
 function shuffledIndexes(n: number): number[] {
   const arr = Array.from({ length: n }, (_, i) => i)
@@ -202,6 +205,18 @@ function shuffledIndexes(n: number): number[] {
     ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
   return arr
+}
+
+function shuffledVideoFormats(): Map<number, VideoFormat> {
+  const picked = shuffledIndexes(STYLE_PRESETS.length).slice(
+    0,
+    VIDEO_CARD_COUNT
+  )
+  const map = new Map<number, VideoFormat>()
+  picked.forEach((presetIndex, i) => {
+    map.set(presetIndex, i < 4 ? 'wide' : i < 7 ? 'square' : 'tall')
+  })
+  return map
 }
 
 function StylePresetGrid({
@@ -217,15 +232,12 @@ function StylePresetGrid({
 }) {
   // Collapsed: first 17 presets + a "Plus" card; expanded: all 34 + Fermer.
   const visible = expanded ? STYLE_PRESETS : STYLE_PRESETS.slice(0, 17)
-  const videoSet = useMemo(
-    () => new Set(shuffledIndexes(STYLE_PRESETS.length).slice(0, VIDEO_CARD_COUNT)),
-    []
-  )
+  const videoMap = useMemo(() => shuffledVideoFormats(), [])
   return (
-    <div className="grid grid-cols-4 gap-[6px] md:grid-cols-5 lg:grid-cols-6">
+    <div className="grid grid-flow-dense grid-cols-4 gap-[6px] md:grid-cols-5 lg:grid-cols-6">
       {visible.map(label => {
         const isActive = active === label
-        const isVideo = videoSet.has(STYLE_PRESETS.indexOf(label))
+        const format = videoMap.get(STYLE_PRESETS.indexOf(label))
         return (
           <button
             key={label}
@@ -235,15 +247,22 @@ function StylePresetGrid({
             title={label}
             className={cn(
               'group relative w-full overflow-hidden rounded-[18px] bg-neutral-200 transition-all duration-150 ease-out hover:scale-[1.04] hover:shadow-md dark:bg-white/10',
-              isVideo ? 'col-span-2 aspect-video' : 'aspect-[60/86]',
+              format === 'wide' && 'col-span-2 aspect-video',
+              format === 'square' && 'aspect-square',
+              format === 'tall' && 'row-span-2 min-h-full',
+              !format && 'aspect-[60/86]',
               isActive && 'shadow-lg ring-2 ring-white'
             )}
           >
             <img
               src={
-                isVideo
+                format === 'wide'
                   ? `https://picsum.photos/seed/${encodeURIComponent(label)}/320/180`
-                  : `https://picsum.photos/seed/${encodeURIComponent(label)}/120/176`
+                  : format === 'square'
+                    ? `https://picsum.photos/seed/${encodeURIComponent(label)}/200/200`
+                    : format === 'tall'
+                      ? `https://picsum.photos/seed/${encodeURIComponent(label)}/180/320`
+                      : `https://picsum.photos/seed/${encodeURIComponent(label)}/120/176`
               }
               alt={label}
               loading="lazy"
