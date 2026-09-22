@@ -179,7 +179,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   }
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-[#faf9f7] [font-family:Arial,sans-serif] dark:bg-background">
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-y-auto bg-[#faf9f7] [font-family:Arial,sans-serif] dark:bg-background">
       <div className="mx-auto flex w-full max-w-[752px] flex-col items-center px-4 pt-10 pb-16 md:pt-[100px]">
         <h1 className="text-center text-[25px] font-bold leading-[31px] text-[#080808] md:text-[26px] dark:text-foreground">
           Qu&apos;allons-nous imaginer ?
@@ -201,8 +201,9 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
             className="min-h-[48px] w-full resize-none bg-transparent px-[19px] pt-[16px] text-[16px] leading-[22px] text-[#111] outline-none placeholder:text-[#707070] dark:text-foreground"
           />
 
-          {/* Bottom toolbar — same composer, controls swap per mode */}
-          <div className="flex flex-wrap items-center gap-3 px-[19px] pt-[6px] pb-[11px]">
+          {/* Bottom toolbar — same composer, controls swap per mode.
+              Wraps on narrow screens so nothing overflows horizontally. */}
+          <div className="flex flex-wrap items-center gap-2 px-[15px] pt-[6px] pb-[11px] md:gap-3 md:px-[19px]">
             {/* Plus */}
             <ToolbarIconButton
               label="Ajouter"
