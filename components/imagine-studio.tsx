@@ -192,11 +192,11 @@ const STYLE_PRESETS = [
 ]
 
 // 10 presets, picked once at random, render enlarged as video cards
-// in three formats — 16:9 landscape (double width), 1:1 square and
-// 9:16 tall — among the portrait style cards.
+// in two formats — 16:9 landscape (double width) and 1:1 square —
+// among the portrait style cards.
 const VIDEO_CARD_COUNT = 10
 
-type VideoFormat = 'wide' | 'square' | 'tall'
+type VideoFormat = 'wide' | 'square'
 
 function shuffledIndexes(n: number): number[] {
   const arr = Array.from({ length: n }, (_, i) => i)
@@ -214,7 +214,7 @@ function shuffledVideoFormats(): Map<number, VideoFormat> {
   )
   const map = new Map<number, VideoFormat>()
   picked.forEach((presetIndex, i) => {
-    map.set(presetIndex, i < 4 ? 'wide' : i < 7 ? 'square' : 'tall')
+    map.set(presetIndex, i < 4 ? 'wide' : 'square')
   })
   return map
 }
@@ -249,7 +249,6 @@ function StylePresetGrid({
               'group relative w-full overflow-hidden rounded-[18px] bg-neutral-200 transition-all duration-150 ease-out hover:scale-[1.04] hover:shadow-md dark:bg-white/10',
               format === 'wide' && 'col-span-2 aspect-video',
               format === 'square' && 'aspect-square',
-              format === 'tall' && 'row-span-2 min-h-full',
               !format && 'aspect-[60/86]',
               isActive && 'shadow-lg ring-2 ring-white'
             )}
@@ -260,9 +259,7 @@ function StylePresetGrid({
                   ? `https://picsum.photos/seed/${encodeURIComponent(label)}/320/180`
                   : format === 'square'
                     ? `https://picsum.photos/seed/${encodeURIComponent(label)}/200/200`
-                    : format === 'tall'
-                      ? `https://picsum.photos/seed/${encodeURIComponent(label)}/180/320`
-                      : `https://picsum.photos/seed/${encodeURIComponent(label)}/120/176`
+                    : `https://picsum.photos/seed/${encodeURIComponent(label)}/120/176`
               }
               alt={label}
               loading="lazy"
