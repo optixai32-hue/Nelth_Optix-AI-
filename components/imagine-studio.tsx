@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
+  IconExternalLink,
   IconLayoutGrid,
   IconPhoto,
   IconPlus,
@@ -259,6 +260,101 @@ function StylePresetGrid({
   )
 }
 
+// ---------------------------------------------------------------------------
+// Style preview card (Gemini/ChatGPT-like): click a preset → lightbox with
+// the image, its title and actions (use style, open original, send).
+// ---------------------------------------------------------------------------
+
+function StylePreviewCard({
+  label,
+  onUse,
+  onSend,
+  onClose
+}: {
+  label: string
+  onUse: () => void
+  onSend: () => void
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const fullUrl = `https://picsum.photos/seed/${encodeURIComponent(label)}/800/1000`
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-md overflow-hidden rounded-[20px] bg-white shadow-2xl dark:bg-card"
+      >
+        <div className="relative">
+          <img
+            src={fullUrl}
+            alt={label}
+            draggable={false}
+            className="aspect-[4/3] w-full object-cover"
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer l'aperçu"
+            className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
+          >
+            <X size={16} strokeWidth={2} />
+          </button>
+        </div>
+        <div className="flex items-center gap-2 p-4">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-semibold text-[#111] dark:text-foreground">
+              {label}
+            </p>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Preset de style
+            </p>
+          </div>
+          <a
+            href={fullUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Voir l'original"
+            title="Voir l'original"
+            className="flex size-10 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10"
+          >
+            <IconExternalLink size={17} />
+          </a>
+          <button
+            type="button"
+            onClick={onUse}
+            className="shrink-0 rounded-full border border-black/10 px-3.5 py-2 text-[13px] font-medium text-[#111] transition-colors hover:bg-black/5 dark:border-white/15 dark:text-foreground dark:hover:bg-white/10"
+          >
+            Utiliser
+          </button>
+          <button
+            type="button"
+            onClick={onSend}
+            aria-label="Envoyer"
+            title="Envoyer"
+            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition-transform hover:scale-105 active:scale-95 dark:bg-white dark:text-black"
+          >
+            <ArrowUp size={18} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   const [mode, setMode] = useState<StudioMode>('image')
   const [prompt, setPrompt] = useState('')
@@ -268,6 +364,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   const [duration, setDuration] = useState<VideoDuration>('6s')
   const [style, setStyle] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(true)
+  const [preview, setPreview] = useState<string | null>(null)
 
   const cycleAspectRatio = () => {
     setAspectRatio(
@@ -442,13 +539,33 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
         <div className="mt-8 w-full">
           <StylePresetGrid
             active={style}
-            onSelect={label =>
-              setStyle(prev => (prev === label ? null : label))
-            }
+            onSelect={label => setPreview(label)}
             expanded={expanded}
             onToggle={() => setExpanded(prev => !prev)}
           />
         </div>
+        {preview && (
+          <StylePreviewCard
+            label={preview}
+            onUse={() => {
+              setStyle(preview)
+              setPreview(null)
+            }}
+            onSend={() => {
+              setStyle(preview)
+              setPreview(null)
+              onGenerate?.({
+                mode,
+                prompt: prompt.trim(),
+                aspectRatio,
+                resolution,
+                duration,
+                style: preview
+              })
+            }}
+            onClose={() => setPreview(null)}
+          />
+        )}
       </div>
     </div>
   )
