@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
 import {
   IconLayoutGrid,
@@ -191,33 +191,25 @@ const STYLE_PRESETS = [
   'Bronze'
 ]
 
-// 10 presets, picked once at random, render enlarged as video cards
-// in two formats — 16:9 landscape (double width) and 1:1 square —
-// among the portrait style cards.
-const VIDEO_CARD_COUNT = 10
-
+// 10 enlarged video cards at FIXED positions — 16:9 landscape (double
+// width) and 1:1 square — among the portrait style cards. Fixed order so
+// the layout is identical on every visit (no reshuffling).
 type VideoFormat = 'wide' | 'square'
 
-function shuffledIndexes(n: number): number[] {
-  const arr = Array.from({ length: n }, (_, i) => i)
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[arr[i], arr[j]] = [arr[j], arr[i]]
-  }
-  return arr
-}
+const VIDEO_CARDS: Array<[number, VideoFormat]> = [
+  [2, 'wide'],
+  [5, 'square'],
+  [9, 'wide'],
+  [12, 'square'],
+  [16, 'wide'],
+  [19, 'square'],
+  [23, 'wide'],
+  [26, 'square'],
+  [29, 'square'],
+  [32, 'square']
+]
 
-function shuffledVideoFormats(): Map<number, VideoFormat> {
-  const picked = shuffledIndexes(STYLE_PRESETS.length).slice(
-    0,
-    VIDEO_CARD_COUNT
-  )
-  const map = new Map<number, VideoFormat>()
-  picked.forEach((presetIndex, i) => {
-    map.set(presetIndex, i < 4 ? 'wide' : 'square')
-  })
-  return map
-}
+const VIDEO_MAP = new Map<number, VideoFormat>(VIDEO_CARDS)
 
 function StylePresetGrid({
   active,
@@ -232,7 +224,7 @@ function StylePresetGrid({
 }) {
   // Collapsed: first 17 presets + a "Plus" card; expanded: all 34 + Fermer.
   const visible = expanded ? STYLE_PRESETS : STYLE_PRESETS.slice(0, 17)
-  const videoMap = useMemo(() => shuffledVideoFormats(), [])
+  const videoMap = VIDEO_MAP
   return (
     <div className="grid grid-flow-dense grid-cols-4 gap-[6px] md:grid-cols-5 lg:grid-cols-6">
       {visible.map(label => {
