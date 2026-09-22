@@ -194,15 +194,19 @@ const STYLE_PRESETS = [
 function StylePresetGrid({
   active,
   onSelect,
-  onClose
+  expanded,
+  onToggle
 }: {
   active: string | null
   onSelect: (label: string) => void
-  onClose: () => void
+  expanded: boolean
+  onToggle: () => void
 }) {
+  // Collapsed: first 17 presets + a "Plus" card; expanded: all 34 + Fermer.
+  const visible = expanded ? STYLE_PRESETS : STYLE_PRESETS.slice(0, 17)
   return (
     <div className="grid grid-cols-4 gap-[6px] md:grid-cols-5 lg:grid-cols-6">
-      {STYLE_PRESETS.map(label => {
+      {visible.map(label => {
         const isActive = active === label
         return (
           <button
@@ -233,14 +237,21 @@ function StylePresetGrid({
           </button>
         )
       })}
-      {/* Close card — same shape, no image */}
+      {/* Trailing card — Fermer collapses to 17 + Plus, Plus expands
+          back to the full 34. Same shape, no image. */}
       <button
         type="button"
-        onClick={onClose}
+        onClick={onToggle}
         className="flex aspect-[60/86] w-full flex-col items-center justify-center gap-1 rounded-[18px] bg-[#F1F1F1] text-[#555555] transition-transform duration-150 ease-out hover:scale-[1.04] dark:bg-white/10 dark:text-neutral-400"
       >
-        <X size={17} strokeWidth={2} />
-        <span className="text-[10px] font-medium">Fermer</span>
+        {expanded ? (
+          <X size={17} strokeWidth={2} />
+        ) : (
+          <IconPlus size={17} strokeWidth={2} />
+        )}
+        <span className="text-[10px] font-medium">
+          {expanded ? 'Fermer' : 'Plus'}
+        </span>
       </button>
     </div>
   )
@@ -254,7 +265,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     useState<VideoResolution>('480p')
   const [duration, setDuration] = useState<VideoDuration>('6s')
   const [style, setStyle] = useState<string | null>(null)
-  const [stylesOpen, setStylesOpen] = useState(true)
+  const [expanded, setExpanded] = useState(true)
 
   const cycleAspectRatio = () => {
     setAspectRatio(
@@ -426,28 +437,16 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
         {/* Style presets: below the composer on desktop, below the
             resolution/duration selectors on mobile (both sit above this
             block). The backend fills real artwork in later. */}
-        {stylesOpen ? (
-          <div className="mt-8 w-full">
-            <StylePresetGrid
-              active={style}
-              onSelect={label =>
-                setStyle(prev => (prev === label ? null : label))
-              }
-              onClose={() => setStylesOpen(false)}
-            />
-          </div>
-        ) : (
-          <div className="mt-8 flex w-full justify-center">
-            <button
-              type="button"
-              onClick={() => setStylesOpen(true)}
-              className="flex items-center gap-1.5 rounded-full bg-black/5 px-3 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-black/10 dark:bg-white/10 dark:text-neutral-300 dark:hover:bg-white/15"
-            >
-              <IconPhoto size={14} />
-              Styles
-            </button>
-          </div>
-        )}
+        <div className="mt-8 w-full">
+          <StylePresetGrid
+            active={style}
+            onSelect={label =>
+              setStyle(prev => (prev === label ? null : label))
+            }
+            expanded={expanded}
+            onToggle={() => setExpanded(prev => !prev)}
+          />
+        </div>
       </div>
     </div>
   )
