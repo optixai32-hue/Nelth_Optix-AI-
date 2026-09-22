@@ -1,0 +1,349 @@
+'use client'
+
+import { useState } from 'react'
+
+import {
+  IconBolt,
+  IconLayoutGrid,
+  IconMicrophone,
+  IconPhoto,
+  IconPlus,
+  IconRectangleVertical,
+  IconSparkles,
+  IconVideo,
+  IconVolumeOff
+} from '@tabler/icons-react'
+import { ArrowUp } from 'lucide-react'
+
+import { cn } from '@/lib/utils'
+
+type StudioMode = 'image' | 'video'
+type ImageQuality = 'vitesse' | 'qualite'
+type AspectRatio = '1:1' | '16:9' | '9:16'
+type VideoResolution = '480p' | '720p'
+type VideoDuration = '6s' | '10s'
+
+export interface ImagineParams {
+  mode: StudioMode
+  prompt: string
+  quality: ImageQuality
+  aspectRatio: AspectRatio
+  resolution: VideoResolution
+  duration: VideoDuration
+}
+
+interface ImagineStudioProps {
+  onGenerate?: (params: ImagineParams) => void
+}
+
+// ---------------------------------------------------------------------------
+// Small building blocks (pixel spec: 752px composer, 22px radius, toolbar)
+// ---------------------------------------------------------------------------
+
+function ToolbarIconButton({
+  label,
+  onClick,
+  children,
+  className
+}: {
+  label: string
+  onClick?: () => void
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={cn(
+        'flex size-8 shrink-0 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-black/5 dark:text-neutral-300 dark:hover:bg-white/10',
+        className
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ModeCapsule({
+  active,
+  onClick,
+  label,
+  icon,
+  wide
+}: {
+  active?: boolean
+  onClick?: () => void
+  label: string
+  icon: React.ReactNode
+  wide?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'flex h-[38px] shrink-0 items-center gap-1.5 rounded-[18px] px-3 text-[14px] font-medium transition-colors',
+        wide && 'min-w-[70px] justify-center',
+        active
+          ? 'border border-black/5 bg-white text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.10)] dark:border-white/10 dark:bg-background dark:text-foreground'
+          : 'text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10'
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+}
+
+function SegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+  disabledValues = [],
+  disabledHint
+}: {
+  options: readonly T[]
+  value: T
+  onChange: (v: T) => void
+  disabledValues?: readonly T[]
+  disabledHint?: string
+}) {
+  return (
+    <div className="flex h-[38px] shrink-0 items-center gap-1 rounded-[20px] bg-neutral-100 p-1 dark:bg-muted">
+      {options.map(option => {
+        const isActive = option === value
+        const isDisabled =
+          disabledValues.includes(option) && !isActive
+        return (
+          <button
+            key={option}
+            type="button"
+            disabled={isDisabled}
+            title={isDisabled ? disabledHint : option}
+            onClick={() => onChange(option)}
+            className={cn(
+              'flex h-full items-center justify-center rounded-[16px] px-3 text-[14px] transition-colors',
+              isActive
+                ? 'bg-white font-medium text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.10)] dark:bg-background dark:text-foreground'
+                : 'text-neutral-500 dark:text-neutral-400',
+              !isActive &&
+                !isDisabled &&
+                'hover:bg-black/5 dark:hover:bg-white/10',
+              isDisabled && 'cursor-not-allowed opacity-50'
+            )}
+          >
+            {option}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Imagine studio (frontend only — backend wiring comes later)
+// ---------------------------------------------------------------------------
+
+const ASPECT_RATIOS: AspectRatio[] = ['1:1', '16:9', '9:16']
+const VIDEO_RESOLUTIONS: VideoResolution[] = ['480p', '720p']
+const VIDEO_DURATIONS: VideoDuration[] = ['6s', '10s']
+
+export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
+  const [mode, setMode] = useState<StudioMode>('image')
+  const [prompt, setPrompt] = useState('')
+  const [quality, setQuality] = useState<ImageQuality>('qualite')
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1')
+  const [resolution, setResolution] =
+    useState<VideoResolution>('480p')
+  const [duration, setDuration] = useState<VideoDuration>('6s')
+
+  const cycleAspectRatio = () => {
+    setAspectRatio(
+      prev => ASPECT_RATIOS[(ASPECT_RATIOS.indexOf(prev) + 1) % ASPECT_RATIOS.length]
+    )
+  }
+
+  const handleGenerate = () => {
+    onGenerate?.({
+      mode,
+      prompt: prompt.trim(),
+      quality,
+      aspectRatio,
+      resolution,
+      duration
+    })
+  }
+
+  return (
+    <div className="h-full w-full overflow-y-auto bg-[#faf9f7] dark:bg-background">
+      <div className="mx-auto flex w-full max-w-[752px] flex-col items-center px-4 pt-10 pb-16 md:pt-[100px]">
+        <h1 className="text-center text-[25px] font-bold leading-[31px] text-[#080808] md:text-[26px] dark:text-foreground">
+          Qu&apos;allons-nous imaginer ?
+        </h1>
+
+        {/* Prompt composer */}
+        <div className="mt-[34px] w-full overflow-hidden rounded-[22px] border border-[#e3e3e3] bg-white dark:border-border dark:bg-card">
+          <textarea
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleGenerate()
+              }
+            }}
+            placeholder="Décrivez ce que vous imaginez"
+            rows={1}
+            className="min-h-[48px] w-full resize-none bg-transparent px-[19px] pt-[16px] text-[16px] leading-[22px] text-[#111] outline-none placeholder:text-[#707070] dark:text-foreground"
+          />
+
+          {/* Bottom toolbar — same composer, controls swap per mode */}
+          <div className="flex flex-wrap items-center gap-3 px-[19px] pt-[6px] pb-[11px]">
+            {/* Plus */}
+            <ToolbarIconButton
+              label="Ajouter"
+              className="-ml-2"
+            >
+              <IconPlus size={20} strokeWidth={2} />
+            </ToolbarIconButton>
+
+            {mode === 'image' ? (
+              <>
+                {/* Active Image mode */}
+                <ModeCapsule
+                  active
+                  label="Image"
+                  icon={<IconPhoto size={15} />}
+                />
+                {/* Switch to video mode */}
+                <ToolbarIconButton
+                  label="Mode vidéo"
+                  onClick={() => setMode('video')}
+                >
+                  <IconVideo size={20} />
+                </ToolbarIconButton>
+                {/* Secondary media control */}
+                <ToolbarIconButton label="Médias">
+                  <IconLayoutGrid size={19} />
+                </ToolbarIconButton>
+                {/* Quality selector */}
+                <div className="flex h-[39px] shrink-0 items-center gap-1 rounded-[20px] bg-neutral-100 p-1 dark:bg-muted">
+                  <button
+                    type="button"
+                    onClick={() => setQuality('vitesse')}
+                    aria-pressed={quality === 'vitesse'}
+                    className={cn(
+                      'flex h-full items-center gap-1.5 rounded-[16px] px-3 text-[14px] transition-colors',
+                      quality === 'vitesse'
+                        ? 'bg-white font-medium text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.10)] dark:bg-background dark:text-foreground'
+                        : 'text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10'
+                    )}
+                  >
+                    <IconBolt size={15} />
+                    Vitesse
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuality('qualite')}
+                    aria-pressed={quality === 'qualite'}
+                    className={cn(
+                      'flex h-full items-center gap-1.5 rounded-[16px] px-3 text-[14px] transition-colors',
+                      quality === 'qualite'
+                        ? 'border border-black/5 bg-white font-medium text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.10)] dark:border-white/10 dark:bg-background dark:text-foreground'
+                        : 'text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10'
+                    )}
+                  >
+                    <IconSparkles size={15} />
+                    Qualité 2.0
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Back to image mode (icon only) */}
+                <ToolbarIconButton
+                  label="Mode image"
+                  onClick={() => setMode('image')}
+                >
+                  <IconPhoto size={20} />
+                </ToolbarIconButton>
+                {/* Active Video mode */}
+                <ModeCapsule
+                  active
+                  wide
+                  label="Vidéo"
+                  icon={<IconVideo size={16} className="text-black dark:text-foreground" />}
+                />
+                {/* Secondary media control */}
+                <ToolbarIconButton label="Médias">
+                  <IconLayoutGrid size={19} />
+                </ToolbarIconButton>
+                {/* Resolution selector */}
+                <SegmentedControl
+                  options={VIDEO_RESOLUTIONS}
+                  value={resolution}
+                  onChange={setResolution}
+                />
+                {/* Duration selector (10s coming soon) */}
+                <SegmentedControl
+                  options={VIDEO_DURATIONS}
+                  value={duration}
+                  onChange={setDuration}
+                  disabledValues={['10s']}
+                  disabledHint="Bientôt disponible"
+                />
+                {/* Sound (audio coming soon — stays disabled) */}
+                <ToolbarIconButton
+                  label="Audio (bientôt disponible)"
+                >
+                  <IconVolumeOff size={18} />
+                </ToolbarIconButton>
+              </>
+            )}
+
+            {/* Aspect ratio (click cycles 1:1 → 16:9 → 9:16) */}
+            <button
+              type="button"
+              onClick={cycleAspectRatio}
+              title="Format d'image"
+              className="flex h-[39px] w-[63px] shrink-0 items-center justify-center gap-1.5 rounded-[20px] bg-neutral-100 text-[14px] text-[#111] transition-colors hover:bg-neutral-200/70 dark:bg-muted dark:text-foreground dark:hover:bg-white/10"
+            >
+              <IconRectangleVertical size={14} />
+              {aspectRatio}
+            </button>
+
+            {/* Mic + generate, pinned right */}
+            <div className="ml-auto flex items-center gap-1">
+              <ToolbarIconButton label="Microphone">
+                <IconMicrophone size={16} />
+              </ToolbarIconButton>
+              <button
+                type="button"
+                onClick={handleGenerate}
+                aria-label="Générer"
+                title="Générer"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#8dccf5] text-white transition-transform hover:scale-105 active:scale-95"
+              >
+                <ArrowUp size={18} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Gallery placeholder (backend fills this in later) */}
+        <div className="mt-10 flex w-full flex-col items-center gap-2 text-center">
+          <span className="flex size-11 items-center justify-center rounded-full bg-black/5 text-neutral-400 dark:bg-white/10 dark:text-neutral-500">
+            <IconPhoto size={20} />
+          </span>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            Vos créations apparaîtront ici
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

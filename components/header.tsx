@@ -3,9 +3,9 @@
 // import Link from 'next/link' // No longer needed directly here for Sign In button
 import React from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
-import { SquarePen } from 'lucide-react'
+import { Image as ImageIcon, SquarePen } from 'lucide-react'
 
 import type { AppUser } from '@/lib/firebase/user'
 import { SHORTCUT_EVENTS } from '@/lib/keyboard-shortcuts'
@@ -23,14 +23,20 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ user }) => {
   const router = useRouter()
+  const pathname = usePathname()
   const { open } = useSidebar()
   const isMobile = useIsMobile()
+  const isImagine = pathname === '/imagine'
 
   const handleNewChat = () => {
     window.dispatchEvent(
       new CustomEvent(SHORTCUT_EVENTS.newChat, { cancelable: true })
     )
     router.push('/')
+  }
+
+  const handleImagine = () => {
+    router.push('/imagine')
   }
 
   return (
@@ -57,6 +63,20 @@ export const Header: React.FC<HeaderProps> = ({ user }) => {
               onClick={handleNewChat}
             >
               <SquarePen size={16} />
+            </Button>
+            <div className="w-px h-5 bg-border" aria-hidden />
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'size-8 transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-110 active:scale-95',
+                isImagine ? 'text-primary' : 'text-foreground'
+              )}
+              aria-label="Imagine studio"
+              title="Imagine studio"
+              onClick={handleImagine}
+            >
+              <ImageIcon size={16} />
             </Button>
           </div>
         )}
@@ -86,6 +106,19 @@ export const Header: React.FC<HeaderProps> = ({ user }) => {
               onClick={handleNewChat}
             >
               <SquarePen size={16} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'size-8 transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:scale-110 active:scale-95',
+                isImagine && 'text-primary'
+              )}
+              aria-label="Imagine studio"
+              title="Imagine studio"
+              onClick={handleImagine}
+            >
+              <ImageIcon size={16} />
             </Button>
           </div>
         )}
