@@ -247,20 +247,26 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                 <ToolbarIconButton label="Médias">
                   <IconLayoutGrid size={19} />
                 </ToolbarIconButton>
-                {/* Resolution selector */}
-                <SegmentedControl
-                  options={VIDEO_RESOLUTIONS}
-                  value={resolution}
-                  onChange={setResolution}
-                />
-                {/* Duration selector (10s coming soon) */}
-                <SegmentedControl
-                  options={VIDEO_DURATIONS}
-                  value={duration}
-                  onChange={setDuration}
-                  disabledValues={['10s']}
-                  disabledHint="Bientôt disponible"
-                />
+                {/* Resolution selector — desktop: in toolbar /
+                    mobile: below the composer (see below) */}
+                <div className="hidden md:contents">
+                  <SegmentedControl
+                    options={VIDEO_RESOLUTIONS}
+                    value={resolution}
+                    onChange={setResolution}
+                  />
+                </div>
+                {/* Duration selector (10s coming soon) — desktop: in
+                    toolbar / mobile: below the composer (see below) */}
+                <div className="hidden md:contents">
+                  <SegmentedControl
+                    options={VIDEO_DURATIONS}
+                    value={duration}
+                    onChange={setDuration}
+                    disabledValues={['10s']}
+                    disabledHint="Bientôt disponible"
+                  />
+                </div>
                 {/* Sound (audio coming soon — stays disabled) */}
                 <ToolbarIconButton
                   label="Audio (bientôt disponible)"
@@ -299,6 +305,25 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
             </div>
           </div>
         </div>
+
+        {/* Video settings below the composer — mobile only
+            (desktop keeps them inside the toolbar) */}
+        {mode === 'video' && (
+          <div className="mt-3 flex w-full flex-wrap items-center justify-center gap-2 md:hidden">
+            <SegmentedControl
+              options={VIDEO_RESOLUTIONS}
+              value={resolution}
+              onChange={setResolution}
+            />
+            <SegmentedControl
+              options={VIDEO_DURATIONS}
+              value={duration}
+              onChange={setDuration}
+              disabledValues={['10s']}
+              disabledHint="Bientôt disponible"
+            />
+          </div>
+        )}
 
         {/* Gallery placeholder (backend fills this in later) */}
         <div className="mt-10 flex w-full flex-col items-center gap-2 text-center">
