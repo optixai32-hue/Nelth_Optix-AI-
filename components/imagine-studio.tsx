@@ -202,8 +202,9 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           />
 
           {/* Bottom toolbar — same composer, controls swap per mode.
-              Wraps on narrow screens so nothing overflows horizontally. */}
-          <div className="flex flex-wrap items-center gap-2 px-[15px] pt-[6px] pb-[11px] md:gap-3 md:px-[19px]">
+              Single scrollable row on mobile (compact, app-like), wrapping
+              row on desktop per the reference layout. */}
+          <div className="no-scrollbar flex flex-nowrap items-center gap-2 overflow-x-auto px-[15px] pt-[6px] pb-[11px] md:flex-wrap md:gap-3 md:overflow-visible md:px-[19px]">
             {/* Plus */}
             <ToolbarIconButton
               label="Ajouter"
@@ -317,8 +318,9 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
               {aspectRatio}
             </button>
 
-            {/* Mic + generate, pinned right */}
-            <div className="ml-auto flex items-center gap-1">
+            {/* Mic + generate, pinned right (stays visible while the
+                toolbar row scrolls on mobile) */}
+            <div className="sticky right-0 ml-auto flex shrink-0 items-center gap-1 bg-white pl-1 dark:bg-card">
               <ToolbarIconButton label="Microphone">
                 <IconMicrophone size={16} />
               </ToolbarIconButton>
