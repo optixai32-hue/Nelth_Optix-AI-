@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import {
   IconLayoutGrid,
@@ -191,6 +191,19 @@ const STYLE_PRESETS = [
   'Bronze'
 ]
 
+// 10 presets, picked once at random, render enlarged as landscape
+// video cards (double width) among the portrait style cards.
+const VIDEO_CARD_COUNT = 10
+
+function shuffledIndexes(n: number): number[] {
+  const arr = Array.from({ length: n }, (_, i) => i)
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
 function StylePresetGrid({
   active,
   onSelect,
@@ -204,10 +217,15 @@ function StylePresetGrid({
 }) {
   // Collapsed: first 17 presets + a "Plus" card; expanded: all 34 + Fermer.
   const visible = expanded ? STYLE_PRESETS : STYLE_PRESETS.slice(0, 17)
+  const videoSet = useMemo(
+    () => new Set(shuffledIndexes(STYLE_PRESETS.length).slice(0, VIDEO_CARD_COUNT)),
+    []
+  )
   return (
     <div className="grid grid-cols-4 gap-[6px] md:grid-cols-5 lg:grid-cols-6">
       {visible.map(label => {
         const isActive = active === label
+        const isVideo = videoSet.has(STYLE_PRESETS.indexOf(label))
         return (
           <button
             key={label}
@@ -216,12 +234,17 @@ function StylePresetGrid({
             aria-pressed={isActive}
             title={label}
             className={cn(
-              'group relative aspect-[60/86] w-full overflow-hidden rounded-[18px] bg-neutral-200 transition-all duration-150 ease-out hover:scale-[1.04] hover:shadow-md dark:bg-white/10',
+              'group relative w-full overflow-hidden rounded-[18px] bg-neutral-200 transition-all duration-150 ease-out hover:scale-[1.04] hover:shadow-md dark:bg-white/10',
+              isVideo ? 'col-span-2 aspect-video' : 'aspect-[60/86]',
               isActive && 'shadow-lg ring-2 ring-white'
             )}
           >
             <img
-              src={`https://picsum.photos/seed/${encodeURIComponent(label)}/120/176`}
+              src={
+                isVideo
+                  ? `https://picsum.photos/seed/${encodeURIComponent(label)}/320/180`
+                  : `https://picsum.photos/seed/${encodeURIComponent(label)}/120/176`
+              }
               alt={label}
               loading="lazy"
               draggable={false}
