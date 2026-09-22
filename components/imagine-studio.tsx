@@ -191,25 +191,7 @@ const STYLE_PRESETS = [
   'Bronze'
 ]
 
-// 10 enlarged video cards at FIXED positions — 16:9 landscape (double
-// width) and 1:1 square — among the portrait style cards. Fixed order so
-// the layout is identical on every visit (no reshuffling).
-type VideoFormat = 'wide' | 'square'
 
-const VIDEO_CARDS: Array<[number, VideoFormat]> = [
-  [2, 'wide'],
-  [5, 'square'],
-  [9, 'wide'],
-  [12, 'square'],
-  [16, 'wide'],
-  [19, 'square'],
-  [23, 'wide'],
-  [26, 'square'],
-  [29, 'square'],
-  [32, 'square']
-]
-
-const VIDEO_MAP = new Map<number, VideoFormat>(VIDEO_CARDS)
 
 function StylePresetGrid({
   active,
@@ -224,12 +206,10 @@ function StylePresetGrid({
 }) {
   // Collapsed: first 17 presets + a "Plus" card; expanded: all 34 + Fermer.
   const visible = expanded ? STYLE_PRESETS : STYLE_PRESETS.slice(0, 17)
-  const videoMap = VIDEO_MAP
   return (
-    <div className="grid grid-flow-dense grid-cols-4 gap-[6px] md:grid-cols-5 lg:grid-cols-6">
+    <div className="grid grid-cols-3 gap-2 md:grid-cols-4 lg:grid-cols-5">
       {visible.map(label => {
         const isActive = active === label
-        const format = videoMap.get(STYLE_PRESETS.indexOf(label))
         return (
           <button
             key={label}
@@ -238,21 +218,12 @@ function StylePresetGrid({
             aria-pressed={isActive}
             title={label}
             className={cn(
-              'group relative w-full overflow-hidden rounded-[18px] bg-neutral-200 transition-all duration-150 ease-out hover:scale-[1.04] hover:shadow-md dark:bg-white/10',
-              format === 'wide' && 'col-span-2 aspect-video',
-              format === 'square' && 'aspect-square',
-              !format && 'aspect-[60/86]',
+              'group relative aspect-[60/86] w-full overflow-hidden rounded-[18px] bg-neutral-200 transition-all duration-150 ease-out hover:scale-[1.04] hover:shadow-md dark:bg-white/10',
               isActive && 'shadow-lg ring-2 ring-white'
             )}
           >
             <img
-              src={
-                format === 'wide'
-                  ? `https://picsum.photos/seed/${encodeURIComponent(label)}/320/180`
-                  : format === 'square'
-                    ? `https://picsum.photos/seed/${encodeURIComponent(label)}/200/200`
-                    : `https://picsum.photos/seed/${encodeURIComponent(label)}/120/176`
-              }
+              src={`https://picsum.photos/seed/${encodeURIComponent(label)}/280/400`}
               alt={label}
               loading="lazy"
               draggable={false}
@@ -262,7 +233,7 @@ function StylePresetGrid({
               aria-hidden
               className="absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-black/65 via-black/20 to-transparent"
             />
-            <span className="absolute bottom-[6px] left-[6px] right-[6px] text-left text-[10px] font-semibold leading-tight text-white">
+            <span className="absolute bottom-[8px] left-[8px] right-[8px] text-left text-[12px] font-semibold leading-tight text-white">
               {label}
             </span>
           </button>
@@ -276,11 +247,11 @@ function StylePresetGrid({
         className="flex aspect-[60/86] w-full flex-col items-center justify-center gap-1 rounded-[18px] bg-[#F1F1F1] text-[#555555] transition-transform duration-150 ease-out hover:scale-[1.04] dark:bg-white/10 dark:text-neutral-400"
       >
         {expanded ? (
-          <X size={17} strokeWidth={2} />
+          <X size={20} strokeWidth={2} />
         ) : (
-          <IconPlus size={17} strokeWidth={2} />
+          <IconPlus size={20} strokeWidth={2} />
         )}
-        <span className="text-[10px] font-medium">
+        <span className="text-xs font-medium">
           {expanded ? 'Fermer' : 'Plus'}
         </span>
       </button>
