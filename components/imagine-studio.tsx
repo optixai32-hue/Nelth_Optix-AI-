@@ -3,13 +3,11 @@
 import { useState } from 'react'
 
 import {
-  IconBolt,
   IconLayoutGrid,
   IconMicrophone,
   IconPhoto,
   IconPlus,
   IconRectangleVertical,
-  IconSparkles,
   IconVideo,
   IconVolumeOff
 } from '@tabler/icons-react'
@@ -18,7 +16,6 @@ import { ArrowUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type StudioMode = 'image' | 'video'
-type ImageQuality = 'vitesse' | 'qualite'
 type AspectRatio = '1:1' | '16:9' | '9:16'
 type VideoResolution = '480p' | '720p'
 type VideoDuration = '6s' | '10s'
@@ -26,7 +23,6 @@ type VideoDuration = '6s' | '10s'
 export interface ImagineParams {
   mode: StudioMode
   prompt: string
-  quality: ImageQuality
   aspectRatio: AspectRatio
   resolution: VideoResolution
   duration: VideoDuration
@@ -155,7 +151,6 @@ const VIDEO_DURATIONS: VideoDuration[] = ['6s', '10s']
 export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   const [mode, setMode] = useState<StudioMode>('image')
   const [prompt, setPrompt] = useState('')
-  const [quality, setQuality] = useState<ImageQuality>('qualite')
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1')
   const [resolution, setResolution] =
     useState<VideoResolution>('480p')
@@ -171,7 +166,6 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     onGenerate?.({
       mode,
       prompt: prompt.trim(),
-      quality,
       aspectRatio,
       resolution,
       duration
@@ -232,37 +226,6 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                 <ToolbarIconButton label="Médias">
                   <IconLayoutGrid size={19} />
                 </ToolbarIconButton>
-                {/* Quality selector */}
-                <div className="flex h-[39px] shrink-0 items-center gap-1 rounded-[20px] bg-neutral-100 p-1 dark:bg-muted">
-                  <button
-                    type="button"
-                    onClick={() => setQuality('vitesse')}
-                    aria-pressed={quality === 'vitesse'}
-                    className={cn(
-                      'flex h-full items-center gap-1.5 rounded-[16px] px-3 text-[14px] transition-colors',
-                      quality === 'vitesse'
-                        ? 'bg-white font-medium text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.10)] dark:bg-background dark:text-foreground'
-                        : 'text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10'
-                    )}
-                  >
-                    <IconBolt size={15} />
-                    Vitesse
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setQuality('qualite')}
-                    aria-pressed={quality === 'qualite'}
-                    className={cn(
-                      'flex h-full items-center gap-1.5 rounded-[16px] px-3 text-[14px] transition-colors',
-                      quality === 'qualite'
-                        ? 'border border-black/5 bg-white font-medium text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.10)] dark:border-white/10 dark:bg-background dark:text-foreground'
-                        : 'text-neutral-500 hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/10'
-                    )}
-                  >
-                    <IconSparkles size={15} />
-                    Qualité 2.0
-                  </button>
-                </div>
               </>
             ) : (
               <>
