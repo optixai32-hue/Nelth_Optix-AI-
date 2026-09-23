@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   IconExternalLink,
   IconLayoutGrid,
+  IconLoader2,
   IconPhoto,
   IconPlus,
   IconRectangleVertical,
@@ -365,6 +366,24 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   const [style, setStyle] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(true)
   const [preview, setPreview] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [job, setJob] = useState<
+    | { status: 'working'; label: string }
+    | { status: 'error'; message: string }
+    | null
+  >(null)
+  const [results, setResults] = useState<
+    Array<{ kind: 'image' | 'video'; url: string; prompt: string }>
+  >([])
+  const busyRef = useRef(false)
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Stop any pending video poll on unmount.
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
+    }
+  }, [])
 
   const cycleAspectRatio = () => {
     setAspectRatio(
@@ -372,15 +391,123 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     )
   }
 
+  const withStyle = (text: string, styleOverride: string | null) =>
+    styleOverride ? `${text} (${styleOverride} style)` : text
+
+  const runGeneration = async (params: {
+    mode: StudioMode
+    prompt: string
+    aspectRatio: AspectRatio
+    resolution: VideoResolution
+    style: string | null
+  }) => {
+    const text = params.prompt.trim()
+    if (!text || busyRef.current) return
+    // External handler (embedding) takes over entirely when provided.
+    if (onGenerate) {
+      onGenerate({ ...params, prompt: text, duration })
+      return
+    }
+    busyRef.current = true
+    setGenerating(true)
+    setJob(null)
+    try {
+      const fullPrompt = withStyle(text, params.style)
+      if (params.mode === 'image') {
+        setJob({ status: 'working', label: 'Génération de l’image…' })
+        const res = await fetch('/api/imagine/images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: fullPrompt,
+            aspectRatio: params.aspectRatio
+          })
+        })
+        const json = (await res.json().catch(() => null)) as {
+          data?: Array<{ url: string }>
+          error?: string
+        } | null
+        if (!res.ok || !json?.data?.length) {
+          throw new Error(json?.error || 'La génération a échoué.')
+        }
+        setResults(prev => [
+          ...json.data!.map(d => ({ kind: 'image' as const, url: d.url, prompt: text })),
+          ...prev
+        ])
+        setJob(null)
+      } else {
+        setJob({ status: 'working', label: 'Démarrage de la vidéo…' })
+        const res = await fetch('/api/imagine/videos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: fullPrompt,
+            aspectRatio: params.aspectRatio,
+            resolution: params.resolution
+          })
+        })
+        const json = (await res.json().catch(() => null)) as {
+          batchId?: string
+          error?: string
+        } | null
+        if (!res.ok || !json?.batchId) {
+          throw new Error(json?.error || 'La génération a échoué.')
+        }
+        const batchId = json.batchId
+        // Poll every 5s (backend timeout=5s) until a videoUrl lands.
+        let attempt = 0
+        const poll = async (): Promise<void> => {
+          attempt += 1
+          if (attempt > 60) throw new Error('Délai dépassé, réessaie.')
+          setJob({
+            status: 'working',
+            label: `Génération vidéo… (${attempt})`
+          })
+          const pollRes = await fetch('/api/imagine/videos/poll', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ batchId })
+          })
+          const pollJson = (await pollRes.json().catch(() => null)) as {
+            batch?: {
+              content?: Array<{ videoUrl?: string | null }>
+            }
+            error?: string
+          } | null
+          if (!pollRes.ok || !pollJson?.batch) {
+            throw new Error(pollJson?.error || 'Le suivi a échoué.')
+          }
+          const videoUrl = pollJson.batch.content?.find(
+            c => typeof c.videoUrl === 'string' && c.videoUrl.length > 0
+          )?.videoUrl as string | undefined
+          if (videoUrl) {
+            setResults(prev => [
+              { kind: 'video' as const, url: videoUrl, prompt: text },
+              ...prev
+            ])
+            setJob(null)
+            return
+          }
+          await new Promise<void>(resolve => {
+            pollTimerRef.current = setTimeout(() => resolve(), 5000)
+          })
+          return poll()
+        }
+        await poll()
+      }
+    } catch (err) {
+      setJob({
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Échec de génération.'
+      })
+    } finally {
+      busyRef.current = false
+      setGenerating(false)
+    }
+  }
+
   const handleGenerate = () => {
-    onGenerate?.({
-      mode,
-      prompt: prompt.trim(),
-      aspectRatio,
-      resolution,
-      duration,
-      style
-    })
+    void runGeneration({ mode, prompt, aspectRatio, resolution, style })
   }
 
   return (
@@ -506,9 +633,14 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                 onClick={handleGenerate}
                 aria-label="Générer"
                 title="Générer"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition-transform hover:scale-105 active:scale-95 dark:bg-white dark:text-black"
+                disabled={generating}
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-black"
               >
-                <ArrowUp size={18} strokeWidth={2.5} />
+                {generating ? (
+                  <IconLoader2 size={18} className="animate-spin" />
+                ) : (
+                  <ArrowUp size={18} strokeWidth={2.5} />
+                )}
               </button>
             </div>
           </div>
@@ -533,6 +665,68 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           </div>
         )}
 
+        {/* Generation status + results */}
+        {(job || results.length > 0) && (
+          <div className="mt-6 w-full">
+            {job?.status === 'working' && (
+              <div className="mb-3 flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+                <IconLoader2 size={16} className="animate-spin" />
+                {job.label}
+              </div>
+            )}
+            {job?.status === 'error' && (
+              <p className="mb-3 text-sm text-red-600 dark:text-red-400">
+                {job.message}
+              </p>
+            )}
+            {results.length > 0 && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {results.map((r, i) => (
+                  <div
+                    key={`${r.url}-${i}`}
+                    className="overflow-hidden rounded-[18px] border border-black/5 bg-white dark:border-white/10 dark:bg-card"
+                  >
+                    {r.kind === 'image' ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={r.url}
+                        alt={r.prompt}
+                        loading="lazy"
+                        className="aspect-square w-full object-cover"
+                      />
+                    ) : (
+                      <video
+                        src={r.url}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="aspect-video w-full bg-black object-contain"
+                      />
+                    )}
+                    <div className="flex items-center gap-2 p-3">
+                      <p className="min-w-0 flex-1 truncate text-[13px] text-neutral-600 dark:text-neutral-300">
+                        {r.prompt}
+                      </p>
+                      {r.kind === 'image' ? (
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                          ImageKit
+                        </span>
+                      ) : (
+                        <span
+                          title="URL temporaire (~1h) — hébergement permanent à venir"
+                          className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                        >
+                          Temporaire
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Style presets: below the composer on desktop, below the
             resolution/duration selectors on mobile (both sit above this
             block). The backend fills real artwork in later. */}
@@ -554,12 +748,11 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
             onSend={() => {
               setStyle(preview)
               setPreview(null)
-              onGenerate?.({
+              void runGeneration({
                 mode,
-                prompt: prompt.trim(),
+                prompt,
                 aspectRatio,
                 resolution,
-                duration,
                 style: preview
               })
             }}
