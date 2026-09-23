@@ -20,6 +20,7 @@
   "iconLibrary": "tabler",
   "registries": {
     "@assistant-ui": "https://r.assistant-ui.com/{name}.json",
-    "@nexus-ui": "https://nexus-ui.dev/r/{name}.json"
+    "@nexus-ui": "https://nexus-ui.dev/r/{name}.json",
+    "@soralabs": "https://ui.soralabs.studio/r/{name}.json"
   }
 }

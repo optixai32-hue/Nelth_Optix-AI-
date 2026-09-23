@@ -18,6 +18,8 @@ import { ArrowUp, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
+import { VideoPlayer } from '@/components/sora-ui/effects/video-player'
+
 type StudioMode = 'image' | 'video'
 type AspectRatio = '1:1' | '16:9' | '9:16'
 type VideoResolution = '480p' | '720p'
@@ -692,6 +694,10 @@ function DiscoverCard({
   result?: ImagineResult | null
   loading: boolean
 }) {
+  // Fresh mount per URL (parent keys by identity): video starts hidden
+  // over its own skeleton and fades in on first playable frame — same
+  // geometry, no height change, smooth skeleton → media transition.
+  const [videoReady, setVideoReady] = useState(false)
   return (
     <div className="group relative aspect-[2/3] w-full overflow-hidden rounded-[4px] bg-[#f5f5f5] transition-all duration-150 ease-out hover:scale-[1.02] hover:shadow-lg dark:bg-white/5">
       {result?.kind === 'image' ? (
@@ -704,19 +710,29 @@ function DiscoverCard({
           className="discover-card-in absolute inset-0 h-full w-full object-cover"
         />
       ) : result?.kind === 'video' ? (
-        <>
+        <VideoPlayer
+          src={result.url}
+          defaultSpeed={1}
+          dialogLabel="Lecture de la vidéo"
+          triggerClassName="absolute inset-0 block h-full w-full cursor-pointer p-0"
+        >
+          {!videoReady && <ImageGenerationLoadingCard loading={loading} />}
           <video
             key={result.url}
             src={result.url}
-            controls
+            muted
             playsInline
             preload="metadata"
-            className="discover-card-in absolute inset-0 h-full w-full object-cover"
+            onCanPlay={() => setVideoReady(true)}
+            className={cn(
+              'pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
+              videoReady ? 'opacity-100' : 'opacity-0'
+            )}
           />
           <span className="pointer-events-none absolute left-2 top-2 flex size-7 items-center justify-center rounded-full bg-black/55 text-white">
             <IconVideo size={14} />
           </span>
-        </>
+        </VideoPlayer>
       ) : (
         <ImageGenerationLoadingCard loading={loading} />
       )}
