@@ -1107,16 +1107,29 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     }
   }
 
-  const runGeneration = async (params: {
-    mode: StudioMode
-    prompt: string
-    aspectRatio: AspectRatio
-    resolution: VideoResolution
-    style: string | null
-  }) => {
+  const runGeneration = async (
+    params: {
+      mode: StudioMode
+      prompt: string
+      aspectRatio: AspectRatio
+      resolution: VideoResolution
+      style: string | null
+      variations?: number
+    },
+    opts?: {
+      /** Workspace iteration: swap its canvas to the fresh image. */
+      onFirstImage?: (url: string, caption: string) => void
+    }
+  ) => {
     const text = params.prompt.trim()
     const ent = attachment?.status === 'ready' ? attachment.ent! : null
-    const count = ent ? 1 : variations
+    const count = ent
+      ? 1
+      : typeof params.variations === 'number' &&
+          params.variations >= 1 &&
+          params.variations <= 4
+        ? params.variations
+        : variations
     if ((!text && !(ent && params.mode === 'video')) || busyRef.current) return
     // External handler (embedding) takes over entirely when provided.
     if (onGenerate) {
@@ -1176,6 +1189,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           },
           ...prev
         ])
+        opts?.onFirstImage?.(editUrl, json.usedPrompt || text)
         setJob(null)
         return
       }
@@ -1244,6 +1258,9 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           })),
           ...prev
         ])
+        if (cleaned.length > 0) {
+          opts?.onFirstImage?.(cleaned[0].url, text)
+        }
         setJob(null)
         return
       } else {
@@ -1342,6 +1359,45 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
 
   const handleGenerate = () => {
     void runGeneration({ mode, prompt, aspectRatio, resolution, style })
+  }
+
+  // Workspace iteration: images swap the workspace canvas, videos close
+  // it and continue in the Découvrir grid behind.
+  const handleWorkspaceGenerate = (p: {
+    prompt: string
+    mode: 'image' | 'video'
+    aspectRatio: string
+    variations: number
+    resolution: string
+  }) => {
+    if (p.mode === 'video') {
+      setEditing(null)
+      void runGeneration({
+        mode: 'video',
+        prompt: p.prompt,
+        aspectRatio: p.aspectRatio as AspectRatio,
+        resolution: p.resolution as VideoResolution,
+        style: null,
+        variations: p.variations
+      })
+      return
+    }
+    void runGeneration(
+      {
+        mode: 'image',
+        prompt: p.prompt,
+        aspectRatio: p.aspectRatio as AspectRatio,
+        resolution: p.resolution as VideoResolution,
+        style: null,
+        variations: p.variations
+      },
+      {
+        onFirstImage: (url, caption) =>
+          setEditing(prev =>
+            prev ? { kind: 'image', url, prompt: caption } : prev
+          )
+      }
+    )
   }
 
   const extras: ComposerExtras = {
@@ -1587,9 +1643,11 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
         )}
         {editing?.kind === 'image' && (
           <ImageEditor
+            key={editing.url}
             src={editing.url}
             title={editing.prompt}
             onClose={() => setEditing(null)}
+            onGenerateRequest={handleWorkspaceGenerate}
             onSave={blob => {
               const url = URL.createObjectURL(blob)
               setResults(prev => [
