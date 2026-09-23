@@ -496,10 +496,15 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
         await poll()
       }
     } catch (err) {
-      setJob({
-        status: 'error',
-        message: err instanceof Error ? err.message : 'Échec de génération.'
-      })
+      const raw = err instanceof Error ? err.message : 'Échec de génération.'
+      // fetch() TypeError ("Failed to fetch") = connection dropped,
+      // typically our serverless function hitting its time limit while
+      // the backend was still working — retrying usually succeeds.
+      const message =
+        err instanceof TypeError || /failed to fetch|networkerror/i.test(raw)
+          ? 'Connexion interrompue (serveur trop lent), réessaie.'
+          : raw
+      setJob({ status: 'error', message })
     } finally {
       busyRef.current = false
       setGenerating(false)
@@ -675,9 +680,18 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
               </div>
             )}
             {job?.status === 'error' && (
-              <p className="mb-3 text-sm text-red-600 dark:text-red-400">
-                {job.message}
-              </p>
+              <div className="mb-3 flex items-center gap-2">
+                <p className="flex-1 text-sm text-red-600 dark:text-red-400">
+                  {job.message}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  className="shrink-0 rounded-full border border-black/10 px-3 py-1.5 text-[13px] font-medium text-[#111] transition-colors hover:bg-black/5 dark:border-white/15 dark:text-foreground dark:hover:bg-white/10"
+                >
+                  Réessayer
+                </button>
+              </div>
             )}
             {results.length > 0 && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

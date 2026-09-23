@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { vibesGenerateVideo } from '@/lib/imagine/vibes'
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 const RATIOS = ['1:1', '16:9', '9:16'] as const
 const RESOLUTIONS = ['480p', '720p'] as const
