@@ -1374,7 +1374,17 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   }
 
   // Workspace iteration: images swap the workspace canvas, videos close
-  // it and continue in the Découvrir grid behind.
+  // it and continue in the Découvrir grid behind. The workspace canvas
+  // supports 7 ratios but generation only 3 — map to the nearest.
+  const NEAREST_GENERATION_RATIO: Record<string, AspectRatio> = {
+    '1:1': '1:1',
+    '16:9': '16:9',
+    '9:16': '9:16',
+    '4:3': '1:1',
+    '3:4': '1:1',
+    '3:2': '16:9',
+    '2:3': '9:16'
+  }
   const handleWorkspaceGenerate = (p: {
     prompt: string
     mode: 'image' | 'video'
@@ -1382,12 +1392,13 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     variations: number
     resolution: string
   }) => {
+    const generationRatio = NEAREST_GENERATION_RATIO[p.aspectRatio] ?? '1:1'
     if (p.mode === 'video') {
       setEditing(null)
       void runGeneration({
         mode: 'video',
         prompt: p.prompt,
-        aspectRatio: p.aspectRatio as AspectRatio,
+        aspectRatio: generationRatio,
         resolution: p.resolution as VideoResolution,
         style: null,
         variations: p.variations
@@ -1398,7 +1409,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
       {
         mode: 'image',
         prompt: p.prompt,
-        aspectRatio: p.aspectRatio as AspectRatio,
+        aspectRatio: generationRatio,
         resolution: p.resolution as VideoResolution,
         style: null,
         variations: p.variations

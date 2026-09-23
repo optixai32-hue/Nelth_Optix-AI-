@@ -51,11 +51,36 @@ const PALETTE = [
   '#9B9B9B'
 ]
 
-// Canvas follows the SOURCE ratio (never forced): natural size capped
-// at MAX_EDGE, displayed fit-to-area preserving proportions.
-const MAX_EDGE = 2048
+// Canvas ratio is SELECTED (never forced): 7 ratios, backing store +
+// display box both follow the selection. Source is contain-fitted
+// (letterboxed, never cropped/zoomed/stretched).
+const WORKSPACE_RATIO_DIMS: Record<WorkspaceRatio, [number, number]> = {
+  '1:1': [1024, 1024],
+  '16:9': [1280, 720],
+  '9:16': [720, 1280],
+  '4:3': [1280, 960],
+  '3:4': [960, 1280],
+  '3:2': [1280, 853],
+  '2:3': [853, 1280]
+}
 
-const WORKSPACE_RATIOS = ['1:1', '16:9', '9:16'] as const
+// Display caps per orientation (§12): landscape 900×500, portrait
+// 420×500, square 500×500.
+function ratioDisplayCaps(w: number, h: number): [number, number] {
+  if (w > h) return [900, 500]
+  if (w < h) return [420, 500]
+  return [500, 500]
+}
+
+const WORKSPACE_RATIOS = [
+  '1:1',
+  '16:9',
+  '9:16',
+  '4:3',
+  '3:4',
+  '3:2',
+  '2:3'
+] as const
 type WorkspaceRatio = (typeof WORKSPACE_RATIOS)[number]
 type WorkspaceMode = 'image' | 'video'
 
@@ -129,9 +154,12 @@ export function ImageEditor({
     }
   }, [])
 
+  const [cw, ch] = WORKSPACE_RATIO_DIMS[composerRatio]
+  const [capW, capH] = ratioDisplayCaps(cw, ch)
+
   // Load the base image (CORS-clean so export never taints when possible).
-  // Backing store keeps the source proportions (capped), display scales
-  // to fit — never stretched, never force-cropped.
+  // Annotations reset only when the SOURCE image changes, never on ratio
+  // switches (relative coords remap onto the new canvas shape).
   useEffect(() => {
     let cancelled = false
     setReady(false)
@@ -140,14 +168,6 @@ export function ImageEditor({
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       if (cancelled) return
-      const scale =
-        Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight)) ||
-        1
-      const canvas = canvasRef.current
-      if (canvas) {
-        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
-        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
-      }
       baseRef.current = img
       setActions([])
       setStep(0)
@@ -163,15 +183,28 @@ export function ImageEditor({
     }
   }, [baseSrc])
 
-  // Repaint base + applied actions.
+  // Repaint base (contain-fitted, never cropped) + applied actions.
   const repaint = useCallback(() => {
     const canvas = canvasRef.current
     const base = baseRef.current
-    if (!canvas || !base) return
+    if (!canvas || !base || !base.naturalWidth || !base.naturalHeight) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(base, 0, 0, canvas.width, canvas.height)
+    const fit =
+      Math.min(
+        canvas.width / base.naturalWidth,
+        canvas.height / base.naturalHeight
+      ) || 1
+    const dw = base.naturalWidth * fit
+    const dh = base.naturalHeight * fit
+    ctx.drawImage(
+      base,
+      (canvas.width - dw) / 2,
+      (canvas.height - dh) / 2,
+      dw,
+      dh
+    )
     const applied = actions.slice(0, step)
     for (const action of applied) {
       if (action.kind === 'draw') {
@@ -206,6 +239,16 @@ export function ImageEditor({
   useEffect(() => {
     repaint()
   }, [repaint, ready])
+
+  // Canvas follows the SELECTED ratio (resize + repaint, actions kept).
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (canvas && (canvas.width !== cw || canvas.height !== ch)) {
+      canvas.width = cw
+      canvas.height = ch
+      repaint()
+    }
+  }, [cw, ch, repaint])
 
   // Escape closes the editor.
   useEffect(() => {
@@ -444,9 +487,18 @@ export function ImageEditor({
         <p className="px-4 pb-2 text-center text-sm text-red-400">{error}</p>
       )}
 
-      {/* Center image — follows the source ratio, fit to the area */}
+      {/* Center image — display box follows the SELECTED ratio, source
+          contain-fitted inside (never zoomed/cropped/stretched), capped
+          per orientation, flex-centered with dark margins all around. */}
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 pt-5 md:px-10">
-        <div className="relative inline-block max-h-full max-w-full">
+        <div
+          className="relative max-h-full"
+          style={{
+            aspectRatio: `${cw} / ${ch}`,
+            width: `min(${capW}px, 100%)`,
+            maxHeight: `${capH}px`
+          }}
+        >
           <canvas
             ref={canvasRef}
             onPointerDown={e => {
@@ -504,7 +556,7 @@ export function ImageEditor({
               repaint()
             }}
             className={cn(
-              'block h-auto max-h-full w-auto max-w-full touch-none',
+              'absolute inset-0 h-full w-full touch-none',
               tool === 'draw' ? 'cursor-crosshair' : 'cursor-text'
             )}
           />
@@ -593,6 +645,10 @@ export function ImageEditor({
         </button>
       </div>
 
+      {/* Reserved clearance above the fixed composer so image + controls
+          always stay visible and never slide underneath it. */}
+      <div className="h-[130px] shrink-0" aria-hidden />
+
       {/* Floating prompt composer */}
       <input
         ref={swapInputRef}
@@ -607,8 +663,8 @@ export function ImageEditor({
           if (file) swapBaseImage(file)
         }}
       />
-      <div className="mx-auto mb-6 mt-6 w-[min(720px,calc(100vw-40px))] shrink-0">
-        <div className="w-full overflow-hidden rounded-[24px] border border-[#E5E5E5] bg-white shadow-[0_12px_35px_rgba(0,0,0,0.20)]">
+      <div className="fixed bottom-6 left-1/2 z-[71] w-[min(720px,calc(100vw-40px))] -translate-x-1/2">
+        <div className="w-full overflow-hidden rounded-[24px] border border-[#E5E5E5] bg-white shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
           <textarea
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
