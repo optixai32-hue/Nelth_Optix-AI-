@@ -699,7 +699,7 @@ function DiscoverCard({
   // geometry, no height change, smooth skeleton → media transition.
   const [videoReady, setVideoReady] = useState(false)
   return (
-    <div className="group relative aspect-[2/3] w-full overflow-hidden rounded-[4px] bg-[#f5f5f5] transition-all duration-150 ease-out hover:scale-[1.02] hover:shadow-lg dark:bg-white/5">
+    <div className="group relative aspect-[2/3] w-full overflow-hidden rounded-[4px] bg-[#f5f5f5] transition-shadow duration-150 ease-out hover:shadow-lg dark:bg-white/5">
       {result?.kind === 'image' ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -707,7 +707,7 @@ function DiscoverCard({
           src={result.url}
           alt=""
           draggable={false}
-          className="discover-card-in absolute inset-0 h-full w-full object-cover"
+          className="discover-card-in absolute inset-0 h-full w-full object-cover transition-transform duration-150 ease-out group-hover:scale-[1.04]"
         />
       ) : result?.kind === 'video' ? (
         <VideoPlayer
@@ -725,7 +725,7 @@ function DiscoverCard({
             preload="metadata"
             onCanPlay={() => setVideoReady(true)}
             className={cn(
-              'pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
+              'pointer-events-none absolute inset-0 h-full w-full object-cover transition-all duration-150 ease-out group-hover:scale-[1.04]',
               videoReady ? 'opacity-100' : 'opacity-0'
             )}
           />

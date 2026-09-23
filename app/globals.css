@@ -405,7 +405,10 @@
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    /* none (NOT scale(1)): any other transform value — even identity —
+       makes this element a containing block for fixed-position
+       descendants, which would trap the video player dialog inside. */
+    transform: none;
   }
 }
 
