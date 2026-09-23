@@ -726,12 +726,12 @@ function DiscoverView({
           Mettre à niveau
         </button>
       </div>
-      <div className="px-2 pt-4">
+      <div className="px-4 pt-4">
         <div className="flex size-[42px] items-center justify-center rounded-full bg-[#f1f1f1] text-xs text-neutral-600 dark:bg-white/10 dark:text-neutral-300">
           ug
         </div>
       </div>
-      <div className="flex flex-wrap gap-2.5 px-2 pt-3">
+      <div className="flex flex-wrap gap-2.5 px-4 pt-3">
         {Array.from({ length: Math.max(1, expected) }).map((_, i) => (
           <DiscoverCard key={i} result={results[i] ?? null} loading={working} />
         ))}
