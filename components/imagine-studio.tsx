@@ -44,6 +44,8 @@ export interface StudioAttachment {
   previewUrl: string
   status: 'uploading' | 'ready' | 'error'
   error?: string
+  /** Original file kept in memory so a failed upload can be retried. */
+  file?: File
   ent?: {
     sourceImageEntId: string
     mediaEntId: string
@@ -229,10 +231,12 @@ function VariationsSelect({
 
 function AttachmentBar({
   attachment,
-  onRemove
+  onRemove,
+  onRetry
 }: {
   attachment: StudioAttachment | null
   onRemove: () => void
+  onRetry: () => void
 }) {
   if (!attachment) return null
   return (
@@ -264,6 +268,15 @@ function AttachmentBar({
               : (attachment.error ?? 'Échec de l’envoi.')}
         </p>
       </div>
+      {attachment.status === 'error' && attachment.file ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="shrink-0 rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium text-[#111] transition-colors hover:bg-black/5 dark:border-white/15 dark:text-foreground dark:hover:bg-white/10"
+        >
+          Réessayer
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={onRemove}
@@ -1061,15 +1074,26 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
       id,
       name: file.name,
       previewUrl: URL.createObjectURL(file),
-      status: 'uploading'
+      status: 'uploading',
+      file
     })
     try {
       const { base64 } = await prepareImageForUpload(file)
-      const res = await fetch('/api/imagine/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, filename: file.name })
-      })
+      // Slow mobile networks need headroom: the 4-account fan-out alone
+      // takes ~13s even for tiny files.
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 90000)
+      let res: Response
+      try {
+        res = await fetch('/api/imagine/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: base64, filename: file.name }),
+          signal: controller.signal
+        })
+      } finally {
+        clearTimeout(timeout)
+      }
       const json = (await res.json().catch(() => null)) as {
         sourceImageEntId?: string
         mediaEntId?: string
@@ -1105,13 +1129,23 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           : prev
       )
     } catch (err) {
+      const isHeic =
+        file.type === 'image/heic' ||
+        file.type === 'image/heif' ||
+        /\.hei[cf]$/i.test(file.name)
+      const message =
+        err instanceof DOMException && err.name === 'AbortError'
+          ? 'Délai dépassé, réessaie.'
+          : isHeic &&
+              err instanceof Error &&
+              /lecture impossible/i.test(err.message)
+            ? 'Format HEIC non pris en charge ici.'
+            : err instanceof Error
+              ? err.message
+              : "L'envoi a échoué."
       setAttachment(prev =>
         prev && prev.id === id
-          ? {
-              ...prev,
-              status: 'error',
-              error: err instanceof Error ? err.message : "L'envoi a échoué."
-            }
+          ? { ...prev, status: 'error', error: message }
           : prev
       )
     }
@@ -1370,6 +1404,10 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
       <AttachmentBar
         attachment={attachment}
         onRemove={handleRemoveAttachment}
+        onRetry={() => {
+          const file = attachment?.file
+          if (file) void handleAttachFile(file)
+        }}
       />
     ),
     onAttach: () => fileInputRef.current?.click(),
