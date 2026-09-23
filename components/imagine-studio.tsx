@@ -18,6 +18,7 @@ import { ArrowUp, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
+import AiImageCard from '@/components/ai-image-card'
 import { VideoPlayer } from '@/components/sora-ui/effects/video-player'
 
 type StudioMode = 'image' | 'video'
@@ -670,19 +671,23 @@ export interface ImagineResult {
 
 /**
  * ImageGenerationLoadingCard — loading skeleton with the exact geometry
- * of the final card (same width, 2:3 aspect, rounded corners, neutral
- * grain + subtle shimmer). No text, no spinner: the card box never
- * changes size, so the conversation height stays frozen while loading
- * and the image cross-fades in place on arrival.
+ * of the final card (same width, 2:3 aspect, rounded corners). Live
+ * blinking-grid + elapsed timer while the backend works; the reveal is
+ * driven by our real results (the card unmounts on arrival), never by
+ * the countdown. The card box never changes size, so the conversation
+ * height stays frozen while loading.
  */
 export function ImageGenerationLoadingCard({ loading }: { loading: boolean }) {
+  if (!loading) {
+    return <div aria-hidden className="noise-placeholder absolute inset-0" />
+  }
   return (
-    <div
-      aria-hidden
-      className={cn(
-        'noise-placeholder absolute inset-0',
-        loading && 'shimmer-loading'
-      )}
+    <AiImageCard
+      generateDuration={9999}
+      imageSrc=""
+      imageAlt=""
+      label=""
+      className="absolute inset-0 aspect-auto rounded-[4px] border-0 bg-[#f5f5f5] dark:bg-white/5"
     />
   )
 }
