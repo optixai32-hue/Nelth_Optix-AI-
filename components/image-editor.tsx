@@ -70,6 +70,8 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
   const [mounted, setMounted] = useState(false)
   const [ready, setReady] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Display-box ratio follows the loaded backing store.
+  const [dims, setDims] = useState<[number, number]>([1280, 720])
   const [tool, setTool] = useState<'draw' | 'text'>('draw')
   const [color, setColor] = useState(PALETTE[1])
   const [actions, setActions] = useState<EditorAction[]>([])
@@ -103,6 +105,7 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
       if (canvas) {
         canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
         canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
+        setDims([canvas.width, canvas.height])
       }
       baseRef.current = img
       setActions([])
@@ -387,13 +390,17 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
           percentages, which resolve circularly and let the image blow
           up): landscape 900×500, portrait 420×500, square 500×500. */}
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 pt-5 md:px-10">
-        <div className="relative inline-block">
+        <div
+          className="relative flex items-center justify-center"
+          style={{
+            aspectRatio: `${dims[0]} / ${dims[1]}`,
+            width: `min(${capW}px, calc(100vw - 64px))`,
+            maxHeight: `min(${capH}px, calc(100dvh - 240px))`
+          }}
+        >
           <canvas
             ref={canvasRef}
-            style={{
-              maxWidth: `min(${capW}px, calc(100vw - 64px))`,
-              maxHeight: `min(${capH}px, calc(100dvh - 240px))`
-            }}
+            style={{ width: '75%', height: 'auto' }}
             onPointerDown={e => {
               if (!ready) return
               const p = toRelative(e)
@@ -449,7 +456,7 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
               repaint()
             }}
             className={cn(
-              'block h-auto w-auto touch-none',
+              'relative block touch-none',
               tool === 'draw' ? 'cursor-crosshair' : 'cursor-text'
             )}
           />
