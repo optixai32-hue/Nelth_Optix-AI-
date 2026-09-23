@@ -40,7 +40,12 @@ export interface StudioAttachment {
   previewUrl: string
   status: 'uploading' | 'ready' | 'error'
   error?: string
-  ent?: { sourceImageEntId: string; mediaEntId: string; imageUrl: string }
+  ent?: {
+    sourceImageEntId: string
+    mediaEntId: string
+    imageUrl: string
+    allMediaEntIds: Array<{ accountIndex: number; mediaEntId: string }>
+  }
 }
 
 export interface ComposerExtras {
@@ -650,11 +655,19 @@ function DiscoverComposer({
 // right when the user sends a prompt.
 // ---------------------------------------------------------------------------
 
+export interface ImagineResult {
+  kind: 'image' | 'video'
+  url: string
+  prompt: string
+  /** True for fbcdn URLs (video + uncleaned images) that expire (~1h). */
+  temporary?: boolean
+}
+
 function DiscoverCard({
   result,
   loading
 }: {
-  result?: { kind: 'image' | 'video'; url: string } | null
+  result?: ImagineResult | null
   loading: boolean
 }) {
   return (
@@ -690,6 +703,14 @@ function DiscoverCard({
           )}
         />
       )}
+      {result?.temporary ? (
+        <span
+          title="URL temporaire (~1h)"
+          className="pointer-events-none absolute right-2 top-2 rounded-full bg-amber-100/95 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+        >
+          Temporaire
+        </span>
+      ) : null}
     </div>
   )
 }
@@ -706,7 +727,7 @@ function DiscoverView({
 }: {
   onBack: () => void
   onRetry: () => void
-  results: Array<{ kind: 'image' | 'video'; url: string; prompt: string }>
+  results: ImagineResult[]
   expected: number
   working: boolean
   status: string | null
@@ -802,9 +823,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     | { status: 'error'; message: string }
     | null
   >(null)
-  const [results, setResults] = useState<
-    Array<{ kind: 'image' | 'video'; url: string; prompt: string }>
-  >([])
+  const [results, setResults] = useState<ImagineResult[]>([])
   const busyRef = useRef(false)
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -898,6 +917,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
         sourceImageEntId?: string
         mediaEntId?: string
         imageUrl?: string
+        allMediaEntIds?: Array<{ accountIndex: number; mediaEntId: string }>
         error?: string
       } | null
       if (
@@ -916,7 +936,8 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
               ent: {
                 sourceImageEntId: json.sourceImageEntId!,
                 mediaEntId: json.mediaEntId!,
-                imageUrl: json.imageUrl!
+                imageUrl: json.imageUrl!,
+                allMediaEntIds: json.allMediaEntIds ?? []
               }
             }
           : prev
@@ -973,12 +994,14 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sourceImageEntId: ent.sourceImageEntId,
-            editPrompt: fullPrompt
+            editPrompt: fullPrompt,
+            allMediaEntIds: ent.allMediaEntIds
           })
         })
         const json = (await res.json().catch(() => null)) as {
           contentItem?: { imageUrl: string }
           usedPrompt?: string
+          cleaned?: boolean
           error?: string
         } | null
         if (!res.ok || !json?.contentItem?.imageUrl) {
@@ -988,7 +1011,8 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           {
             kind: 'image' as const,
             url: json.contentItem!.imageUrl,
-            prompt: json.usedPrompt || text
+            prompt: json.usedPrompt || text,
+            temporary: !json.cleaned
           },
           ...prev
         ])
@@ -1031,7 +1055,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           })
         })
         const json = (await res.json().catch(() => null)) as {
-          data?: Array<{ url: string }>
+          data?: Array<{ url: string; cleaned?: boolean }>
           error?: string
         } | null
         if (!res.ok || !json?.data?.length) {
@@ -1041,7 +1065,8 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           ...json.data!.map(d => ({
             kind: 'image' as const,
             url: d.url,
-            prompt: text
+            prompt: text,
+            temporary: !d.cleaned
           })),
           ...prev
         ])
@@ -1105,9 +1130,14 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           if (urls.length >= count || pollJson.batch.isComplete) {
             if (urls.length === 0) throw new Error('Aucune vidéo générée.')
             setResults(prev => [
-              ...urls
-                .slice(0, count)
-                .map(url => ({ kind: 'video' as const, url, prompt: text })),
+              ...urls.slice(0, count).map(
+                (url): ImagineResult => ({
+                  kind: 'video',
+                  url,
+                  prompt: text,
+                  temporary: true
+                })
+              ),
               ...prev
             ])
             setJob(null)

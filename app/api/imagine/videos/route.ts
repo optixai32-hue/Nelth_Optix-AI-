@@ -16,7 +16,9 @@ export async function POST(req: Request) {
   } | null
 
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
-  const aspectRatio = RATIOS.includes(body?.aspectRatio as (typeof RATIOS)[number])
+  const aspectRatio = RATIOS.includes(
+    body?.aspectRatio as (typeof RATIOS)[number]
+  )
     ? (body?.aspectRatio as (typeof RATIOS)[number])
     : '1:1'
   const resolution = RESOLUTIONS.includes(

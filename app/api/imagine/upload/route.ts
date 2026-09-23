@@ -35,7 +35,13 @@ export async function POST(req: Request) {
 
   try {
     const result = await vibesUploadImage({ base64, filename })
-    return NextResponse.json({ success: true, ...result })
+    return NextResponse.json({
+      success: true,
+      mediaEntId: result.mediaEntId,
+      sourceImageEntId: result.sourceImageEntId,
+      imageUrl: result.imageUrl,
+      allMediaEntIds: result.allMediaEntIds
+    })
   } catch (err) {
     console.error('[imagine] upload failed:', err)
     return NextResponse.json(

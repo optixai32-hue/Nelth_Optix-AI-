@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { vibesGenerateImages } from '@/lib/imagine/vibes'
+import { vibesCleanImageUrl, vibesGenerateImages } from '@/lib/imagine/vibes'
 
 export const maxDuration = 60
 
@@ -14,7 +14,9 @@ export async function POST(req: Request) {
   } | null
 
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
-  const aspectRatio = RATIOS.includes(body?.aspectRatio as (typeof RATIOS)[number])
+  const aspectRatio = RATIOS.includes(
+    body?.aspectRatio as (typeof RATIOS)[number]
+  )
     ? (body?.aspectRatio as (typeof RATIOS)[number])
     : '1:1'
   const variations =
@@ -34,7 +36,16 @@ export async function POST(req: Request) {
 
   try {
     const data = await vibesGenerateImages({ prompt, aspectRatio, variations })
-    return NextResponse.json({ success: true, data })
+    // The backend returns raw fbcdn URLs — watermark-clean each (hosted
+    // on ImageKit, exposed via the X-Imagekit-Url header). Fallback keeps
+    // the raw URL so the image stays visible.
+    const cleaned = await Promise.all(
+      data.map(async d => {
+        const c = await vibesCleanImageUrl(d.url)
+        return { ...d, url: c.url, cleaned: c.cleaned }
+      })
+    )
+    return NextResponse.json({ success: true, data: cleaned })
   } catch (err) {
     console.error('[imagine] images/generate failed:', err)
     return NextResponse.json(

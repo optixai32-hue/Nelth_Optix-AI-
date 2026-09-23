@@ -8,15 +8,25 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as {
     sourceImageEntId?: unknown
     editPrompt?: unknown
+    allMediaEntIds?: unknown
   } | null
 
   const sourceImageEntId =
     typeof body?.sourceImageEntId === 'string' ? body.sourceImageEntId : ''
   const editPrompt =
     typeof body?.editPrompt === 'string' ? body.editPrompt.trim() : ''
+  const allMediaEntIds = Array.isArray(body?.allMediaEntIds)
+    ? (body.allMediaEntIds as Array<{
+        accountIndex: number
+        mediaEntId: string
+      }>)
+    : undefined
 
   if (!sourceImageEntId) {
-    return NextResponse.json({ error: 'Image source requise.' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Image source requise.' },
+      { status: 400 }
+    )
   }
   if (!editPrompt) {
     return NextResponse.json(
@@ -29,7 +39,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await vibesEditImage({ sourceImageEntId, editPrompt })
+    const result = await vibesEditImage({
+      sourceImageEntId,
+      editPrompt,
+      allMediaEntIds
+    })
     return NextResponse.json({ success: true, ...result })
   } catch (err) {
     console.error('[imagine] images/edit failed:', err)

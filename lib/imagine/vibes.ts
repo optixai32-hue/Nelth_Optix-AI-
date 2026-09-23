@@ -137,16 +137,22 @@ export interface VibesUploadResult {
 export async function vibesUploadImage(input: {
   base64: string
   filename?: string
-}): Promise<VibesUploadResult> {
+}): Promise<
+  VibesUploadResult & {
+    allMediaEntIds: Array<{ accountIndex: number; mediaEntId: string }>
+  }
+> {
   const data = await vibesFetch<{
     mediaEntId: string
     sourceImageEntId: string
     imageUrl: string
+    allMediaEntIds?: Array<{ accountIndex: number; mediaEntId: string }>
   }>(
     '/api/vibes/upload/media',
     {
       image_base64: input.base64,
-      filename: input.filename ?? 'upload.png'
+      filename: input.filename ?? 'upload.png',
+      project_id: VIBES_PROJECT_ID
     },
     60000
   )
@@ -154,7 +160,42 @@ export async function vibesUploadImage(input: {
   return {
     mediaEntId: data.mediaEntId,
     sourceImageEntId: data.sourceImageEntId,
-    imageUrl: data.imageUrl
+    imageUrl: data.imageUrl,
+    allMediaEntIds: data.allMediaEntIds ?? []
+  }
+}
+
+/**
+ * Watermark removal + Nelth-IA logo (server-side on the vibes backend).
+ * The backend hosts the cleaned file on ImageKit and exposes it via the
+ * `X-Imagekit-Url` response header. Falls back to the original URL when
+ * cleaning fails so the image stays visible (temporary fbcdn URL).
+ */
+export async function vibesCleanImageUrl(
+  fbcdnUrl: string
+): Promise<{ url: string; cleaned: boolean }> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30000)
+    let res: Response
+    try {
+      res = await fetch(`${VIBES_API_BASE}/api/vibes/watermark/clean`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: fbcdnUrl }),
+        signal: controller.signal
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
+    if (!res.ok) return { url: fbcdnUrl, cleaned: false }
+    const hosted = res.headers.get('x-imagekit-url')
+    if (hosted && /^https?:\/\//.test(hosted)) {
+      return { url: hosted, cleaned: true }
+    }
+    return { url: fbcdnUrl, cleaned: false }
+  } catch {
+    return { url: fbcdnUrl, cleaned: false }
   }
 }
 
@@ -183,12 +224,13 @@ export interface VibesEditResult {
   contentItem: { imageUrl: string; [k: string]: unknown }
   usedPrompt: string
   fallback: boolean
+  cleaned: boolean
 }
 
 export async function vibesEditImage(input: {
   sourceImageEntId: string
   editPrompt: string
-  allMediaEntIds?: string[]
+  allMediaEntIds?: Array<{ accountIndex: number; mediaEntId: string }>
 }): Promise<VibesEditResult> {
   // Auto-enhance first (dashboard behavior), fallback to the raw prompt.
   const { prompt: enhanced, fallback } = await vibesEnhancePrompt(
@@ -210,7 +252,14 @@ export async function vibesEditImage(input: {
     55000
   )
   if (!data.contentItem?.imageUrl) throw new Error('Édition sans image.')
-  return { contentItem: data.contentItem, usedPrompt: enhanced, fallback }
+  // The edit endpoint returns a raw fbcdn URL — clean it the same way.
+  const cleaned = await vibesCleanImageUrl(data.contentItem.imageUrl)
+  return {
+    contentItem: { ...data.contentItem, imageUrl: cleaned.url },
+    usedPrompt: enhanced,
+    fallback,
+    cleaned: cleaned.cleaned
+  }
 }
 
 export async function vibesAnimateVideo(input: {

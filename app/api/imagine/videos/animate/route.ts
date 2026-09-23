@@ -24,7 +24,10 @@ export async function POST(req: Request) {
     typeof source.imageUrl !== 'string' ||
     typeof source.mediaEntId !== 'string'
   ) {
-    return NextResponse.json({ error: 'Image source requise.' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Image source requise.' },
+      { status: 400 }
+    )
   }
 
   try {
