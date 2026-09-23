@@ -874,6 +874,51 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
 
   const MAX_IMAGE_BYTES = 3 * 1024 * 1024
 
+  // Downscale hero photos client-side so the upload stays small and fast:
+  // files ≤1.5Mo go through untouched, bigger ones are resized (max 1920px,
+  // JPEG 0.85). Without this, phone photos blow past the serverless body
+  // limit (HTTP 413) or stall the 4-account upload past its timeout.
+  const prepareImageForUpload = (file: File): Promise<{ base64: string }> =>
+    new Promise((resolve, reject) => {
+      const fail = () => reject(new Error('Lecture impossible.'))
+      if (file.size <= 1536 * 1024) {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = typeof reader.result === 'string' ? reader.result : ''
+          const comma = result.indexOf(',')
+          resolve({ base64: comma >= 0 ? result.slice(comma + 1) : result })
+        }
+        reader.onerror = fail
+        reader.readAsDataURL(file)
+        return
+      }
+      const url = URL.createObjectURL(file)
+      const img = new Image()
+      img.onload = () => {
+        URL.revokeObjectURL(url)
+        const scale = Math.min(1, 1920 / Math.max(img.width, img.height)) || 1
+        const w = Math.max(1, Math.round(img.width * scale))
+        const h = Math.max(1, Math.round(img.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          fail()
+          return
+        }
+        ctx.drawImage(img, 0, 0, w, h)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+        const comma = dataUrl.indexOf(',')
+        resolve({ base64: comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl })
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        fail()
+      }
+      img.src = url
+    })
+
   const handleRemoveAttachment = () => {
     setAttachment(prev => {
       if (prev?.previewUrl.startsWith('blob:')) {
@@ -916,16 +961,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
       status: 'uploading'
     })
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          const result = typeof reader.result === 'string' ? reader.result : ''
-          const comma = result.indexOf(',')
-          resolve(comma >= 0 ? result.slice(comma + 1) : result)
-        }
-        reader.onerror = () => reject(new Error('Lecture impossible.'))
-        reader.readAsDataURL(file)
-      })
+      const { base64 } = await prepareImageForUpload(file)
       const res = await fetch('/api/imagine/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -944,7 +980,12 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
         !json?.mediaEntId ||
         !json?.imageUrl
       ) {
-        throw new Error(json?.error || "L'envoi a échoué.")
+        throw new Error(
+          json?.error ||
+            (res.status === 413
+              ? 'Image trop lourde pour l’envoi.'
+              : `L'envoi a échoué (${res.status}).`)
+        )
       }
       setAttachment(prev =>
         prev && prev.id === id
