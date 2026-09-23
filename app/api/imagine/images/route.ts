@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { vibesCleanImageUrl, vibesGenerateImages } from '@/lib/imagine/vibes'
+import { vibesGenerateImages } from '@/lib/imagine/vibes'
 
 export const maxDuration = 60
 
@@ -35,17 +35,10 @@ export async function POST(req: Request) {
   }
 
   try {
+    // Raw fbcdn URLs — the frontend watermark-cleans each into a session
+    // blob URL (no ImageKit involved).
     const data = await vibesGenerateImages({ prompt, aspectRatio, variations })
-    // The backend returns raw fbcdn URLs — watermark-clean each (hosted
-    // on ImageKit, exposed via the X-Imagekit-Url header). Fallback keeps
-    // the raw URL so the image stays visible.
-    const cleaned = await Promise.all(
-      data.map(async d => {
-        const c = await vibesCleanImageUrl(d.url)
-        return { ...d, url: c.url, cleaned: c.cleaned }
-      })
-    )
-    return NextResponse.json({ success: true, data: cleaned })
+    return NextResponse.json({ success: true, data })
   } catch (err) {
     console.error('[imagine] images/generate failed:', err)
     return NextResponse.json(

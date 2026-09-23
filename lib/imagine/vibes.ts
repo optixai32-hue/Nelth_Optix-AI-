@@ -167,35 +167,23 @@ export async function vibesUploadImage(input: {
 
 /**
  * Watermark removal + Nelth-IA logo (server-side on the vibes backend).
- * The backend hosts the cleaned file on ImageKit and exposes it via the
- * `X-Imagekit-Url` response header. Falls back to the original URL when
- * cleaning fails so the image stays visible (temporary fbcdn URL).
+ * Returns the cleaned PNG bytes — the caller turns them into a browser
+ * blob URL (session-local, no ImageKit involved).
  */
-export async function vibesCleanImageUrl(
-  fbcdnUrl: string
-): Promise<{ url: string; cleaned: boolean }> {
+export async function vibesCleanImageBlob(fbcdnUrl: string): Promise<Blob> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30000)
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 30000)
-    let res: Response
-    try {
-      res = await fetch(`${VIBES_API_BASE}/api/vibes/watermark/clean`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: fbcdnUrl }),
-        signal: controller.signal
-      })
-    } finally {
-      clearTimeout(timeout)
-    }
-    if (!res.ok) return { url: fbcdnUrl, cleaned: false }
-    const hosted = res.headers.get('x-imagekit-url')
-    if (hosted && /^https?:\/\//.test(hosted)) {
-      return { url: hosted, cleaned: true }
-    }
-    return { url: fbcdnUrl, cleaned: false }
-  } catch {
-    return { url: fbcdnUrl, cleaned: false }
+    const res = await fetch(`${VIBES_API_BASE}/api/vibes/watermark/clean`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_url: fbcdnUrl }),
+      signal: controller.signal
+    })
+    if (!res.ok) throw new Error(`Clean failed (${res.status})`)
+    return await res.blob()
+  } finally {
+    clearTimeout(timeout)
   }
 }
 
@@ -224,7 +212,6 @@ export interface VibesEditResult {
   contentItem: { imageUrl: string; [k: string]: unknown }
   usedPrompt: string
   fallback: boolean
-  cleaned: boolean
 }
 
 export async function vibesEditImage(input: {
@@ -252,14 +239,8 @@ export async function vibesEditImage(input: {
     55000
   )
   if (!data.contentItem?.imageUrl) throw new Error('Édition sans image.')
-  // The edit endpoint returns a raw fbcdn URL — clean it the same way.
-  const cleaned = await vibesCleanImageUrl(data.contentItem.imageUrl)
-  return {
-    contentItem: { ...data.contentItem, imageUrl: cleaned.url },
-    usedPrompt: enhanced,
-    fallback,
-    cleaned: cleaned.cleaned
-  }
+  // Raw fbcdn URL — the frontend cleans it into a session blob URL.
+  return { contentItem: data.contentItem, usedPrompt: enhanced, fallback }
 }
 
 export async function vibesAnimateVideo(input: {

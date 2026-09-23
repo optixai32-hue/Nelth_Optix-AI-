@@ -597,15 +597,18 @@ function DiscoverComposer({
               </ToolbarIconButton>
             </>
           )}
-          <button
-            type="button"
-            onClick={cycleAspectRatio}
-            title="Format d'image"
-            className="flex h-[39px] w-[63px] shrink-0 items-center justify-center gap-1.5 rounded-[20px] bg-neutral-100 text-[14px] text-[#111] transition-colors hover:bg-neutral-200/70 dark:bg-muted dark:text-foreground dark:hover:bg-white/10"
-          >
-            <IconRectangleVertical size={14} />
-            {aspectRatio}
-          </button>
+          {/* No ratio in edit/animate mode — the source image decides. */}
+          {!extras.variationsLocked && (
+            <button
+              type="button"
+              onClick={cycleAspectRatio}
+              title="Format d'image"
+              className="flex h-[39px] w-[63px] shrink-0 items-center justify-center gap-1.5 rounded-[20px] bg-neutral-100 text-[14px] text-[#111] transition-colors hover:bg-neutral-200/70 dark:bg-muted dark:text-foreground dark:hover:bg-white/10"
+            >
+              <IconRectangleVertical size={14} />
+              {aspectRatio}
+            </button>
+          )}
           <VariationsSelect
             value={extras.variationsLocked ? 1 : extras.variations}
             onChange={extras.setVariations}
@@ -835,6 +838,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   // image + video mode, motion directive optional).
   const canSend =
     !generating &&
+    attachment?.status !== 'uploading' &&
     (prompt.trim().length > 0 || (mode === 'video' && variationsLocked))
 
   // Stop any pending video poll on unmount.
@@ -853,6 +857,20 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
 
   const withStyle = (text: string, styleOverride: string | null) =>
     styleOverride ? `${text} (${styleOverride} style)` : text
+
+  // Watermark removal + logo via our clean proxy, returned as a session
+  // blob URL (browser-local, no ImageKit). Throws on failure so callers
+  // can fall back to the raw fbcdn URL.
+  const cleanToBlobUrl = async (fbcdnUrl: string): Promise<string> => {
+    const res = await fetch('/api/imagine/images/clean', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_url: fbcdnUrl })
+    })
+    if (!res.ok) throw new Error('Nettoyage impossible.')
+    const blob = await res.blob()
+    return URL.createObjectURL(blob)
+  }
 
   const MAX_IMAGE_BYTES = 3 * 1024 * 1024
 
@@ -1001,18 +1019,26 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
         const json = (await res.json().catch(() => null)) as {
           contentItem?: { imageUrl: string }
           usedPrompt?: string
-          cleaned?: boolean
           error?: string
         } | null
         if (!res.ok || !json?.contentItem?.imageUrl) {
           throw new Error(json?.error || "L'édition a échoué.")
         }
+        setJob({ status: 'working', label: 'Nettoyage…' })
+        let editUrl = json.contentItem.imageUrl
+        let editTemporary = true
+        try {
+          editUrl = await cleanToBlobUrl(json.contentItem.imageUrl)
+          editTemporary = false
+        } catch {
+          // Fallback: raw fbcdn URL stays visible (~1h).
+        }
         setResults(prev => [
           {
             kind: 'image' as const,
-            url: json.contentItem!.imageUrl,
+            url: editUrl,
             prompt: json.usedPrompt || text,
-            temporary: !json.cleaned
+            temporary: editTemporary
           },
           ...prev
         ])
@@ -1055,18 +1081,32 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           })
         })
         const json = (await res.json().catch(() => null)) as {
-          data?: Array<{ url: string; cleaned?: boolean }>
+          data?: Array<{ url: string }>
           error?: string
         } | null
         if (!res.ok || !json?.data?.length) {
           throw new Error(json?.error || 'La génération a échoué.')
         }
+        setJob({ status: 'working', label: 'Nettoyage…' })
+        const cleaned = await Promise.all(
+          json.data!.map(async d => {
+            try {
+              return {
+                url: await cleanToBlobUrl(d.url),
+                temporary: false
+              }
+            } catch {
+              // Fallback: raw fbcdn URL stays visible (~1h).
+              return { url: d.url, temporary: true }
+            }
+          })
+        )
         setResults(prev => [
-          ...json.data!.map(d => ({
+          ...cleaned.map(c => ({
             kind: 'image' as const,
-            url: d.url,
+            url: c.url,
             prompt: text,
-            temporary: !d.cleaned
+            temporary: c.temporary
           })),
           ...prev
         ])
@@ -1322,16 +1362,19 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                   </>
                 )}
 
-                {/* Aspect ratio (click cycles 1:1 → 16:9 → 9:16) */}
-                <button
-                  type="button"
-                  onClick={cycleAspectRatio}
-                  title="Format d'image"
-                  className="flex h-[39px] w-[63px] shrink-0 items-center justify-center gap-1.5 rounded-[20px] bg-neutral-100 text-[14px] text-[#111] transition-colors hover:bg-neutral-200/70 dark:bg-muted dark:text-foreground dark:hover:bg-white/10"
-                >
-                  <IconRectangleVertical size={14} />
-                  {aspectRatio}
-                </button>
+                {/* Aspect ratio (click cycles 1:1 → 16:9 → 9:16).
+                    Hidden in edit/animate mode — the source image decides. */}
+                {!extras.variationsLocked && (
+                  <button
+                    type="button"
+                    onClick={cycleAspectRatio}
+                    title="Format d'image"
+                    className="flex h-[39px] w-[63px] shrink-0 items-center justify-center gap-1.5 rounded-[20px] bg-neutral-100 text-[14px] text-[#111] transition-colors hover:bg-neutral-200/70 dark:bg-muted dark:text-foreground dark:hover:bg-white/10"
+                  >
+                    <IconRectangleVertical size={14} />
+                    {aspectRatio}
+                  </button>
+                )}
                 <VariationsSelect
                   value={extras.variationsLocked ? 1 : extras.variations}
                   onChange={extras.setVariations}
