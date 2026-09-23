@@ -911,13 +911,19 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   // Lock background scroll while an overlay is open (editor, preset
   // preview, or the video player dialog which signals via its hidden
   // attribute) so wheel/touch never scrolls the page behind them.
+  // NOTE: the real scroller is the studio container below (the app shell
+  // is position:fixed, body itself never scrolls) — lock them both.
+  const scrollRootRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const sync = () => {
       const videoOpen = !!document.querySelector(
         '[data-media-01-player]:not([hidden])'
       )
-      document.body.style.overflow =
-        editing !== null || preview !== null || videoOpen ? 'hidden' : ''
+      const locked = editing !== null || preview !== null || videoOpen
+      document.body.style.overflow = locked ? 'hidden' : ''
+      if (scrollRootRef.current) {
+        scrollRootRef.current.style.overflow = locked ? 'hidden' : ''
+      }
     }
     sync()
     const obs = new MutationObserver(sync)
@@ -929,6 +935,9 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     return () => {
       obs.disconnect()
       document.body.style.overflow = ''
+      if (scrollRootRef.current) {
+        scrollRootRef.current.style.overflow = ''
+      }
     }
   }, [editing, preview])
 
@@ -1350,7 +1359,10 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   }
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-y-auto bg-[#faf9f7] [font-family:Arial,sans-serif] dark:bg-background">
+    <div
+      ref={scrollRootRef}
+      className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-y-auto bg-[#faf9f7] [font-family:Arial,sans-serif] dark:bg-background"
+    >
       <div key={view} className="discover-view flex min-h-full w-full flex-col">
         {view === 'discover' ? (
           <DiscoverView
