@@ -666,6 +666,25 @@ export interface ImagineResult {
   temporary?: boolean
 }
 
+/**
+ * ImageGenerationLoadingCard — loading skeleton with the exact geometry
+ * of the final card (same width, 2:3 aspect, rounded corners, neutral
+ * grain + subtle shimmer). No text, no spinner: the card box never
+ * changes size, so the conversation height stays frozen while loading
+ * and the image cross-fades in place on arrival.
+ */
+export function ImageGenerationLoadingCard({ loading }: { loading: boolean }) {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        'noise-placeholder absolute inset-0',
+        loading && 'shimmer-loading'
+      )}
+    />
+  )
+}
+
 function DiscoverCard({
   result,
   loading
@@ -699,12 +718,7 @@ function DiscoverCard({
           </span>
         </>
       ) : (
-        <div
-          className={cn(
-            'noise-placeholder absolute inset-0',
-            loading && 'shimmer-loading'
-          )}
-        />
+        <ImageGenerationLoadingCard loading={loading} />
       )}
       {result?.temporary ? (
         <span
@@ -769,8 +783,10 @@ function DiscoverView({
           ug
         </div>
       </div>
-      {(status || error) && (
-        <div className="pl-4 pr-4 pt-3 md:pl-14">
+      {/* Status slot with reserved height: appearing/disappearing status
+          never shifts the cards below. */}
+      <div className="pl-4 pr-4 pt-3 md:pl-14">
+        <div className="min-h-[24px]">
           {status && !error ? (
             <div className="flex cursor-default select-none flex-row items-center gap-2 text-[14px] text-neutral-600 dark:text-neutral-300">
               <IconLoader2 size={16} className="animate-spin" />
@@ -792,11 +808,21 @@ function DiscoverView({
             </div>
           ) : null}
         </div>
-      )}
+      </div>
       <div className="grid grid-cols-2 gap-2.5 pl-4 pr-4 pt-3 md:grid-cols-3 md:pl-14 xl:grid-cols-4">
-        {Array.from({ length: Math.max(1, expected) }).map((_, i) => (
-          <DiscoverCard key={i} result={results[i] ?? null} loading={working} />
-        ))}
+        {Array.from({ length: Math.max(1, expected) }).map((_, i) => {
+          const item = results[i] ?? null
+          // Key by content identity (never by index): a fresh result mounts
+          // a NEW card with its entrance animation instead of swapping the
+          // pixels inside the already-displayed card.
+          return (
+            <DiscoverCard
+              key={item ? item.url : `loading-${i}`}
+              result={item}
+              loading={working}
+            />
+          )
+        })}
       </div>
       <div className="sticky bottom-4 z-10 mx-auto mt-8 w-full max-w-[750px] px-4 pb-2">
         {composer}
