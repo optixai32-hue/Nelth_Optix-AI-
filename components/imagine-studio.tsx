@@ -417,11 +417,11 @@ function StylePreviewCard({
       aria-modal="true"
       aria-label={label}
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overscroll-contain bg-black/60 p-4"
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-md overflow-hidden rounded-[20px] bg-white shadow-2xl dark:bg-card"
+        className="my-auto w-full max-w-md overflow-hidden rounded-[20px] bg-white shadow-2xl dark:bg-card"
       >
         <div className="relative">
           <img
@@ -907,6 +907,30 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
     }
   }, [])
+
+  // Lock background scroll while an overlay is open (editor, preset
+  // preview, or the video player dialog which signals via its hidden
+  // attribute) so wheel/touch never scrolls the page behind them.
+  useEffect(() => {
+    const sync = () => {
+      const videoOpen = !!document.querySelector(
+        '[data-media-01-player]:not([hidden])'
+      )
+      document.body.style.overflow =
+        editing !== null || preview !== null || videoOpen ? 'hidden' : ''
+    }
+    sync()
+    const obs = new MutationObserver(sync)
+    obs.observe(document.body, {
+      attributes: true,
+      subtree: true,
+      attributeFilter: ['hidden', 'class']
+    })
+    return () => {
+      obs.disconnect()
+      document.body.style.overflow = ''
+    }
+  }, [editing, preview])
 
   const cycleAspectRatio = () => {
     setAspectRatio(

@@ -273,7 +273,7 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
       role="dialog"
       aria-modal="true"
       aria-label={title || 'Éditeur d’image'}
-      className="fixed inset-0 z-[70] flex flex-col overflow-y-auto bg-[#0a0a0a] [font-family:Arial,sans-serif]"
+      className="fixed inset-0 z-[70] flex flex-col overflow-y-auto overscroll-contain bg-[#0a0a0a] [font-family:Arial,sans-serif]"
       style={{
         background:
           'radial-gradient(ellipse at center, #1c1c1e 0%, #0a0a0a 70%)'
@@ -416,7 +416,7 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
               repaint()
             }}
             className={cn(
-              'max-h-[52vh] max-w-full touch-none md:max-h-[58vh]',
+              'max-h-[46dvh] max-w-full touch-none md:max-h-[56dvh]',
               tool === 'draw' ? 'cursor-crosshair' : 'cursor-text'
             )}
           />
