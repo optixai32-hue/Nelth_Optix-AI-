@@ -19,6 +19,7 @@ import { ArrowUp, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import AiImageCard from '@/components/ai-image-card'
+import { ImageEditor } from '@/components/image-editor'
 import { VideoPlayer } from '@/components/sora-ui/effects/video-player'
 
 type StudioMode = 'image' | 'video'
@@ -694,10 +695,12 @@ export function ImageGenerationLoadingCard({ loading }: { loading: boolean }) {
 
 function DiscoverCard({
   result,
-  loading
+  loading,
+  onEdit
 }: {
   result?: ImagineResult | null
   loading: boolean
+  onEdit?: () => void
 }) {
   // Fresh mount per URL (parent keys by identity): video starts hidden
   // over its own skeleton and fades in on first playable frame — same
@@ -712,7 +715,8 @@ function DiscoverCard({
           src={result.url}
           alt=""
           draggable={false}
-          className="discover-card-in absolute inset-0 h-full w-full object-cover transition-transform duration-150 ease-out group-hover:scale-[1.04]"
+          onClick={onEdit}
+          className="discover-card-in absolute inset-0 h-full w-full cursor-pointer object-cover"
         />
       ) : result?.kind === 'video' ? (
         <VideoPlayer
@@ -756,6 +760,7 @@ function DiscoverCard({
 function DiscoverView({
   onBack,
   onRetry,
+  onEditResult,
   results,
   expected,
   working,
@@ -765,6 +770,7 @@ function DiscoverView({
 }: {
   onBack: () => void
   onRetry: () => void
+  onEditResult: (r: ImagineResult) => void
   results: ImagineResult[]
   expected: number
   working: boolean
@@ -847,6 +853,7 @@ function DiscoverView({
             key={`${r.kind}-${r.url}`}
             result={r}
             loading={false}
+            onEdit={r.kind === 'image' ? () => onEditResult(r) : undefined}
           />
         ))}
       </div>
@@ -868,6 +875,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   const [expanded, setExpanded] = useState(true)
   const [preview, setPreview] = useState<string | null>(null)
   const [view, setView] = useState<'create' | 'discover'>('create')
+  const [editing, setEditing] = useState<ImagineResult | null>(null)
   const [expectedCount, setExpectedCount] = useState(2)
   const [variations, setVariations] = useState(2)
   const [attachment, setAttachment] = useState<StudioAttachment | null>(null)
@@ -1324,6 +1332,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           <DiscoverView
             onBack={() => setView('create')}
             onRetry={handleGenerate}
+            onEditResult={r => setEditing(r)}
             results={results}
             expected={expectedCount}
             working={generating}
@@ -1538,6 +1547,25 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                 if (file) void handleAttachFile(file)
               }}
             />
+            {editing?.kind === 'image' && (
+              <ImageEditor
+                src={editing.url}
+                title={editing.prompt}
+                onClose={() => setEditing(null)}
+                onSave={blob => {
+                  const url = URL.createObjectURL(blob)
+                  setResults(prev => [
+                    {
+                      kind: 'image',
+                      url,
+                      prompt: `${editing.prompt} (édité)`
+                    },
+                    ...prev
+                  ])
+                  setEditing(null)
+                }}
+              />
+            )}
             {preview && (
               <StylePreviewCard
                 label={preview}
