@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { usePathname } from 'next/navigation'
 
 import {
   MODEL_SELECTION_COOKIE,
@@ -50,6 +51,7 @@ export default function SidebarModelSelector({
 }) {
   const { state } = useSidebar()
   const isMobile = useIsMobile()
+  const pathname = usePathname()
 
   const models = useMemo<ModelOption[]>(() => {
     if (!modelSelectorData) return []
@@ -65,6 +67,9 @@ export default function SidebarModelSelector({
 
   if (isCloudDeployment || isGuest || !modelSelectorData) return null
   if (!models.length) return null
+  // The imagine studio + Découvrir have no model choice (fixed vibes
+  // backend) — keep them free of the chat model picker.
+  if (pathname === '/imagine') return null
 
   const selectedId = modelSelectorData.selectedModelKey || models[0]?.id
 
