@@ -51,9 +51,9 @@ const PALETTE = [
   '#9B9B9B'
 ]
 
-// Workspace canvas is always 16:9 landscape (source cover-cropped).
-const CANVAS_W = 1280
-const CANVAS_H = 720
+// Canvas follows the SOURCE ratio (never forced): natural size capped
+// at MAX_EDGE, displayed fit-to-area preserving proportions.
+const MAX_EDGE = 2048
 
 const WORKSPACE_RATIOS = ['1:1', '16:9', '9:16'] as const
 type WorkspaceRatio = (typeof WORKSPACE_RATIOS)[number]
@@ -129,8 +129,9 @@ export function ImageEditor({
     }
   }, [])
 
-  // Load the base image (CORS-clean so export never taints when possible),
-  // cover-cropped to the 16:9 workspace canvas.
+  // Load the base image (CORS-clean so export never taints when possible).
+  // Backing store keeps the source proportions (capped), display scales
+  // to fit — never stretched, never force-cropped.
   useEffect(() => {
     let cancelled = false
     setReady(false)
@@ -139,10 +140,13 @@ export function ImageEditor({
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       if (cancelled) return
+      const scale =
+        Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight)) ||
+        1
       const canvas = canvasRef.current
       if (canvas) {
-        canvas.width = CANVAS_W
-        canvas.height = CANVAS_H
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
       }
       baseRef.current = img
       setActions([])
@@ -167,21 +171,7 @@ export function ImageEditor({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    // Cover-crop the source into the 16:9 canvas (no distortion).
-    const cover =
-      Math.max(
-        canvas.width / base.naturalWidth,
-        canvas.height / base.naturalHeight
-      ) || 1
-    const dw = base.naturalWidth * cover
-    const dh = base.naturalHeight * cover
-    ctx.drawImage(
-      base,
-      (canvas.width - dw) / 2,
-      (canvas.height - dh) / 2,
-      dw,
-      dh
-    )
+    ctx.drawImage(base, 0, 0, canvas.width, canvas.height)
     const applied = actions.slice(0, step)
     for (const action of applied) {
       if (action.kind === 'draw') {
@@ -454,9 +444,9 @@ export function ImageEditor({
         <p className="px-4 pb-2 text-center text-sm text-red-400">{error}</p>
       )}
 
-      {/* Center image — 16:9 landscape, centered */}
-      <div className="flex min-h-0 flex-1 items-center justify-center px-4 pt-5 md:px-10">
-        <div className="relative w-full max-w-[610px]">
+      {/* Center image — follows the source ratio, fit to the area */}
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 pt-5 md:px-10">
+        <div className="relative inline-block max-h-full max-w-full">
           <canvas
             ref={canvasRef}
             onPointerDown={e => {
@@ -514,7 +504,7 @@ export function ImageEditor({
               repaint()
             }}
             className={cn(
-              'h-auto w-full touch-none',
+              'block h-auto max-h-full w-auto max-w-full touch-none',
               tool === 'draw' ? 'cursor-crosshair' : 'cursor-text'
             )}
           />
@@ -617,7 +607,7 @@ export function ImageEditor({
           if (file) swapBaseImage(file)
         }}
       />
-      <div className="fixed bottom-6 left-1/2 z-[71] w-[min(720px,calc(100vw-40px))] -translate-x-1/2">
+      <div className="mx-auto mb-6 mt-6 w-[min(720px,calc(100vw-40px))] shrink-0">
         <div className="w-full overflow-hidden rounded-[24px] border border-[#E5E5E5] bg-white shadow-[0_12px_35px_rgba(0,0,0,0.20)]">
           <textarea
             value={prompt}
