@@ -834,19 +834,21 @@ function DiscoverView({
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2.5 pl-4 pr-4 pt-3 md:grid-cols-3 md:pl-14 xl:grid-cols-4">
-        {Array.from({ length: Math.max(1, expected) }).map((_, i) => {
-          const item = results[i] ?? null
-          // Key by content identity (never by index): a fresh result mounts
-          // a NEW card with its entrance animation instead of swapping the
-          // pixels inside the already-displayed card.
-          return (
-            <DiscoverCard
-              key={item ? item.url : `loading-${i}`}
-              result={item}
-              loading={working}
-            />
-          )
-        })}
+        {/* In-flight generation: fresh loading cards first … */}
+        {working &&
+          Array.from({ length: Math.max(1, expected) }).map((_, i) => (
+            <DiscoverCard key={`pending-${i}`} result={null} loading />
+          ))}
+        {/* … then every past result, keyed by identity so nothing already
+            displayed is ever replaced: 4 max per row, following
+            generations flow to the rows below. */}
+        {results.map(r => (
+          <DiscoverCard
+            key={`${r.kind}-${r.url}`}
+            result={r}
+            loading={false}
+          />
+        ))}
       </div>
       <div className="sticky bottom-4 z-10 mx-auto mt-8 w-full max-w-[750px] px-4 pb-2">
         {composer}
