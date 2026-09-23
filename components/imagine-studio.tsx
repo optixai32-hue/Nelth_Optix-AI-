@@ -4,11 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
   IconArrowLeft,
-  IconBolt,
   IconExternalLink,
   IconLayoutGrid,
   IconLoader2,
-  IconMicrophone,
   IconPhoto,
   IconPlus,
   IconRectangleVertical,
@@ -478,9 +476,6 @@ function StylePreviewCard({
 // toolbar: quality pills (Vitesse / Qualité 2.0), mic, pastel-blue CTA.
 // ---------------------------------------------------------------------------
 
-type DiscoverQuality = 'Vitesse' | 'Qualité 2.0'
-const DISCOVER_QUALITIES: DiscoverQuality[] = ['Vitesse', 'Qualité 2.0']
-
 interface DiscoverComposerProps {
   prompt: string
   setPrompt: (v: string) => void
@@ -512,7 +507,6 @@ function DiscoverComposer({
   onGenerate,
   extras
 }: DiscoverComposerProps) {
-  const [quality, setQuality] = useState<DiscoverQuality>('Vitesse')
   return (
     <>
       <div className="w-full overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:border-border dark:bg-card">
@@ -554,11 +548,6 @@ function DiscoverComposer({
               <ToolbarIconButton label="Médias">
                 <IconLayoutGrid size={19} />
               </ToolbarIconButton>
-              <SegmentedControl
-                options={DISCOVER_QUALITIES}
-                value={quality}
-                onChange={setQuality}
-              />
             </>
           ) : (
             <>
@@ -618,16 +607,13 @@ function DiscoverComposer({
             locked={extras.variationsLocked}
           />
           <div className="sticky right-0 ml-auto flex shrink-0 items-center gap-1 bg-white pl-1 dark:bg-card">
-            <ToolbarIconButton label="Microphone">
-              <IconMicrophone size={16} />
-            </ToolbarIconButton>
             <button
               type="button"
               onClick={onGenerate}
               aria-label="Générer"
               title="Générer"
               disabled={!extras.canSend}
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#8dccf5] text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-black"
             >
               {generating ? (
                 <IconLoader2 size={18} className="animate-spin" />
@@ -672,7 +658,7 @@ function DiscoverCard({
   loading: boolean
 }) {
   return (
-    <div className="relative aspect-[2/3] w-full max-w-[312px] flex-1 overflow-hidden rounded-[3px] bg-[#f5f5f5] dark:bg-white/5">
+    <div className="relative aspect-[2/3] w-full min-w-[140px] max-w-[312px] flex-1 basis-40 overflow-hidden rounded-[3px] bg-[#f5f5f5] dark:bg-white/5">
       {result?.kind === 'image' ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -704,11 +690,13 @@ function DiscoverCard({
 function DiscoverView({
   onBack,
   results,
+  expected,
   working,
   composer
 }: {
   onBack: () => void
   results: Array<{ kind: 'image' | 'video'; url: string; prompt: string }>
+  expected: number
   working: boolean
   composer: React.ReactNode
 }) {
@@ -738,14 +726,15 @@ function DiscoverView({
           Mettre à niveau
         </button>
       </div>
-      <div className="px-2.5 pt-4">
+      <div className="px-2 pt-4">
         <div className="flex size-[42px] items-center justify-center rounded-full bg-[#f1f1f1] text-xs text-neutral-600 dark:bg-white/10 dark:text-neutral-300">
           ug
         </div>
       </div>
-      <div className="flex gap-2.5 px-2.5 pt-3">
-        <DiscoverCard result={results[0] ?? null} loading={working} />
-        <DiscoverCard result={results[1] ?? null} loading={working} />
+      <div className="flex flex-wrap gap-2.5 px-2 pt-3">
+        {Array.from({ length: Math.max(1, expected) }).map((_, i) => (
+          <DiscoverCard key={i} result={results[i] ?? null} loading={working} />
+        ))}
       </div>
       <div className="sticky bottom-4 z-10 mx-auto mt-8 w-full max-w-[750px] px-4 pb-2">
         {composer}
@@ -765,6 +754,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   const [expanded, setExpanded] = useState(true)
   const [preview, setPreview] = useState<string | null>(null)
   const [view, setView] = useState<'create' | 'discover'>('create')
+  const [expectedCount, setExpectedCount] = useState(2)
   const [variations, setVariations] = useState(2)
   const [attachment, setAttachment] = useState<StudioAttachment | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -930,6 +920,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     }
     // Swap to the Découvrir view with its loading cards (animated).
     setView('discover')
+    setExpectedCount(count)
     busyRef.current = true
     setGenerating(true)
     setJob(null)
@@ -1132,6 +1123,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           <DiscoverView
             onBack={() => setView('create')}
             results={results}
+            expected={expectedCount}
             working={generating}
             composer={
               <DiscoverComposer

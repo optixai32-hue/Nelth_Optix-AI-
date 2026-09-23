@@ -72,17 +72,38 @@ export async function vibesGenerateImages(input: {
   aspectRatio: ImagineAspectRatio
   variations?: number
 }): Promise<VibesImageResult[]> {
-  const data = await vibesFetch<{ success: boolean; data: VibesImageResult[] }>(
-    '/api/vibes/images/generate',
-    {
-      project_id: VIBES_PROJECT_ID,
-      prompt: input.prompt,
-      aspect_ratio: input.aspectRatio,
-      variations: input.variations ?? 1
-    },
-    55000
+  const count =
+    Number.isInteger(input.variations) &&
+    (input.variations as number) >= 1 &&
+    (input.variations as number) <= 4
+      ? (input.variations as number)
+      : 1
+  const single = () =>
+    vibesFetch<{ success: boolean; data: VibesImageResult[] }>(
+      '/api/vibes/images/generate',
+      {
+        project_id: VIBES_PROJECT_ID,
+        prompt: input.prompt,
+        aspect_ratio: input.aspectRatio,
+        variations: 1
+      },
+      55000
+    )
+  if (count <= 1) {
+    const data = await single()
+    return data.data ?? []
+  }
+  // The backend gateway times out (~40s+) on multi-variation synchronous
+  // calls, so fan out N parallel single-variation calls instead (~13s
+  // each). Partial success is tolerated — show whatever arrived.
+  const settled = await Promise.allSettled(
+    Array.from({ length: count }, () => single())
   )
-  return data.data ?? []
+  const merged = settled.flatMap(s =>
+    s.status === 'fulfilled' ? (s.value.data ?? []) : []
+  )
+  if (merged.length === 0) throw new Error('La génération a échoué.')
+  return merged
 }
 
 export async function vibesGenerateVideo(input: {
