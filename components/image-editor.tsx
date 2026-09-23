@@ -286,11 +286,11 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
   const [capW, capH] =
     nat && nat.naturalWidth && nat.naturalHeight
       ? nat.naturalWidth > nat.naturalHeight
-        ? [1100, 620]
+        ? [1280, 720]
         : nat.naturalWidth < nat.naturalHeight
-          ? [520, 640]
-          : [640, 640]
-      : [1100, 620]
+          ? [600, 750]
+          : [750, 750]
+      : [1280, 720]
 
   if (!mounted) return null
   return createPortal(
@@ -392,7 +392,7 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
             ref={canvasRef}
             style={{
               maxWidth: `min(${capW}px, calc(100vw - 64px))`,
-              maxHeight: `min(${capH}px, calc(100dvh - 260px))`
+              maxHeight: `min(${capH}px, calc(100dvh - 240px))`
             }}
             onPointerDown={e => {
               if (!ready) return
