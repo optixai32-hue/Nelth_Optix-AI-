@@ -32,6 +32,26 @@ export interface ImagineParams {
   resolution: VideoResolution
   duration: VideoDuration
   style: string | null
+  variations: number
+  sourceImageEntId: string | null
+}
+
+export interface StudioAttachment {
+  id: string
+  name: string
+  previewUrl: string
+  status: 'uploading' | 'ready' | 'error'
+  error?: string
+  ent?: { sourceImageEntId: string; mediaEntId: string; imageUrl: string }
+}
+
+export interface ComposerExtras {
+  variations: number
+  setVariations: (n: number) => void
+  variationsLocked: boolean
+  attachmentBar: React.ReactNode
+  onAttach: () => void
+  canSend: boolean
 }
 
 interface ImagineStudioProps {
@@ -152,6 +172,102 @@ function SegmentedControl<T extends string>({
 const ASPECT_RATIOS: AspectRatio[] = ['1:1', '16:9', '9:16']
 const VIDEO_RESOLUTIONS: VideoResolution[] = ['480p', '720p']
 const VIDEO_DURATIONS: VideoDuration[] = ['6s', '10s']
+
+// ---------------------------------------------------------------------------
+// Variations selector (1-4, default 2). Locked to 1 when an image is
+// attached (the request becomes image-to-image / image-to-video).
+// ---------------------------------------------------------------------------
+
+function VariationsSelect({
+  value,
+  onChange,
+  locked
+}: {
+  value: number
+  onChange: (n: number) => void
+  locked: boolean
+}) {
+  return (
+    <div
+      title={locked ? 'Fixé à 1 avec une image' : 'Variations'}
+      className="flex h-[38px] shrink-0 items-center gap-0.5 rounded-[19px] bg-neutral-100 p-1 dark:bg-muted"
+    >
+      {[1, 2, 3, 4].map(n => (
+        <button
+          key={n}
+          type="button"
+          disabled={locked}
+          onClick={() => onChange(n)}
+          aria-pressed={value === n}
+          aria-label={`${n} variation${n > 1 ? 's' : ''}`}
+          className={cn(
+            'flex size-[30px] items-center justify-center rounded-full text-[13px] transition-colors',
+            value === n
+              ? 'bg-white font-semibold text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.10)] dark:bg-background dark:text-foreground'
+              : 'text-neutral-500 dark:text-neutral-400',
+            !locked && value !== n && 'hover:bg-black/5 dark:hover:bg-white/10',
+            locked && 'cursor-not-allowed opacity-60'
+          )}
+        >
+          {n}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Attached source image chip (thumbnail + upload status + remove).
+// ---------------------------------------------------------------------------
+
+function AttachmentBar({
+  attachment,
+  onRemove
+}: {
+  attachment: StudioAttachment | null
+  onRemove: () => void
+}) {
+  if (!attachment) return null
+  return (
+    <div className="flex items-center gap-2 px-[19px] pt-3">
+      <div className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-black/5 bg-neutral-100 dark:border-white/10 dark:bg-white/10">
+        {attachment.previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={attachment.previewUrl}
+            alt=""
+            className="size-full object-cover"
+          />
+        ) : null}
+        {attachment.status === 'uploading' && (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <IconLoader2 size={14} className="animate-spin text-white" />
+          </span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-medium text-[#111] dark:text-foreground">
+          {attachment.name}
+        </p>
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          {attachment.status === 'uploading'
+            ? 'Envoi…'
+            : attachment.status === 'ready'
+              ? 'Prête — variations fixées à 1'
+              : (attachment.error ?? 'Échec de l’envoi.')}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label="Retirer l’image"
+        className="shrink-0 rounded-full p-1.5 text-neutral-500 transition-colors hover:bg-black/5 hover:text-foreground dark:text-neutral-400"
+      >
+        <X size={14} strokeWidth={2} />
+      </button>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Style preset grid (Whisk-style): dense compact cards, image cover,
@@ -378,6 +494,7 @@ interface DiscoverComposerProps {
   setDuration: (d: VideoDuration) => void
   generating: boolean
   onGenerate: () => void
+  extras: ComposerExtras
 }
 
 function DiscoverComposer({
@@ -392,12 +509,14 @@ function DiscoverComposer({
   duration,
   setDuration,
   generating,
-  onGenerate
+  onGenerate,
+  extras
 }: DiscoverComposerProps) {
   const [quality, setQuality] = useState<DiscoverQuality>('Vitesse')
   return (
     <>
       <div className="w-full overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:border-border dark:bg-card">
+        {extras.attachmentBar}
         <textarea
           value={prompt}
           onChange={e => setPrompt(e.target.value)}
@@ -412,7 +531,11 @@ function DiscoverComposer({
           className="min-h-[48px] w-full resize-none bg-transparent px-[19px] pt-[16px] text-[16px] leading-[22px] text-[#111] outline-none placeholder:text-[#707070] dark:text-foreground"
         />
         <div className="no-scrollbar flex flex-nowrap items-center gap-2 overflow-x-auto px-[15px] pt-[6px] pb-[11px] md:flex-wrap md:gap-3 md:overflow-visible md:px-[19px]">
-          <ToolbarIconButton label="Ajouter" className="-ml-2">
+          <ToolbarIconButton
+            label="Ajouter"
+            className="-ml-2"
+            onClick={extras.onAttach}
+          >
             <IconPlus size={20} strokeWidth={2} />
           </ToolbarIconButton>
           {mode === 'image' ? (
@@ -489,6 +612,11 @@ function DiscoverComposer({
             <IconRectangleVertical size={14} />
             {aspectRatio}
           </button>
+          <VariationsSelect
+            value={extras.variationsLocked ? 1 : extras.variations}
+            onChange={extras.setVariations}
+            locked={extras.variationsLocked}
+          />
           <div className="sticky right-0 ml-auto flex shrink-0 items-center gap-1 bg-white pl-1 dark:bg-card">
             <ToolbarIconButton label="Microphone">
               <IconMicrophone size={16} />
@@ -498,7 +626,7 @@ function DiscoverComposer({
               onClick={onGenerate}
               aria-label="Générer"
               title="Générer"
-              disabled={generating}
+              disabled={!extras.canSend}
               className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#8dccf5] text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"
             >
               {generating ? (
@@ -637,6 +765,9 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   const [expanded, setExpanded] = useState(true)
   const [preview, setPreview] = useState<string | null>(null)
   const [view, setView] = useState<'create' | 'discover'>('create')
+  const [variations, setVariations] = useState(2)
+  const [attachment, setAttachment] = useState<StudioAttachment | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [generating, setGenerating] = useState(false)
   const [job, setJob] = useState<
     | { status: 'working'; label: string }
@@ -648,6 +779,16 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   >([])
   const busyRef = useRef(false)
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Effective variations: locked to 1 as soon as a source image is
+  // attached (the request becomes image-to-image / image-to-video).
+  const variationsLocked = attachment?.status === 'ready'
+  const effectiveVariations = variationsLocked ? 1 : variations
+  // Send allowed with prompt text — or empty for auto-animate (attached
+  // image + video mode, motion directive optional).
+  const canSend =
+    !generating &&
+    (prompt.trim().length > 0 || (mode === 'video' && variationsLocked))
 
   // Stop any pending video poll on unmount.
   useEffect(() => {
@@ -666,6 +807,105 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   const withStyle = (text: string, styleOverride: string | null) =>
     styleOverride ? `${text} (${styleOverride} style)` : text
 
+  const MAX_IMAGE_BYTES = 3 * 1024 * 1024
+
+  const handleRemoveAttachment = () => {
+    setAttachment(prev => {
+      if (prev?.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(prev.previewUrl)
+      }
+      return null
+    })
+  }
+
+  const handleAttachFile = async (file: File) => {
+    handleRemoveAttachment()
+    const id =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}`
+    if (!file.type.startsWith('image/')) {
+      setAttachment({
+        id,
+        name: file.name,
+        previewUrl: '',
+        status: 'error',
+        error: 'Image uniquement.'
+      })
+      return
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setAttachment({
+        id,
+        name: file.name,
+        previewUrl: URL.createObjectURL(file),
+        status: 'error',
+        error: 'Image trop lourde (max 3 Mo).'
+      })
+      return
+    }
+    setAttachment({
+      id,
+      name: file.name,
+      previewUrl: URL.createObjectURL(file),
+      status: 'uploading'
+    })
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = typeof reader.result === 'string' ? reader.result : ''
+          const comma = result.indexOf(',')
+          resolve(comma >= 0 ? result.slice(comma + 1) : result)
+        }
+        reader.onerror = () => reject(new Error('Lecture impossible.'))
+        reader.readAsDataURL(file)
+      })
+      const res = await fetch('/api/imagine/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, filename: file.name })
+      })
+      const json = (await res.json().catch(() => null)) as {
+        sourceImageEntId?: string
+        mediaEntId?: string
+        imageUrl?: string
+        error?: string
+      } | null
+      if (
+        !res.ok ||
+        !json?.sourceImageEntId ||
+        !json?.mediaEntId ||
+        !json?.imageUrl
+      ) {
+        throw new Error(json?.error || "L'envoi a échoué.")
+      }
+      setAttachment(prev =>
+        prev && prev.id === id
+          ? {
+              ...prev,
+              status: 'ready',
+              ent: {
+                sourceImageEntId: json.sourceImageEntId!,
+                mediaEntId: json.mediaEntId!,
+                imageUrl: json.imageUrl!
+              }
+            }
+          : prev
+      )
+    } catch (err) {
+      setAttachment(prev =>
+        prev && prev.id === id
+          ? {
+              ...prev,
+              status: 'error',
+              error: err instanceof Error ? err.message : "L'envoi a échoué."
+            }
+          : prev
+      )
+    }
+  }
+
   const runGeneration = async (params: {
     mode: StudioMode
     prompt: string
@@ -674,10 +914,18 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     style: string | null
   }) => {
     const text = params.prompt.trim()
-    if (!text || busyRef.current) return
+    const ent = attachment?.status === 'ready' ? attachment.ent! : null
+    const count = ent ? 1 : variations
+    if ((!text && !(ent && params.mode === 'video')) || busyRef.current) return
     // External handler (embedding) takes over entirely when provided.
     if (onGenerate) {
-      onGenerate({ ...params, prompt: text, duration })
+      onGenerate({
+        ...params,
+        prompt: text,
+        duration,
+        variations: count,
+        sourceImageEntId: ent?.sourceImageEntId ?? null
+      })
       return
     }
     // Swap to the Découvrir view with its loading cards (animated).
@@ -687,14 +935,70 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     setJob(null)
     try {
       const fullPrompt = withStyle(text, params.style)
-      if (params.mode === 'image') {
+      // Attached source image → image-to-image edit (auto-enhanced
+      // server-side) or image-to-video animate. Variations locked to 1.
+      if (ent && params.mode === 'image') {
+        setJob({ status: 'working', label: 'Édition de l’image…' })
+        const res = await fetch('/api/imagine/images/edit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sourceImageEntId: ent.sourceImageEntId,
+            editPrompt: fullPrompt
+          })
+        })
+        const json = (await res.json().catch(() => null)) as {
+          contentItem?: { imageUrl: string }
+          usedPrompt?: string
+          error?: string
+        } | null
+        if (!res.ok || !json?.contentItem?.imageUrl) {
+          throw new Error(json?.error || "L'édition a échoué.")
+        }
+        setResults(prev => [
+          {
+            kind: 'image' as const,
+            url: json.contentItem!.imageUrl,
+            prompt: json.usedPrompt || text
+          },
+          ...prev
+        ])
+        setJob(null)
+        return
+      }
+      // Batch starter (text-to-x or animate): returns a batchId, then poll.
+      let batchId: string
+      if (ent) {
+        setJob({ status: 'working', label: 'Animation de l’image…' })
+        const res = await fetch('/api/imagine/videos/animate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: {
+              id: ent.mediaEntId,
+              imageUrl: ent.imageUrl,
+              mediaEntId: ent.mediaEntId
+            },
+            ...(text ? { motion: fullPrompt } : {})
+          })
+        })
+        const json = (await res.json().catch(() => null)) as {
+          batchId?: string
+          error?: string
+        } | null
+        if (!res.ok || !json?.batchId) {
+          throw new Error(json?.error || "L'animation a échoué.")
+        }
+        batchId = json.batchId
+      } else if (params.mode === 'image') {
         setJob({ status: 'working', label: 'Génération de l’image…' })
         const res = await fetch('/api/imagine/images', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: fullPrompt,
-            aspectRatio: params.aspectRatio
+            aspectRatio: params.aspectRatio,
+            variations: count
           })
         })
         const json = (await res.json().catch(() => null)) as {
@@ -713,6 +1017,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           ...prev
         ])
         setJob(null)
+        return
       } else {
         setJob({ status: 'working', label: 'Démarrage de la vidéo…' })
         const res = await fetch('/api/imagine/videos', {
@@ -721,7 +1026,8 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           body: JSON.stringify({
             prompt: fullPrompt,
             aspectRatio: params.aspectRatio,
-            resolution: params.resolution
+            resolution: params.resolution,
+            variations: count
           })
         })
         const json = (await res.json().catch(() => null)) as {
@@ -731,8 +1037,10 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
         if (!res.ok || !json?.batchId) {
           throw new Error(json?.error || 'La génération a échoué.')
         }
-        const batchId = json.batchId
-        // Poll every 5s (backend timeout=5s) until a videoUrl lands.
+        batchId = json.batchId
+      }
+      {
+        // Poll every 5s (backend timeout=5s) until enough videoUrls land.
         let attempt = 0
         const poll = async (): Promise<void> => {
           attempt += 1
@@ -748,6 +1056,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           })
           const pollJson = (await pollRes.json().catch(() => null)) as {
             batch?: {
+              isComplete?: boolean
               content?: Array<{ videoUrl?: string | null }>
             }
             error?: string
@@ -755,12 +1064,21 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           if (!pollRes.ok || !pollJson?.batch) {
             throw new Error(pollJson?.error || 'Le suivi a échoué.')
           }
-          const videoUrl = pollJson.batch.content?.find(
-            c => typeof c.videoUrl === 'string' && c.videoUrl.length > 0
-          )?.videoUrl as string | undefined
-          if (videoUrl) {
+          const urls = [
+            ...new Set(
+              (pollJson.batch.content ?? []).flatMap(c =>
+                typeof c.videoUrl === 'string' && c.videoUrl.length > 0
+                  ? [c.videoUrl]
+                  : []
+              )
+            )
+          ]
+          if (urls.length >= count || pollJson.batch.isComplete) {
+            if (urls.length === 0) throw new Error('Aucune vidéo générée.')
             setResults(prev => [
-              { kind: 'video' as const, url: videoUrl, prompt: text },
+              ...urls
+                .slice(0, count)
+                .map(url => ({ kind: 'video' as const, url, prompt: text })),
               ...prev
             ])
             setJob(null)
@@ -793,6 +1111,20 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
     void runGeneration({ mode, prompt, aspectRatio, resolution, style })
   }
 
+  const extras: ComposerExtras = {
+    variations,
+    setVariations,
+    variationsLocked,
+    attachmentBar: (
+      <AttachmentBar
+        attachment={attachment}
+        onRemove={handleRemoveAttachment}
+      />
+    ),
+    onAttach: () => fileInputRef.current?.click(),
+    canSend
+  }
+
   return (
     <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-y-auto bg-[#faf9f7] [font-family:Arial,sans-serif] dark:bg-background">
       <div key={view} className="discover-view flex min-h-full w-full flex-col">
@@ -815,6 +1147,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                 setDuration={setDuration}
                 generating={generating}
                 onGenerate={handleGenerate}
+                extras={extras}
               />
             }
           />
@@ -826,6 +1159,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
 
             {/* Prompt composer */}
             <div className="mt-[34px] w-full overflow-hidden rounded-[22px] border border-[#e3e3e3] bg-white dark:border-border dark:bg-card">
+              {extras.attachmentBar}
               <textarea
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
@@ -845,7 +1179,11 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
               row on desktop per the reference layout. */}
               <div className="no-scrollbar flex flex-nowrap items-center gap-2 overflow-x-auto px-[15px] pt-[6px] pb-[11px] md:flex-wrap md:gap-3 md:overflow-visible md:px-[19px]">
                 {/* Plus */}
-                <ToolbarIconButton label="Ajouter" className="-ml-2">
+                <ToolbarIconButton
+                  label="Ajouter"
+                  className="-ml-2"
+                  onClick={extras.onAttach}
+                >
                   <IconPlus size={20} strokeWidth={2} />
                 </ToolbarIconButton>
 
@@ -931,6 +1269,11 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                   <IconRectangleVertical size={14} />
                   {aspectRatio}
                 </button>
+                <VariationsSelect
+                  value={extras.variationsLocked ? 1 : extras.variations}
+                  onChange={extras.setVariations}
+                  locked={extras.variationsLocked}
+                />
 
                 {/* Generate, pinned right (stays visible while the
                 toolbar row scrolls on mobile) */}
@@ -940,7 +1283,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                     onClick={handleGenerate}
                     aria-label="Générer"
                     title="Générer"
-                    disabled={generating}
+                    disabled={!extras.canSend}
                     className="flex size-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-black"
                   >
                     {generating ? (
@@ -1054,6 +1397,19 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                 onToggle={() => setExpanded(prev => !prev)}
               />
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              aria-hidden
+              tabIndex={-1}
+              onChange={e => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) void handleAttachFile(file)
+              }}
+            />
             {preview && (
               <StylePreviewCard
                 label={preview}

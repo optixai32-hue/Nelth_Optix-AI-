@@ -10,12 +10,20 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as {
     prompt?: unknown
     aspectRatio?: unknown
+    variations?: unknown
   } | null
 
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
   const aspectRatio = RATIOS.includes(body?.aspectRatio as (typeof RATIOS)[number])
     ? (body?.aspectRatio as (typeof RATIOS)[number])
     : '1:1'
+  const variations =
+    typeof body?.variations === 'number' &&
+    Number.isInteger(body.variations) &&
+    body.variations >= 1 &&
+    body.variations <= 4
+      ? body.variations
+      : 1
 
   if (!prompt) {
     return NextResponse.json({ error: 'Prompt requis.' }, { status: 400 })
@@ -25,7 +33,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const data = await vibesGenerateImages({ prompt, aspectRatio })
+    const data = await vibesGenerateImages({ prompt, aspectRatio, variations })
     return NextResponse.json({ success: true, data })
   } catch (err) {
     console.error('[imagine] images/generate failed:', err)

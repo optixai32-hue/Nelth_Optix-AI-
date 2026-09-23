@@ -12,6 +12,7 @@ export async function POST(req: Request) {
     prompt?: unknown
     aspectRatio?: unknown
     resolution?: unknown
+    variations?: unknown
   } | null
 
   const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
@@ -23,6 +24,13 @@ export async function POST(req: Request) {
   )
     ? (body?.resolution as (typeof RESOLUTIONS)[number])
     : '480p'
+  const variations =
+    typeof body?.variations === 'number' &&
+    Number.isInteger(body.variations) &&
+    body.variations >= 1 &&
+    body.variations <= 4
+      ? body.variations
+      : 1
 
   if (!prompt) {
     return NextResponse.json({ error: 'Prompt requis.' }, { status: 400 })
@@ -35,7 +43,8 @@ export async function POST(req: Request) {
     const { batchId } = await vibesGenerateVideo({
       prompt,
       aspectRatio,
-      resolution
+      resolution,
+      variations
     })
     return NextResponse.json({ success: true, batchId })
   } catch (err) {

@@ -70,6 +70,7 @@ async function vibesFetch<T>(
 export async function vibesGenerateImages(input: {
   prompt: string
   aspectRatio: ImagineAspectRatio
+  variations?: number
 }): Promise<VibesImageResult[]> {
   const data = await vibesFetch<{ success: boolean; data: VibesImageResult[] }>(
     '/api/vibes/images/generate',
@@ -77,7 +78,7 @@ export async function vibesGenerateImages(input: {
       project_id: VIBES_PROJECT_ID,
       prompt: input.prompt,
       aspect_ratio: input.aspectRatio,
-      variations: 1
+      variations: input.variations ?? 1
     },
     55000
   )
@@ -88,6 +89,7 @@ export async function vibesGenerateVideo(input: {
   prompt: string
   aspectRatio: ImagineAspectRatio
   resolution: ImagineResolution
+  variations?: number
 }): Promise<{ batchId: string }> {
   const data = await vibesFetch<{ success: boolean; batchId: string }>(
     '/api/vibes/videos/generate',
@@ -96,13 +98,126 @@ export async function vibesGenerateVideo(input: {
       prompt: input.prompt,
       aspect_ratio: input.aspectRatio,
       resolution: input.resolution,
-      variations: 1,
+      variations: input.variations ?? 1,
       poll: false
     },
     30000
   )
   if (!data.batchId) throw new Error('No batchId returned')
   return { batchId: data.batchId }
+}
+
+export interface VibesUploadResult {
+  mediaEntId: string
+  sourceImageEntId: string
+  imageUrl: string
+}
+
+export async function vibesUploadImage(input: {
+  base64: string
+  filename?: string
+}): Promise<VibesUploadResult> {
+  const data = await vibesFetch<{
+    mediaEntId: string
+    sourceImageEntId: string
+    imageUrl: string
+  }>(
+    '/api/vibes/upload/media',
+    {
+      image_base64: input.base64,
+      filename: input.filename ?? 'upload.png'
+    },
+    60000
+  )
+  if (!data.sourceImageEntId) throw new Error('Upload sans identifiant.')
+  return {
+    mediaEntId: data.mediaEntId,
+    sourceImageEntId: data.sourceImageEntId,
+    imageUrl: data.imageUrl
+  }
+}
+
+/** NVIDIA Nemotron enhancement with fallback to the original prompt. */
+export async function vibesEnhancePrompt(
+  prompt: string
+): Promise<{ prompt: string; fallback: boolean }> {
+  try {
+    const data = await vibesFetch<{ enhanced_prompt?: string }>(
+      '/api/prompts/enhance',
+      { prompt },
+      25000
+    )
+    const enhanced =
+      typeof data.enhanced_prompt === 'string'
+        ? data.enhanced_prompt.trim()
+        : ''
+    if (!enhanced) return { prompt, fallback: true }
+    return { prompt: enhanced, fallback: false }
+  } catch {
+    return { prompt, fallback: true }
+  }
+}
+
+export interface VibesEditResult {
+  contentItem: { imageUrl: string; [k: string]: unknown }
+  usedPrompt: string
+  fallback: boolean
+}
+
+export async function vibesEditImage(input: {
+  sourceImageEntId: string
+  editPrompt: string
+  allMediaEntIds?: string[]
+}): Promise<VibesEditResult> {
+  // Auto-enhance first (dashboard behavior), fallback to the raw prompt.
+  const { prompt: enhanced, fallback } = await vibesEnhancePrompt(
+    input.editPrompt
+  )
+  const data = await vibesFetch<{
+    success: boolean
+    contentItem?: { imageUrl: string }
+  }>(
+    '/api/vibes/images/edit',
+    {
+      source_image_ent_id: input.sourceImageEntId,
+      edit_prompt: enhanced,
+      project_id: VIBES_PROJECT_ID,
+      ...(input.allMediaEntIds?.length
+        ? { all_media_ent_ids: input.allMediaEntIds }
+        : {})
+    },
+    55000
+  )
+  if (!data.contentItem?.imageUrl) throw new Error('Édition sans image.')
+  return { contentItem: data.contentItem, usedPrompt: enhanced, fallback }
+}
+
+export async function vibesAnimateVideo(input: {
+  source: { id: string; imageUrl: string; mediaEntId: string; prompt?: string }
+  motion?: string
+}): Promise<{ batchId: string }> {
+  const data = await vibesFetch<{
+    batchId?: string
+    batch?: { id?: string }
+    id?: string
+  }>(
+    '/api/vibes/videos/animate',
+    {
+      project_id: VIBES_PROJECT_ID,
+      source_image: {
+        id: input.source.id,
+        imageUrl: input.source.imageUrl,
+        mediaEntId: input.source.mediaEntId,
+        prompt: input.source.prompt ?? 'Uploaded image'
+      },
+      ...(input.motion ? { prompt: input.motion } : {}),
+      poll: false
+    },
+    30000
+  )
+  const batchId = data.batchId || data.batch?.id || data.id
+  if (!batchId) throw new Error('No batchId returned')
+  return { batchId }
 }
 
 export async function vibesPollBatch(batchId: string): Promise<VibesBatch> {
