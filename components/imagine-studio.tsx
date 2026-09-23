@@ -3,12 +3,16 @@
 import { useEffect, useRef, useState } from 'react'
 
 import {
+  IconArrowLeft,
+  IconBolt,
   IconExternalLink,
   IconLayoutGrid,
   IconLoader2,
+  IconMicrophone,
   IconPhoto,
   IconPlus,
   IconRectangleVertical,
+  IconSparkles,
   IconVideo,
   IconVolumeOff
 } from '@tabler/icons-react'
@@ -114,8 +118,7 @@ function SegmentedControl<T extends string>({
     <div className="flex h-[38px] shrink-0 items-center gap-1 rounded-[20px] bg-neutral-100 p-1 dark:bg-muted">
       {options.map(option => {
         const isActive = option === value
-        const isDisabled =
-          disabledValues.includes(option) && !isActive
+        const isDisabled = disabledValues.includes(option) && !isActive
         return (
           <button
             key={option}
@@ -192,8 +195,6 @@ const STYLE_PRESETS = [
   'Pop-up',
   'Bronze'
 ]
-
-
 
 function StylePresetGrid({
   active,
@@ -356,16 +357,286 @@ function StylePreviewCard({
   )
 }
 
+// ---------------------------------------------------------------------------
+// Découvrir composer — matches the Découvrir reference twin of the studio
+// toolbar: quality pills (Vitesse / Qualité 2.0), mic, pastel-blue CTA.
+// ---------------------------------------------------------------------------
+
+type DiscoverQuality = 'Vitesse' | 'Qualité 2.0'
+const DISCOVER_QUALITIES: DiscoverQuality[] = ['Vitesse', 'Qualité 2.0']
+
+interface DiscoverComposerProps {
+  prompt: string
+  setPrompt: (v: string) => void
+  mode: StudioMode
+  setMode: (m: StudioMode) => void
+  aspectRatio: AspectRatio
+  cycleAspectRatio: () => void
+  resolution: VideoResolution
+  setResolution: (r: VideoResolution) => void
+  duration: VideoDuration
+  setDuration: (d: VideoDuration) => void
+  generating: boolean
+  onGenerate: () => void
+}
+
+function DiscoverComposer({
+  prompt,
+  setPrompt,
+  mode,
+  setMode,
+  aspectRatio,
+  cycleAspectRatio,
+  resolution,
+  setResolution,
+  duration,
+  setDuration,
+  generating,
+  onGenerate
+}: DiscoverComposerProps) {
+  const [quality, setQuality] = useState<DiscoverQuality>('Vitesse')
+  return (
+    <>
+      <div className="w-full overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:border-border dark:bg-card">
+        <textarea
+          value={prompt}
+          onChange={e => setPrompt(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              onGenerate()
+            }
+          }}
+          placeholder="Décrivez ce que vous imaginez"
+          rows={1}
+          className="min-h-[48px] w-full resize-none bg-transparent px-[19px] pt-[16px] text-[16px] leading-[22px] text-[#111] outline-none placeholder:text-[#707070] dark:text-foreground"
+        />
+        <div className="no-scrollbar flex flex-nowrap items-center gap-2 overflow-x-auto px-[15px] pt-[6px] pb-[11px] md:flex-wrap md:gap-3 md:overflow-visible md:px-[19px]">
+          <ToolbarIconButton label="Ajouter" className="-ml-2">
+            <IconPlus size={20} strokeWidth={2} />
+          </ToolbarIconButton>
+          {mode === 'image' ? (
+            <>
+              <ModeCapsule
+                active
+                label="Image"
+                icon={<IconPhoto size={15} />}
+              />
+              <ToolbarIconButton
+                label="Mode vidéo"
+                onClick={() => setMode('video')}
+              >
+                <IconVideo size={20} />
+              </ToolbarIconButton>
+              <ToolbarIconButton label="Médias">
+                <IconLayoutGrid size={19} />
+              </ToolbarIconButton>
+              <SegmentedControl
+                options={DISCOVER_QUALITIES}
+                value={quality}
+                onChange={setQuality}
+              />
+            </>
+          ) : (
+            <>
+              <ToolbarIconButton
+                label="Mode image"
+                onClick={() => setMode('image')}
+              >
+                <IconPhoto size={20} />
+              </ToolbarIconButton>
+              <ModeCapsule
+                active
+                wide
+                label="Vidéo"
+                icon={
+                  <IconVideo
+                    size={16}
+                    className="text-black dark:text-foreground"
+                  />
+                }
+              />
+              <ToolbarIconButton label="Médias">
+                <IconLayoutGrid size={19} />
+              </ToolbarIconButton>
+              <div className="hidden md:contents">
+                <SegmentedControl
+                  options={VIDEO_RESOLUTIONS}
+                  value={resolution}
+                  onChange={setResolution}
+                />
+              </div>
+              <div className="hidden md:contents">
+                <SegmentedControl
+                  options={VIDEO_DURATIONS}
+                  value={duration}
+                  onChange={setDuration}
+                  disabledValues={['10s']}
+                  disabledHint="Bientôt disponible"
+                />
+              </div>
+              <ToolbarIconButton label="Audio (bientôt disponible)">
+                <IconVolumeOff size={18} />
+              </ToolbarIconButton>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={cycleAspectRatio}
+            title="Format d'image"
+            className="flex h-[39px] w-[63px] shrink-0 items-center justify-center gap-1.5 rounded-[20px] bg-neutral-100 text-[14px] text-[#111] transition-colors hover:bg-neutral-200/70 dark:bg-muted dark:text-foreground dark:hover:bg-white/10"
+          >
+            <IconRectangleVertical size={14} />
+            {aspectRatio}
+          </button>
+          <div className="sticky right-0 ml-auto flex shrink-0 items-center gap-1 bg-white pl-1 dark:bg-card">
+            <ToolbarIconButton label="Microphone">
+              <IconMicrophone size={16} />
+            </ToolbarIconButton>
+            <button
+              type="button"
+              onClick={onGenerate}
+              aria-label="Générer"
+              title="Générer"
+              disabled={generating}
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#8dccf5] text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"
+            >
+              {generating ? (
+                <IconLoader2 size={18} className="animate-spin" />
+              ) : (
+                <ArrowUp size={18} strokeWidth={2.5} />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+      {mode === 'video' && (
+        <div className="mt-3 flex w-full flex-wrap items-center justify-center gap-2 md:hidden">
+          <SegmentedControl
+            options={VIDEO_RESOLUTIONS}
+            value={resolution}
+            onChange={setResolution}
+          />
+          <SegmentedControl
+            options={VIDEO_DURATIONS}
+            value={duration}
+            onChange={setDuration}
+            disabledValues={['10s']}
+            disabledHint="Bientôt disponible"
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Découvrir view: back nav + upgrade pill, user badge, two 2:3 cards
+// (loading grain → results), floating composer. Shown with animation
+// right when the user sends a prompt.
+// ---------------------------------------------------------------------------
+
+function DiscoverCard({
+  result,
+  loading
+}: {
+  result?: { kind: 'image' | 'video'; url: string } | null
+  loading: boolean
+}) {
+  return (
+    <div className="relative aspect-[2/3] w-full max-w-[312px] flex-1 overflow-hidden rounded-[3px] bg-[#f5f5f5] dark:bg-white/5">
+      {result?.kind === 'image' ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={result.url}
+          alt=""
+          draggable={false}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : result?.kind === 'video' ? (
+        <video
+          src={result.url}
+          controls
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div
+          className={cn(
+            'noise-placeholder absolute inset-0',
+            loading && 'animate-pulse'
+          )}
+        />
+      )}
+    </div>
+  )
+}
+
+function DiscoverView({
+  onBack,
+  results,
+  working,
+  composer
+}: {
+  onBack: () => void
+  results: Array<{ kind: 'image' | 'video'; url: string; prompt: string }>
+  working: boolean
+  composer: React.ReactNode
+}) {
+  return (
+    <div className="flex min-h-full w-full flex-col bg-[#fafafa] [font-family:Arial,sans-serif] dark:bg-background">
+      <div className="flex items-center justify-between px-3 pt-3 md:px-6 md:pt-5">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Retour"
+            title="Retour"
+            className="flex size-10 items-center justify-center rounded-full bg-[#f1f1f1] text-black transition-transform hover:scale-105 active:scale-95 dark:bg-white/10 dark:text-foreground"
+          >
+            <IconArrowLeft size={18} />
+          </button>
+          <span className="text-[16px] font-medium text-[#171717] dark:text-foreground">
+            Découvrir
+          </span>
+        </div>
+        <button
+          type="button"
+          title="Bientôt disponible"
+          className="flex h-[36px] items-center gap-1.5 rounded-full bg-[#D9E7FF] px-4 text-[13px] font-medium text-[#5D769C] transition hover:brightness-[0.97] dark:bg-[#D9E7FF]/15 dark:text-[#9db4d4]"
+        >
+          <IconSparkles size={15} />
+          Mettre à niveau
+        </button>
+      </div>
+      <div className="px-2.5 pt-4">
+        <div className="flex size-[42px] items-center justify-center rounded-full bg-[#f1f1f1] text-xs text-neutral-600 dark:bg-white/10 dark:text-neutral-300">
+          ug
+        </div>
+      </div>
+      <div className="flex gap-2.5 px-2.5 pt-3">
+        <DiscoverCard result={results[0] ?? null} loading={working} />
+        <DiscoverCard result={results[1] ?? null} loading={working} />
+      </div>
+      <div className="sticky bottom-4 z-10 mx-auto mt-8 w-full max-w-[750px] px-4 pb-2">
+        {composer}
+      </div>
+      <div className="pb-4" />
+    </div>
+  )
+}
+
 export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
   const [mode, setMode] = useState<StudioMode>('image')
   const [prompt, setPrompt] = useState('')
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1')
-  const [resolution, setResolution] =
-    useState<VideoResolution>('480p')
+  const [resolution, setResolution] = useState<VideoResolution>('480p')
   const [duration, setDuration] = useState<VideoDuration>('6s')
   const [style, setStyle] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(true)
   const [preview, setPreview] = useState<string | null>(null)
+  const [view, setView] = useState<'create' | 'discover'>('create')
   const [generating, setGenerating] = useState(false)
   const [job, setJob] = useState<
     | { status: 'working'; label: string }
@@ -387,7 +658,8 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
 
   const cycleAspectRatio = () => {
     setAspectRatio(
-      prev => ASPECT_RATIOS[(ASPECT_RATIOS.indexOf(prev) + 1) % ASPECT_RATIOS.length]
+      prev =>
+        ASPECT_RATIOS[(ASPECT_RATIOS.indexOf(prev) + 1) % ASPECT_RATIOS.length]
     )
   }
 
@@ -408,6 +680,8 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
       onGenerate({ ...params, prompt: text, duration })
       return
     }
+    // Swap to the Découvrir view with its loading cards (animated).
+    setView('discover')
     busyRef.current = true
     setGenerating(true)
     setJob(null)
@@ -431,7 +705,11 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
           throw new Error(json?.error || 'La génération a échoué.')
         }
         setResults(prev => [
-          ...json.data!.map(d => ({ kind: 'image' as const, url: d.url, prompt: text })),
+          ...json.data!.map(d => ({
+            kind: 'image' as const,
+            url: d.url,
+            prompt: text
+          })),
           ...prev
         ])
         setJob(null)
@@ -517,261 +795,287 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-y-auto bg-[#faf9f7] [font-family:Arial,sans-serif] dark:bg-background">
-      <div className="mx-auto flex w-full max-w-[752px] flex-col items-center px-4 pt-20 pb-16 md:pt-[100px]">
-        <h1 className="imagine-title-shine text-center text-[25px] font-bold leading-[31px] md:text-[26px]">
-          Que voulez-vous créer aujourd&apos;hui ?
-        </h1>
-
-        {/* Prompt composer */}
-        <div className="mt-[34px] w-full overflow-hidden rounded-[22px] border border-[#e3e3e3] bg-white dark:border-border dark:bg-card">
-          <textarea
-            value={prompt}
-            onChange={e => setPrompt(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleGenerate()
-              }
-            }}
-            placeholder="Décrivez ce que vous imaginez"
-            rows={1}
-            className="min-h-[48px] w-full resize-none bg-transparent px-[19px] pt-[16px] text-[16px] leading-[22px] text-[#111] outline-none placeholder:text-[#707070] dark:text-foreground"
+      <div key={view} className="discover-view flex min-h-full w-full flex-col">
+        {view === 'discover' ? (
+          <DiscoverView
+            onBack={() => setView('create')}
+            results={results}
+            working={generating}
+            composer={
+              <DiscoverComposer
+                prompt={prompt}
+                setPrompt={setPrompt}
+                mode={mode}
+                setMode={setMode}
+                aspectRatio={aspectRatio}
+                cycleAspectRatio={cycleAspectRatio}
+                resolution={resolution}
+                setResolution={setResolution}
+                duration={duration}
+                setDuration={setDuration}
+                generating={generating}
+                onGenerate={handleGenerate}
+              />
+            }
           />
+        ) : (
+          <div className="mx-auto flex w-full max-w-[752px] flex-col items-center px-4 pt-20 pb-16 md:pt-[100px]">
+            <h1 className="imagine-title-shine text-center text-[25px] font-bold leading-[31px] md:text-[26px]">
+              Que voulez-vous créer aujourd&apos;hui ?
+            </h1>
 
-          {/* Bottom toolbar — same composer, controls swap per mode.
+            {/* Prompt composer */}
+            <div className="mt-[34px] w-full overflow-hidden rounded-[22px] border border-[#e3e3e3] bg-white dark:border-border dark:bg-card">
+              <textarea
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleGenerate()
+                  }
+                }}
+                placeholder="Décrivez ce que vous imaginez"
+                rows={1}
+                className="min-h-[48px] w-full resize-none bg-transparent px-[19px] pt-[16px] text-[16px] leading-[22px] text-[#111] outline-none placeholder:text-[#707070] dark:text-foreground"
+              />
+
+              {/* Bottom toolbar — same composer, controls swap per mode.
               Single scrollable row on mobile (compact, app-like), wrapping
               row on desktop per the reference layout. */}
-          <div className="no-scrollbar flex flex-nowrap items-center gap-2 overflow-x-auto px-[15px] pt-[6px] pb-[11px] md:flex-wrap md:gap-3 md:overflow-visible md:px-[19px]">
-            {/* Plus */}
-            <ToolbarIconButton
-              label="Ajouter"
-              className="-ml-2"
-            >
-              <IconPlus size={20} strokeWidth={2} />
-            </ToolbarIconButton>
+              <div className="no-scrollbar flex flex-nowrap items-center gap-2 overflow-x-auto px-[15px] pt-[6px] pb-[11px] md:flex-wrap md:gap-3 md:overflow-visible md:px-[19px]">
+                {/* Plus */}
+                <ToolbarIconButton label="Ajouter" className="-ml-2">
+                  <IconPlus size={20} strokeWidth={2} />
+                </ToolbarIconButton>
 
-            {mode === 'image' ? (
-              <>
-                {/* Active Image mode */}
-                <ModeCapsule
-                  active
-                  label="Image"
-                  icon={<IconPhoto size={15} />}
-                />
-                {/* Switch to video mode */}
-                <ToolbarIconButton
-                  label="Mode vidéo"
-                  onClick={() => setMode('video')}
-                >
-                  <IconVideo size={20} />
-                </ToolbarIconButton>
-                {/* Secondary media control */}
-                <ToolbarIconButton label="Médias">
-                  <IconLayoutGrid size={19} />
-                </ToolbarIconButton>
-              </>
-            ) : (
-              <>
-                {/* Back to image mode (icon only) */}
-                <ToolbarIconButton
-                  label="Mode image"
-                  onClick={() => setMode('image')}
-                >
-                  <IconPhoto size={20} />
-                </ToolbarIconButton>
-                {/* Active Video mode */}
-                <ModeCapsule
-                  active
-                  wide
-                  label="Vidéo"
-                  icon={<IconVideo size={16} className="text-black dark:text-foreground" />}
-                />
-                {/* Secondary media control */}
-                <ToolbarIconButton label="Médias">
-                  <IconLayoutGrid size={19} />
-                </ToolbarIconButton>
-                {/* Resolution selector — desktop: in toolbar /
-                    mobile: below the composer (see below) */}
-                <div className="hidden md:contents">
-                  <SegmentedControl
-                    options={VIDEO_RESOLUTIONS}
-                    value={resolution}
-                    onChange={setResolution}
-                  />
-                </div>
-                {/* Duration selector (10s coming soon) — desktop: in
-                    toolbar / mobile: below the composer (see below) */}
-                <div className="hidden md:contents">
-                  <SegmentedControl
-                    options={VIDEO_DURATIONS}
-                    value={duration}
-                    onChange={setDuration}
-                    disabledValues={['10s']}
-                    disabledHint="Bientôt disponible"
-                  />
-                </div>
-                {/* Sound (audio coming soon — stays disabled) */}
-                <ToolbarIconButton
-                  label="Audio (bientôt disponible)"
-                >
-                  <IconVolumeOff size={18} />
-                </ToolbarIconButton>
-              </>
-            )}
-
-            {/* Aspect ratio (click cycles 1:1 → 16:9 → 9:16) */}
-            <button
-              type="button"
-              onClick={cycleAspectRatio}
-              title="Format d'image"
-              className="flex h-[39px] w-[63px] shrink-0 items-center justify-center gap-1.5 rounded-[20px] bg-neutral-100 text-[14px] text-[#111] transition-colors hover:bg-neutral-200/70 dark:bg-muted dark:text-foreground dark:hover:bg-white/10"
-            >
-              <IconRectangleVertical size={14} />
-              {aspectRatio}
-            </button>
-
-            {/* Generate, pinned right (stays visible while the
-                toolbar row scrolls on mobile) */}
-            <div className="sticky right-0 ml-auto flex shrink-0 items-center gap-1 bg-white pl-1 dark:bg-card">
-              <button
-                type="button"
-                onClick={handleGenerate}
-                aria-label="Générer"
-                title="Générer"
-                disabled={generating}
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-black"
-              >
-                {generating ? (
-                  <IconLoader2 size={18} className="animate-spin" />
+                {mode === 'image' ? (
+                  <>
+                    {/* Active Image mode */}
+                    <ModeCapsule
+                      active
+                      label="Image"
+                      icon={<IconPhoto size={15} />}
+                    />
+                    {/* Switch to video mode */}
+                    <ToolbarIconButton
+                      label="Mode vidéo"
+                      onClick={() => setMode('video')}
+                    >
+                      <IconVideo size={20} />
+                    </ToolbarIconButton>
+                    {/* Secondary media control */}
+                    <ToolbarIconButton label="Médias">
+                      <IconLayoutGrid size={19} />
+                    </ToolbarIconButton>
+                  </>
                 ) : (
-                  <ArrowUp size={18} strokeWidth={2.5} />
+                  <>
+                    {/* Back to image mode (icon only) */}
+                    <ToolbarIconButton
+                      label="Mode image"
+                      onClick={() => setMode('image')}
+                    >
+                      <IconPhoto size={20} />
+                    </ToolbarIconButton>
+                    {/* Active Video mode */}
+                    <ModeCapsule
+                      active
+                      wide
+                      label="Vidéo"
+                      icon={
+                        <IconVideo
+                          size={16}
+                          className="text-black dark:text-foreground"
+                        />
+                      }
+                    />
+                    {/* Secondary media control */}
+                    <ToolbarIconButton label="Médias">
+                      <IconLayoutGrid size={19} />
+                    </ToolbarIconButton>
+                    {/* Resolution selector — desktop: in toolbar /
+                    mobile: below the composer (see below) */}
+                    <div className="hidden md:contents">
+                      <SegmentedControl
+                        options={VIDEO_RESOLUTIONS}
+                        value={resolution}
+                        onChange={setResolution}
+                      />
+                    </div>
+                    {/* Duration selector (10s coming soon) — desktop: in
+                    toolbar / mobile: below the composer (see below) */}
+                    <div className="hidden md:contents">
+                      <SegmentedControl
+                        options={VIDEO_DURATIONS}
+                        value={duration}
+                        onChange={setDuration}
+                        disabledValues={['10s']}
+                        disabledHint="Bientôt disponible"
+                      />
+                    </div>
+                    {/* Sound (audio coming soon — stays disabled) */}
+                    <ToolbarIconButton label="Audio (bientôt disponible)">
+                      <IconVolumeOff size={18} />
+                    </ToolbarIconButton>
+                  </>
                 )}
-              </button>
-            </div>
-          </div>
-        </div>
 
-        {/* Video settings below the composer — mobile only
-            (desktop keeps them inside the toolbar) */}
-        {mode === 'video' && (
-          <div className="mt-3 flex w-full flex-wrap items-center justify-center gap-2 md:hidden">
-            <SegmentedControl
-              options={VIDEO_RESOLUTIONS}
-              value={resolution}
-              onChange={setResolution}
-            />
-            <SegmentedControl
-              options={VIDEO_DURATIONS}
-              value={duration}
-              onChange={setDuration}
-              disabledValues={['10s']}
-              disabledHint="Bientôt disponible"
-            />
-          </div>
-        )}
-
-        {/* Generation status + results */}
-        {(job || results.length > 0) && (
-          <div className="mt-6 w-full">
-            {job?.status === 'working' && (
-              <div className="mb-3 flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
-                <IconLoader2 size={16} className="animate-spin" />
-                {job.label}
-              </div>
-            )}
-            {job?.status === 'error' && (
-              <div className="mb-3 flex items-center gap-2">
-                <p className="flex-1 text-sm text-red-600 dark:text-red-400">
-                  {job.message}
-                </p>
+                {/* Aspect ratio (click cycles 1:1 → 16:9 → 9:16) */}
                 <button
                   type="button"
-                  onClick={handleGenerate}
-                  className="shrink-0 rounded-full border border-black/10 px-3 py-1.5 text-[13px] font-medium text-[#111] transition-colors hover:bg-black/5 dark:border-white/15 dark:text-foreground dark:hover:bg-white/10"
+                  onClick={cycleAspectRatio}
+                  title="Format d'image"
+                  className="flex h-[39px] w-[63px] shrink-0 items-center justify-center gap-1.5 rounded-[20px] bg-neutral-100 text-[14px] text-[#111] transition-colors hover:bg-neutral-200/70 dark:bg-muted dark:text-foreground dark:hover:bg-white/10"
                 >
-                  Réessayer
+                  <IconRectangleVertical size={14} />
+                  {aspectRatio}
                 </button>
-              </div>
-            )}
-            {results.length > 0 && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {results.map((r, i) => (
-                  <div
-                    key={`${r.url}-${i}`}
-                    className="overflow-hidden rounded-[18px] border border-black/5 bg-white dark:border-white/10 dark:bg-card"
-                  >
-                    {r.kind === 'image' ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={r.url}
-                        alt={r.prompt}
-                        loading="lazy"
-                        className="aspect-square w-full object-cover"
-                      />
-                    ) : (
-                      <video
-                        src={r.url}
-                        controls
-                        playsInline
-                        preload="metadata"
-                        className="aspect-video w-full bg-black object-contain"
-                      />
-                    )}
-                    <div className="flex items-center gap-2 p-3">
-                      <p className="min-w-0 flex-1 truncate text-[13px] text-neutral-600 dark:text-neutral-300">
-                        {r.prompt}
-                      </p>
-                      {r.kind === 'image' ? (
-                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                          ImageKit
-                        </span>
-                      ) : (
-                        <span
-                          title="URL temporaire (~1h) — hébergement permanent à venir"
-                          className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                        >
-                          Temporaire
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* Style presets: below the composer on desktop, below the
+                {/* Generate, pinned right (stays visible while the
+                toolbar row scrolls on mobile) */}
+                <div className="sticky right-0 ml-auto flex shrink-0 items-center gap-1 bg-white pl-1 dark:bg-card">
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    aria-label="Générer"
+                    title="Générer"
+                    disabled={generating}
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 dark:bg-white dark:text-black"
+                  >
+                    {generating ? (
+                      <IconLoader2 size={18} className="animate-spin" />
+                    ) : (
+                      <ArrowUp size={18} strokeWidth={2.5} />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Video settings below the composer — mobile only
+            (desktop keeps them inside the toolbar) */}
+            {mode === 'video' && (
+              <div className="mt-3 flex w-full flex-wrap items-center justify-center gap-2 md:hidden">
+                <SegmentedControl
+                  options={VIDEO_RESOLUTIONS}
+                  value={resolution}
+                  onChange={setResolution}
+                />
+                <SegmentedControl
+                  options={VIDEO_DURATIONS}
+                  value={duration}
+                  onChange={setDuration}
+                  disabledValues={['10s']}
+                  disabledHint="Bientôt disponible"
+                />
+              </div>
+            )}
+
+            {/* Generation status + results */}
+            {(job || results.length > 0) && (
+              <div className="mt-6 w-full">
+                {job?.status === 'working' && (
+                  <div className="mb-3 flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+                    <IconLoader2 size={16} className="animate-spin" />
+                    {job.label}
+                  </div>
+                )}
+                {job?.status === 'error' && (
+                  <div className="mb-3 flex items-center gap-2">
+                    <p className="flex-1 text-sm text-red-600 dark:text-red-400">
+                      {job.message}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleGenerate}
+                      className="shrink-0 rounded-full border border-black/10 px-3 py-1.5 text-[13px] font-medium text-[#111] transition-colors hover:bg-black/5 dark:border-white/15 dark:text-foreground dark:hover:bg-white/10"
+                    >
+                      Réessayer
+                    </button>
+                  </div>
+                )}
+                {results.length > 0 && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {results.map((r, i) => (
+                      <div
+                        key={`${r.url}-${i}`}
+                        className="overflow-hidden rounded-[18px] border border-black/5 bg-white dark:border-white/10 dark:bg-card"
+                      >
+                        {r.kind === 'image' ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={r.url}
+                            alt={r.prompt}
+                            loading="lazy"
+                            className="aspect-square w-full object-cover"
+                          />
+                        ) : (
+                          <video
+                            src={r.url}
+                            controls
+                            playsInline
+                            preload="metadata"
+                            className="aspect-video w-full bg-black object-contain"
+                          />
+                        )}
+                        <div className="flex items-center gap-2 p-3">
+                          <p className="min-w-0 flex-1 truncate text-[13px] text-neutral-600 dark:text-neutral-300">
+                            {r.prompt}
+                          </p>
+                          {r.kind === 'image' ? (
+                            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                              ImageKit
+                            </span>
+                          ) : (
+                            <span
+                              title="URL temporaire (~1h) — hébergement permanent à venir"
+                              className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                            >
+                              Temporaire
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Style presets: below the composer on desktop, below the
             resolution/duration selectors on mobile (both sit above this
             block). The backend fills real artwork in later. */}
-        <div className="mt-8 w-full">
-          <StylePresetGrid
-            active={style}
-            onSelect={label => setPreview(label)}
-            expanded={expanded}
-            onToggle={() => setExpanded(prev => !prev)}
-          />
-        </div>
-        {preview && (
-          <StylePreviewCard
-            label={preview}
-            onUse={() => {
-              setStyle(preview)
-              setPreview(null)
-            }}
-            onSend={() => {
-              setStyle(preview)
-              setPreview(null)
-              void runGeneration({
-                mode,
-                prompt,
-                aspectRatio,
-                resolution,
-                style: preview
-              })
-            }}
-            onClose={() => setPreview(null)}
-          />
+            <div className="mt-8 w-full">
+              <StylePresetGrid
+                active={style}
+                onSelect={label => setPreview(label)}
+                expanded={expanded}
+                onToggle={() => setExpanded(prev => !prev)}
+              />
+            </div>
+            {preview && (
+              <StylePreviewCard
+                label={preview}
+                onUse={() => {
+                  setStyle(preview)
+                  setPreview(null)
+                }}
+                onSend={() => {
+                  setStyle(preview)
+                  setPreview(null)
+                  void runGeneration({
+                    mode,
+                    prompt,
+                    aspectRatio,
+                    resolution,
+                    style: preview
+                  })
+                }}
+                onClose={() => setPreview(null)}
+              />
+            )}
+          </div>
         )}
       </div>
     </div>
