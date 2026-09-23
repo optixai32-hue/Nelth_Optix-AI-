@@ -286,11 +286,11 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
   const [capW, capH] =
     nat && nat.naturalWidth && nat.naturalHeight
       ? nat.naturalWidth > nat.naturalHeight
-        ? [900, 500]
+        ? [1000, 560]
         : nat.naturalWidth < nat.naturalHeight
-          ? [420, 500]
-          : [500, 500]
-      : [900, 500]
+          ? [460, 560]
+          : [560, 560]
+      : [1000, 560]
 
   if (!mounted) return null
   return createPortal(
