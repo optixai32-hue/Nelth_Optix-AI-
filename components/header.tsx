@@ -39,18 +39,18 @@ export const Header: React.FC<HeaderProps> = ({ user }) => {
     router.push('/imagine')
   }
 
-  // The imagine studio + Découvrir views own their navigation (back
-  // button, title). Rendering the app header here would overlay its
-  // toggle/new-chat buttons on top of them and add an invisible
-  // click-blocking strip, so it stays hidden on this route. Sidebar
-  // access remains via shortcut/keyboard and the sidebar itself.
-  if (pathname === '/imagine') return null
+  // On /imagine the header chrome floats over the page (by design), but
+  // its full-width bar must never block clicks on the content below nor
+  // frost the Découvrir nav — so the bar goes transparent + click-through
+  // while its button groups stay interactive.
+  const isImagineTransparent = pathname === '/imagine'
 
   return (
     <>
       <header
         className={cn(
           'absolute top-0 right-0 p-2 md:p-3 flex justify-between items-center z-10 backdrop-blur-sm lg:backdrop-blur-none bg-background/80 lg:bg-transparent transition-[width] duration-200 ease-linear',
+          isImagineTransparent && 'pointer-events-none bg-transparent backdrop-blur-none',
           open ? 'md:w-[calc(100%-var(--sidebar-width))]' : 'md:w-full',
           'w-full'
         )}
@@ -58,7 +58,7 @@ export const Header: React.FC<HeaderProps> = ({ user }) => {
         {/* Mobile only: sidebar toggle (close icon) + divider + New chat
             button, aligned horizontally at the header left. */}
         {isMobile && user && (
-          <div className="flex flex-row items-center gap-1 rounded-full bg-background/95 px-1.5 py-1 text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-border/80">
+          <div className="pointer-events-auto flex flex-row items-center gap-1 rounded-full bg-background/95 px-1.5 py-1 text-foreground shadow-[0_6px_16px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-border/80">
             <SidebarTrigger className="size-5 text-foreground transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:rotate-90 active:scale-90" />
             <div className="w-px h-5 bg-border" aria-hidden />
             <Button
@@ -101,7 +101,7 @@ export const Header: React.FC<HeaderProps> = ({ user }) => {
             (SidebarIcon) with the New chat button stacked below it, pushed
             just under the top bar on the left. */}
         {!isMobile && !open && user && (
-          <div className="absolute left-3 top-12 flex flex-col items-center gap-1">
+          <div className="pointer-events-auto absolute left-3 top-12 flex flex-col items-center gap-1">
             <div className="w-px h-5 bg-border" aria-hidden />
             <SidebarTrigger className="size-5 transition-transform duration-200 ease-[cubic-bezier(.22,1,.36,1)] hover:rotate-90 active:scale-90" />
             <Button

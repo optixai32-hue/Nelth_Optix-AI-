@@ -715,7 +715,7 @@ function DiscoverView({
 }) {
   return (
     <div className="flex min-h-full w-full flex-col bg-[#fafafa] [font-family:Arial,sans-serif] dark:bg-background">
-      <div className="sticky top-0 z-20 flex items-center justify-between bg-[#fafafa]/85 px-3 py-3 backdrop-blur-md md:px-6 dark:bg-background/85">
+      <div className="sticky top-0 z-20 flex items-center justify-between bg-[#fafafa]/85 px-3 pb-3 pt-16 backdrop-blur-md md:px-6 md:pt-3 dark:bg-background/85">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -740,13 +740,13 @@ function DiscoverView({
           <span className="sm:hidden">Pro</span>
         </button>
       </div>
-      <div className="px-4 pt-[6px]">
+      <div className="pl-4 pr-4 pt-[6px] md:pl-14">
         <div className="flex size-[42px] select-none items-center justify-center rounded-full bg-[#f1f1f1] text-xs text-neutral-600 dark:bg-white/10 dark:text-neutral-300">
           ug
         </div>
       </div>
       {(status || error) && (
-        <div className="px-4 pt-3">
+        <div className="pl-4 pr-4 pt-3 md:pl-14">
           {status && !error ? (
             <div className="flex cursor-default select-none flex-row items-center gap-2 text-[14px] text-neutral-600 dark:text-neutral-300">
               <IconLoader2 size={16} className="animate-spin" />
@@ -769,7 +769,7 @@ function DiscoverView({
           ) : null}
         </div>
       )}
-      <div className="grid grid-cols-2 gap-2.5 px-4 pt-3 md:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 pl-4 pr-4 pt-3 md:grid-cols-3 md:pl-14 xl:grid-cols-4">
         {Array.from({ length: Math.max(1, expected) }).map((_, i) => (
           <DiscoverCard key={i} result={results[i] ?? null} loading={working} />
         ))}
