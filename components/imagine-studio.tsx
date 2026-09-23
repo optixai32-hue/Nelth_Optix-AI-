@@ -805,7 +805,10 @@ function DiscoverView({
         <div className="min-h-[24px]">
           {status && !error ? (
             <div className="flex cursor-default select-none flex-row items-center gap-2 text-[14px] text-neutral-600 dark:text-neutral-300">
-              <IconLoader2 size={16} className="animate-spin" />
+              <span className="relative flex size-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-neutral-400 opacity-40" />
+                <span className="relative inline-flex size-2 rounded-full bg-neutral-400" />
+              </span>
               <span>{status}</span>
             </div>
           ) : null}
