@@ -278,6 +278,20 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
     }
   }
 
+  // Display caps from the loaded natural size (recomputed every render
+  // once ready): landscape 900×500, portrait 420×500, square 500×500.
+  // Viewport-relative (100vw/100dvh are always definite, unlike container
+  // percentages which resolve circularly and let the image blow up).
+  const nat = baseRef.current
+  const [capW, capH] =
+    nat && nat.naturalWidth && nat.naturalHeight
+      ? nat.naturalWidth > nat.naturalHeight
+        ? [900, 500]
+        : nat.naturalWidth < nat.naturalHeight
+          ? [420, 500]
+          : [500, 500]
+      : [900, 500]
+
   if (!mounted) return null
   return createPortal(
     <div
@@ -369,11 +383,17 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
 
       {/* Center image — follows the source ratio, fit to the area
           (never zoomed/cropped/stretched), flex-centered with dark
-          margins all around. */}
+          margins all around. Absolute viewport caps (not container
+          percentages, which resolve circularly and let the image blow
+          up): landscape 900×500, portrait 420×500, square 500×500. */}
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 pt-5 md:px-10">
-        <div className="relative inline-block max-h-full max-w-full">
+        <div className="relative inline-block">
           <canvas
             ref={canvasRef}
+            style={{
+              maxWidth: `min(${capW}px, calc(100vw - 64px))`,
+              maxHeight: `min(${capH}px, calc(100dvh - 320px))`
+            }}
             onPointerDown={e => {
               if (!ready) return
               const p = toRelative(e)
@@ -429,7 +449,7 @@ export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
               repaint()
             }}
             className={cn(
-              'block h-auto max-h-full w-auto max-w-full touch-none',
+              'block h-auto w-auto touch-none',
               tool === 'draw' ? 'cursor-crosshair' : 'cursor-text'
             )}
           />
