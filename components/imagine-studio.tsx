@@ -658,7 +658,7 @@ function DiscoverCard({
   loading: boolean
 }) {
   return (
-    <div className="group relative aspect-[2/3] w-full overflow-hidden rounded-[6px] bg-[#f5f5f5] transition-all duration-150 ease-out hover:scale-[1.02] hover:shadow-lg dark:bg-white/5">
+    <div className="group relative aspect-[2/3] w-full overflow-hidden rounded-[4px] bg-[#f5f5f5] transition-all duration-150 ease-out hover:scale-[1.02] hover:shadow-lg dark:bg-white/5">
       {result?.kind === 'image' ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -726,7 +726,7 @@ function DiscoverView({
           >
             <IconArrowLeft size={18} />
           </button>
-          <span className="text-[16px] font-medium text-[#171717] dark:text-foreground">
+          <span className="select-none text-[16px] font-semibold text-[#171717] dark:text-foreground">
             Découvrir
           </span>
         </div>
@@ -740,17 +740,17 @@ function DiscoverView({
           <span className="sm:hidden">Pro</span>
         </button>
       </div>
-      <div className="px-4 pt-3">
-        <div className="flex size-[42px] items-center justify-center rounded-full bg-[#f1f1f1] text-xs text-neutral-600 dark:bg-white/10 dark:text-neutral-300">
+      <div className="px-4 pt-[6px]">
+        <div className="flex size-[42px] select-none items-center justify-center rounded-full bg-[#f1f1f1] text-xs text-neutral-600 dark:bg-white/10 dark:text-neutral-300">
           ug
         </div>
       </div>
       {(status || error) && (
         <div className="px-4 pt-3">
           {status && !error ? (
-            <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+            <div className="flex cursor-default select-none flex-row items-center gap-2 text-[14px] text-neutral-600 dark:text-neutral-300">
               <IconLoader2 size={16} className="animate-spin" />
-              {status}
+              <span>{status}</span>
             </div>
           ) : null}
           {error ? (

@@ -39,6 +39,13 @@ export const Header: React.FC<HeaderProps> = ({ user }) => {
     router.push('/imagine')
   }
 
+  // The imagine studio + Découvrir views own their navigation (back
+  // button, title). Rendering the app header here would overlay its
+  // toggle/new-chat buttons on top of them and add an invisible
+  // click-blocking strip, so it stays hidden on this route. Sidebar
+  // access remains via shortcut/keyboard and the sidebar itself.
+  if (pathname === '/imagine') return null
+
   return (
     <>
       <header
