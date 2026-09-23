@@ -1547,47 +1547,47 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                 if (file) void handleAttachFile(file)
               }}
             />
-            {editing?.kind === 'image' && (
-              <ImageEditor
-                src={editing.url}
-                title={editing.prompt}
-                onClose={() => setEditing(null)}
-                onSave={blob => {
-                  const url = URL.createObjectURL(blob)
-                  setResults(prev => [
-                    {
-                      kind: 'image',
-                      url,
-                      prompt: `${editing.prompt} (édité)`
-                    },
-                    ...prev
-                  ])
-                  setEditing(null)
-                }}
-              />
-            )}
-            {preview && (
-              <StylePreviewCard
-                label={preview}
-                onUse={() => {
-                  setStyle(preview)
-                  setPreview(null)
-                }}
-                onSend={() => {
-                  setStyle(preview)
-                  setPreview(null)
-                  void runGeneration({
-                    mode,
-                    prompt,
-                    aspectRatio,
-                    resolution,
-                    style: preview
-                  })
-                }}
-                onClose={() => setPreview(null)}
-              />
-            )}
           </div>
+        )}
+        {editing?.kind === 'image' && (
+          <ImageEditor
+            src={editing.url}
+            title={editing.prompt}
+            onClose={() => setEditing(null)}
+            onSave={blob => {
+              const url = URL.createObjectURL(blob)
+              setResults(prev => [
+                {
+                  kind: 'image',
+                  url,
+                  prompt: `${editing.prompt} (édité)`
+                },
+                ...prev
+              ])
+              setEditing(null)
+            }}
+          />
+        )}
+        {preview && (
+          <StylePreviewCard
+            label={preview}
+            onUse={() => {
+              setStyle(preview)
+              setPreview(null)
+            }}
+            onSend={() => {
+              setStyle(preview)
+              setPreview(null)
+              void runGeneration({
+                mode,
+                prompt,
+                aspectRatio,
+                resolution,
+                style: preview
+              })
+            }}
+            onClose={() => setPreview(null)}
+          />
         )}
       </div>
     </div>
