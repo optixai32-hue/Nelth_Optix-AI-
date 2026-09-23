@@ -187,22 +187,25 @@ export async function vibesCleanImageBlob(fbcdnUrl: string): Promise<Blob> {
   }
 }
 
-/** NVIDIA Nemotron enhancement with fallback to the original prompt. */
+/**
+ * Prompt enhancement (Z.ai backend, 1-3s). The API returns an explicit
+ * `fallback` flag when enhancement failed and the original prompt is
+ * returned as-is (vibes.ai accepts raw prompts).
+ */
 export async function vibesEnhancePrompt(
   prompt: string
 ): Promise<{ prompt: string; fallback: boolean }> {
   try {
-    const data = await vibesFetch<{ enhanced_prompt?: string }>(
-      '/api/prompts/enhance',
-      { prompt },
-      25000
-    )
+    const data = await vibesFetch<{
+      enhanced_prompt?: string
+      fallback?: boolean
+    }>('/api/prompts/enhance', { prompt }, 25000)
     const enhanced =
       typeof data.enhanced_prompt === 'string'
         ? data.enhanced_prompt.trim()
         : ''
     if (!enhanced) return { prompt, fallback: true }
-    return { prompt: enhanced, fallback: false }
+    return { prompt: enhanced, fallback: data.fallback === true }
   } catch {
     return { prompt, fallback: true }
   }
