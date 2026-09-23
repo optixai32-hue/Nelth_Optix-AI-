@@ -8,17 +8,10 @@ import {
   IconArrowForwardUp,
   IconCopy,
   IconDownload,
-  IconLayoutGrid,
   IconPencil,
-  IconPhoto,
-  IconPlus,
-  IconRectangleVertical,
   IconShare,
-  IconTextCaption,
-  IconVideo,
-  IconVolumeOff
+  IconTextCaption
 } from '@tabler/icons-react'
-import { ArrowUp } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
@@ -51,46 +44,9 @@ const PALETTE = [
   '#9B9B9B'
 ]
 
-// Canvas ratio is SELECTED (never forced): 7 ratios, backing store +
-// display box both follow the selection. Source is contain-fitted
-// (letterboxed, never cropped/zoomed/stretched).
-const WORKSPACE_RATIO_DIMS: Record<WorkspaceRatio, [number, number]> = {
-  '1:1': [1024, 1024],
-  '16:9': [1280, 720],
-  '9:16': [720, 1280],
-  '4:3': [1280, 960],
-  '3:4': [960, 1280],
-  '3:2': [1280, 853],
-  '2:3': [853, 1280]
-}
-
-// Display caps per orientation (§12): landscape 900×500, portrait
-// 420×500, square 500×500.
-function ratioDisplayCaps(w: number, h: number): [number, number] {
-  if (w > h) return [900, 500]
-  if (w < h) return [420, 500]
-  return [500, 500]
-}
-
-const WORKSPACE_RATIOS = [
-  '1:1',
-  '16:9',
-  '9:16',
-  '4:3',
-  '3:4',
-  '3:2',
-  '2:3'
-] as const
-type WorkspaceRatio = (typeof WORKSPACE_RATIOS)[number]
-type WorkspaceMode = 'image' | 'video'
-
-export interface WorkspaceGenerateParams {
-  prompt: string
-  mode: WorkspaceMode
-  aspectRatio: WorkspaceRatio
-  variations: number
-  resolution: '480p' | '720p'
-}
+// Canvas follows the SOURCE ratio (never forced): natural size capped,
+// displayed fit-to-area preserving proportions.
+const MAX_EDGE = 2048
 
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -106,32 +62,14 @@ interface ImageEditorProps {
   title?: string
   onClose: () => void
   onSave: (blob: Blob) => void
-  onGenerateRequest: (params: WorkspaceGenerateParams) => void
 }
 
-export function ImageEditor({
-  src,
-  title,
-  onClose,
-  onSave,
-  onGenerateRequest
-}: ImageEditorProps) {
+export function ImageEditor({ src, title, onClose, onSave }: ImageEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const baseRef = useRef<HTMLImageElement | null>(null)
   const [mounted, setMounted] = useState(false)
-  const [baseSrc, setBaseSrc] = useState(src)
-  const swapUrlRef = useRef<string | null>(null)
-  const swapInputRef = useRef<HTMLInputElement>(null)
   const [ready, setReady] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-  // Floating workspace composer state (prompt prefilled when one exists).
-  const [prompt, setPrompt] = useState(title ?? '')
-  const [composerMode, setComposerMode] = useState<WorkspaceMode>('image')
-  const [composerRatio, setComposerRatio] = useState<WorkspaceRatio>('1:1')
-  const [composerVariations, setComposerVariations] = useState(2)
-  const [composerResolution, setComposerResolution] = useState<'480p' | '720p'>(
-    '480p'
-  )
   const [tool, setTool] = useState<'draw' | 'text'>('draw')
   const [color, setColor] = useState(PALETTE[1])
   const [actions, setActions] = useState<EditorAction[]>([])
@@ -147,19 +85,9 @@ export function ImageEditor({
     setMounted(true)
   }, [])
 
-  // Revoke swapped object URLs on unmount.
-  useEffect(() => {
-    return () => {
-      if (swapUrlRef.current) URL.revokeObjectURL(swapUrlRef.current)
-    }
-  }, [])
-
-  const [cw, ch] = WORKSPACE_RATIO_DIMS[composerRatio]
-  const [capW, capH] = ratioDisplayCaps(cw, ch)
-
   // Load the base image (CORS-clean so export never taints when possible).
-  // Annotations reset only when the SOURCE image changes, never on ratio
-  // switches (relative coords remap onto the new canvas shape).
+  // Backing store keeps the source proportions (capped), display scales
+  // to fit — never stretched, never force-cropped.
   useEffect(() => {
     let cancelled = false
     setReady(false)
@@ -168,6 +96,14 @@ export function ImageEditor({
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       if (cancelled) return
+      const scale =
+        Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight)) ||
+        1
+      const canvas = canvasRef.current
+      if (canvas) {
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
+      }
       baseRef.current = img
       setActions([])
       setStep(0)
@@ -177,34 +113,21 @@ export function ImageEditor({
     img.onerror = () => {
       if (!cancelled) setLoadError('Image illisible.')
     }
-    img.src = baseSrc
+    img.src = src
     return () => {
       cancelled = true
     }
-  }, [baseSrc])
+  }, [src])
 
-  // Repaint base (contain-fitted, never cropped) + applied actions.
+  // Repaint base + applied actions.
   const repaint = useCallback(() => {
     const canvas = canvasRef.current
     const base = baseRef.current
-    if (!canvas || !base || !base.naturalWidth || !base.naturalHeight) return
+    if (!canvas || !base) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    const fit =
-      Math.min(
-        canvas.width / base.naturalWidth,
-        canvas.height / base.naturalHeight
-      ) || 1
-    const dw = base.naturalWidth * fit
-    const dh = base.naturalHeight * fit
-    ctx.drawImage(
-      base,
-      (canvas.width - dw) / 2,
-      (canvas.height - dh) / 2,
-      dw,
-      dh
-    )
+    ctx.drawImage(base, 0, 0, canvas.width, canvas.height)
     const applied = actions.slice(0, step)
     for (const action of applied) {
       if (action.kind === 'draw') {
@@ -239,16 +162,6 @@ export function ImageEditor({
   useEffect(() => {
     repaint()
   }, [repaint, ready])
-
-  // Canvas follows the SELECTED ratio (resize + repaint, actions kept).
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (canvas && (canvas.width !== cw || canvas.height !== ch)) {
-      canvas.width = cw
-      canvas.height = ch
-      repaint()
-    }
-  }, [cw, ch, repaint])
 
   // Escape closes the editor.
   useEffect(() => {
@@ -365,39 +278,6 @@ export function ImageEditor({
     }
   }
 
-  const cycleComposerRatio = () => {
-    setComposerRatio(
-      prev =>
-        WORKSPACE_RATIOS[
-          (WORKSPACE_RATIOS.indexOf(prev) + 1) % WORKSPACE_RATIOS.length
-        ]
-    )
-  }
-
-  const submitWorkspacePrompt = () => {
-    const text = prompt.trim()
-    if (!text) return
-    onGenerateRequest({
-      prompt: text,
-      mode: composerMode,
-      aspectRatio: composerRatio,
-      variations: composerVariations,
-      resolution: composerResolution
-    })
-  }
-
-  const swapBaseImage = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setError('Image uniquement.')
-      return
-    }
-    if (swapUrlRef.current) URL.revokeObjectURL(swapUrlRef.current)
-    const url = URL.createObjectURL(file)
-    swapUrlRef.current = url
-    setError(null)
-    setBaseSrc(url)
-  }
-
   if (!mounted) return null
   return createPortal(
     <div
@@ -487,18 +367,11 @@ export function ImageEditor({
         <p className="px-4 pb-2 text-center text-sm text-red-400">{error}</p>
       )}
 
-      {/* Center image — display box follows the SELECTED ratio, source
-          contain-fitted inside (never zoomed/cropped/stretched), capped
-          per orientation, flex-centered with dark margins all around. */}
+      {/* Center image — follows the source ratio, fit to the area
+          (never zoomed/cropped/stretched), flex-centered with dark
+          margins all around. */}
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 pt-5 md:px-10">
-        <div
-          className="relative max-h-full"
-          style={{
-            aspectRatio: `${cw} / ${ch}`,
-            width: `min(${capW}px, 100%)`,
-            maxHeight: `${capH}px`
-          }}
-        >
+        <div className="relative inline-block max-h-full max-w-full">
           <canvas
             ref={canvasRef}
             onPointerDown={e => {
@@ -556,7 +429,7 @@ export function ImageEditor({
               repaint()
             }}
             className={cn(
-              'absolute inset-0 h-full w-full touch-none',
+              'block h-auto max-h-full w-auto max-w-full touch-none',
               tool === 'draw' ? 'cursor-crosshair' : 'cursor-text'
             )}
           />
@@ -645,138 +518,9 @@ export function ImageEditor({
         </button>
       </div>
 
-      {/* Reserved clearance above the fixed composer so image + controls
-          always stay visible and never slide underneath it. */}
-      <div className="h-[130px] shrink-0" aria-hidden />
-
-      {/* Floating prompt composer */}
-      <input
-        ref={swapInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        aria-hidden
-        tabIndex={-1}
-        onChange={e => {
-          const file = e.target.files?.[0]
-          e.target.value = ''
-          if (file) swapBaseImage(file)
-        }}
-      />
-      <div className="fixed bottom-6 left-1/2 z-[71] w-[min(720px,calc(100vw-40px))] -translate-x-1/2">
-        <div className="w-full overflow-hidden rounded-[24px] border border-[#E5E5E5] bg-white shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
-          <textarea
-            value={prompt}
-            onChange={e => setPrompt(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                submitWorkspacePrompt()
-              }
-            }}
-            placeholder="Décrivez ce que vous imaginez"
-            rows={1}
-            className="min-h-[40px] w-full resize-none bg-transparent px-4 pt-[14px] text-[15px] leading-[22px] text-[#171717] outline-none placeholder:text-[#737373]"
-          />
-          <div className="no-scrollbar flex flex-nowrap items-center gap-2 overflow-x-auto px-4 pb-3 pt-1">
-            <button
-              type="button"
-              onClick={() => swapInputRef.current?.click()}
-              aria-label="Ajouter une image"
-              title="Ajouter une image"
-              className="flex size-8 shrink-0 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-black/5"
-            >
-              <IconPlus size={20} strokeWidth={2} />
-            </button>
-            {composerMode === 'image' ? (
-              <>
-                <button
-                  type="button"
-                  aria-pressed
-                  className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-[20px] border border-black/5 bg-white px-3 text-[14px] font-medium text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.10)]"
-                >
-                  <IconPhoto size={15} />
-                  Image
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setComposerMode('video')}
-                  aria-label="Mode vidéo"
-                  title="Mode vidéo"
-                  className="flex size-8 shrink-0 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-black/5"
-                >
-                  <IconVideo size={20} />
-                </button>
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full text-neutral-700">
-                  <IconLayoutGrid size={19} />
-                </span>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setComposerMode('image')}
-                  aria-label="Mode image"
-                  title="Mode image"
-                  className="flex size-8 shrink-0 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-black/5"
-                >
-                  <IconPhoto size={20} />
-                </button>
-                <button
-                  type="button"
-                  aria-pressed
-                  className="flex h-[38px] min-w-[70px] shrink-0 items-center justify-center gap-1.5 rounded-[18px] border border-black/5 bg-white px-3 text-[14px] font-medium text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.10)]"
-                >
-                  <IconVideo size={16} className="text-black" />
-                  Vidéo
-                </button>
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full text-neutral-700">
-                  <IconLayoutGrid size={19} />
-                </span>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={cycleComposerRatio}
-              title="Format d'image"
-              className="flex h-[39px] w-[63px] shrink-0 items-center justify-center gap-1.5 rounded-[20px] bg-neutral-100 text-[14px] text-[#111] transition-colors hover:bg-neutral-200/70"
-            >
-              <IconRectangleVertical size={14} />
-              {composerRatio}
-            </button>
-            <div className="flex h-[38px] shrink-0 items-center gap-0.5 rounded-[19px] bg-neutral-100 p-1">
-              {[1, 2, 3, 4].map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setComposerVariations(n)}
-                  aria-pressed={composerVariations === n}
-                  aria-label={`${n} variation${n > 1 ? 's' : ''}`}
-                  className={cn(
-                    'flex size-[30px] items-center justify-center rounded-full text-[13px] transition-colors',
-                    composerVariations === n
-                      ? 'bg-white font-semibold text-[#111] shadow-[0_1px_3px_rgba(0,0,0,0.10)]'
-                      : 'text-neutral-500 hover:bg-black/5'
-                  )}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-            <div className="ml-auto flex shrink-0 items-center">
-              <button
-                type="button"
-                onClick={submitWorkspacePrompt}
-                aria-label="Générer"
-                title="Générer"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-black text-white transition-transform hover:scale-105 active:scale-95"
-              >
-                <ArrowUp size={18} strokeWidth={2.5} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Bottom breathing room (the prompt composer lives in the main
+          views and returns when going back). */}
+      <div className="h-6 shrink-0" aria-hidden />
     </div>,
     document.body
   )
