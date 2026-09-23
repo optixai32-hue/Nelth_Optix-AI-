@@ -47,9 +47,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, ...result })
   } catch (err) {
     console.error('[imagine] images/edit failed:', err)
-    return NextResponse.json(
-      { error: "L'édition a échoué, réessaie." },
-      { status: 502 }
-    )
+    const raw = err instanceof Error ? err.message : ''
+    // Forward actionable backend errors instead of a generic message:
+    // imagesuploaded outside this app (or before project scoping) belong
+    // to another account and can never be edited — re-upload fixes it.
+    const message = /different account/i.test(raw)
+      ? "Cette image vient d'un autre compte : ré-upload-la puis réessaie."
+      : "L'édition a échoué, réessaie."
+    return NextResponse.json({ error: message }, { status: 502 })
   }
 }

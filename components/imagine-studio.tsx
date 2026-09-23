@@ -668,6 +668,8 @@ export interface ImagineResult {
   prompt: string
   /** True for fbcdn URLs (video + uncleaned images) that expire (~1h). */
   temporary?: boolean
+  /** True when the edit prompt was auto-enhanced (not raw user text). */
+  enhanced?: boolean
 }
 
 /**
@@ -751,6 +753,14 @@ function DiscoverCard({
           className="pointer-events-none absolute right-2 top-2 rounded-full bg-amber-100/95 px-2 py-0.5 text-[10px] font-medium text-amber-700"
         >
           Temporaire
+        </span>
+      ) : null}
+      {result?.kind === 'image' && result?.enhanced ? (
+        <span
+          title="Prompt auto-amélioré appliqué"
+          className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white"
+        >
+          ✨ Amélioré
         </span>
       ) : null}
     </div>
@@ -1166,6 +1176,7 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
         const json = (await res.json().catch(() => null)) as {
           contentItem?: { imageUrl: string }
           usedPrompt?: string
+          fallback?: boolean
           error?: string
         } | null
         if (!res.ok || !json?.contentItem?.imageUrl) {
@@ -1185,7 +1196,8 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
             kind: 'image' as const,
             url: editUrl,
             prompt: json.usedPrompt || text,
-            temporary: editTemporary
+            temporary: editTemporary,
+            enhanced: json.fallback === false
           },
           ...prev
         ])
