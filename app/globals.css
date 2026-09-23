@@ -362,6 +362,53 @@
   background-color: rgba(255, 255, 255, 0.04);
 }
 
+/* Découvrir cards: shimmer sweep while loading, pop-in on arrival */
+.shimmer-loading {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.65) 50%,
+    transparent 80%
+  );
+  animation: discover-shimmer 1.6s ease-in-out infinite;
+}
+.dark .shimmer-loading::after {
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 80%
+  );
+}
+@keyframes discover-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+.discover-card-in {
+  animation: discover-card-in 400ms ease-out both;
+}
+@keyframes discover-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Animation utilities for dropdown menu */
 @utility animate-in {
   animation-name: enter;

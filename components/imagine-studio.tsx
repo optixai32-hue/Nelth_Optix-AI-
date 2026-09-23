@@ -658,28 +658,35 @@ function DiscoverCard({
   loading: boolean
 }) {
   return (
-    <div className="relative aspect-[2/3] w-full min-w-[140px] max-w-[312px] flex-1 basis-40 overflow-hidden rounded-[3px] bg-[#f5f5f5] dark:bg-white/5">
+    <div className="group relative aspect-[2/3] w-full overflow-hidden rounded-[6px] bg-[#f5f5f5] transition-all duration-150 ease-out hover:scale-[1.02] hover:shadow-lg dark:bg-white/5">
       {result?.kind === 'image' ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
+          key={result.url}
           src={result.url}
           alt=""
           draggable={false}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="discover-card-in absolute inset-0 h-full w-full object-cover"
         />
       ) : result?.kind === 'video' ? (
-        <video
-          src={result.url}
-          controls
-          playsInline
-          preload="metadata"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+        <>
+          <video
+            key={result.url}
+            src={result.url}
+            controls
+            playsInline
+            preload="metadata"
+            className="discover-card-in absolute inset-0 h-full w-full object-cover"
+          />
+          <span className="pointer-events-none absolute left-2 top-2 flex size-7 items-center justify-center rounded-full bg-black/55 text-white">
+            <IconVideo size={14} />
+          </span>
+        </>
       ) : (
         <div
           className={cn(
             'noise-placeholder absolute inset-0',
-            loading && 'animate-pulse'
+            loading && 'shimmer-loading'
           )}
         />
       )}
@@ -689,20 +696,26 @@ function DiscoverCard({
 
 function DiscoverView({
   onBack,
+  onRetry,
   results,
   expected,
   working,
+  status,
+  error,
   composer
 }: {
   onBack: () => void
+  onRetry: () => void
   results: Array<{ kind: 'image' | 'video'; url: string; prompt: string }>
   expected: number
   working: boolean
+  status: string | null
+  error: string | null
   composer: React.ReactNode
 }) {
   return (
     <div className="flex min-h-full w-full flex-col bg-[#fafafa] [font-family:Arial,sans-serif] dark:bg-background">
-      <div className="flex items-center justify-between px-3 pt-3 md:px-6 md:pt-5">
+      <div className="sticky top-0 z-20 flex items-center justify-between bg-[#fafafa]/85 px-3 py-3 backdrop-blur-md md:px-6 dark:bg-background/85">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -723,15 +736,40 @@ function DiscoverView({
           className="flex h-[36px] items-center gap-1.5 rounded-full bg-[#D9E7FF] px-4 text-[13px] font-medium text-[#5D769C] transition hover:brightness-[0.97] dark:bg-[#D9E7FF]/15 dark:text-[#9db4d4]"
         >
           <IconSparkles size={15} />
-          Mettre à niveau
+          <span className="hidden sm:inline">Mettre à niveau</span>
+          <span className="sm:hidden">Pro</span>
         </button>
       </div>
-      <div className="px-4 pt-4">
+      <div className="px-4 pt-3">
         <div className="flex size-[42px] items-center justify-center rounded-full bg-[#f1f1f1] text-xs text-neutral-600 dark:bg-white/10 dark:text-neutral-300">
           ug
         </div>
       </div>
-      <div className="flex flex-wrap gap-2.5 px-4 pt-3">
+      {(status || error) && (
+        <div className="px-4 pt-3">
+          {status && !error ? (
+            <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+              <IconLoader2 size={16} className="animate-spin" />
+              {status}
+            </div>
+          ) : null}
+          {error ? (
+            <div className="flex items-center gap-2">
+              <p className="flex-1 text-sm text-red-600 dark:text-red-400">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={onRetry}
+                className="shrink-0 rounded-full border border-black/10 px-3 py-1.5 text-[13px] font-medium text-[#111] transition-colors hover:bg-black/5 dark:border-white/15 dark:text-foreground dark:hover:bg-white/10"
+              >
+                Réessayer
+              </button>
+            </div>
+          ) : null}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2.5 px-4 pt-3 md:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: Math.max(1, expected) }).map((_, i) => (
           <DiscoverCard key={i} result={results[i] ?? null} loading={working} />
         ))}
@@ -1122,9 +1160,12 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
         {view === 'discover' ? (
           <DiscoverView
             onBack={() => setView('create')}
+            onRetry={handleGenerate}
             results={results}
             expected={expectedCount}
             working={generating}
+            status={job?.status === 'working' ? job.label : null}
+            error={job?.status === 'error' ? job.message : null}
             composer={
               <DiscoverComposer
                 prompt={prompt}
@@ -1304,77 +1345,6 @@ export function ImagineStudio({ onGenerate }: ImagineStudioProps) {
                   disabledValues={['10s']}
                   disabledHint="Bientôt disponible"
                 />
-              </div>
-            )}
-
-            {/* Generation status + results */}
-            {(job || results.length > 0) && (
-              <div className="mt-6 w-full">
-                {job?.status === 'working' && (
-                  <div className="mb-3 flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
-                    <IconLoader2 size={16} className="animate-spin" />
-                    {job.label}
-                  </div>
-                )}
-                {job?.status === 'error' && (
-                  <div className="mb-3 flex items-center gap-2">
-                    <p className="flex-1 text-sm text-red-600 dark:text-red-400">
-                      {job.message}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleGenerate}
-                      className="shrink-0 rounded-full border border-black/10 px-3 py-1.5 text-[13px] font-medium text-[#111] transition-colors hover:bg-black/5 dark:border-white/15 dark:text-foreground dark:hover:bg-white/10"
-                    >
-                      Réessayer
-                    </button>
-                  </div>
-                )}
-                {results.length > 0 && (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {results.map((r, i) => (
-                      <div
-                        key={`${r.url}-${i}`}
-                        className="overflow-hidden rounded-[18px] border border-black/5 bg-white dark:border-white/10 dark:bg-card"
-                      >
-                        {r.kind === 'image' ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={r.url}
-                            alt={r.prompt}
-                            loading="lazy"
-                            className="aspect-square w-full object-cover"
-                          />
-                        ) : (
-                          <video
-                            src={r.url}
-                            controls
-                            playsInline
-                            preload="metadata"
-                            className="aspect-video w-full bg-black object-contain"
-                          />
-                        )}
-                        <div className="flex items-center gap-2 p-3">
-                          <p className="min-w-0 flex-1 truncate text-[13px] text-neutral-600 dark:text-neutral-300">
-                            {r.prompt}
-                          </p>
-                          {r.kind === 'image' ? (
-                            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                              ImageKit
-                            </span>
-                          ) : (
-                            <span
-                              title="URL temporaire (~1h) — hébergement permanent à venir"
-                              className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                            >
-                              Temporaire
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 
