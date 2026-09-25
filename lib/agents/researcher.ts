@@ -1075,10 +1075,13 @@ export async function createResearcher({
     const affirmativeLayer = affirmativeHint
       ? `\n\nAFFIRMATIVE CONTINUATION — NON-NEGOTIABLE:\n${affirmativeHint}\nDo NOT greet again. Continue the exact previous topic immediately.`
       : ''
-    // Static continuity policy + live per-turn state (active topic, pending
-    // clarification). Placed right after the affirmative layer so both models
-    // obey the user's objective before any other instruction.
-    const continuityLayer = `${CONVERSATION_CONTINUITY_POLICY}${conversationStateLayer ? `\n\n${conversationStateLayer}` : ''}`
+    // Live per-turn state FIRST, static policy after. The static 50-section
+    // policy (~20KB) otherwise buries the few-hundred-char live signal
+    // (active topic/goal) and the weak non-thinking model relapses to old
+    // topics on short replies — the exact failure this ordering fixes
+    // (primacy bias: first instructions win; static bulk stays as
+    // reference below). Empty state renders policy-only, as before.
+    const continuityLayer = `${conversationStateLayer ? `${conversationStateLayer}\n\n` : ''}${CONVERSATION_CONTINUITY_POLICY}`
     // Bookend: the same directive repeated at the very end of the
     // instructions, where diluted attention lands last.
     const continuityTrailer = conversationStateTrailer
